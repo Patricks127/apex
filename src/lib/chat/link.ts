@@ -5,6 +5,7 @@ export type LinkAtivo = {
   pt_id: string;
   student_id: string;
   scope_evolucao: boolean;
+  scope_videos: boolean;
   perspetiva: "aluno" | "pt";
   outroId: string;
 };
@@ -16,7 +17,7 @@ export async function linkAtivo(
 ): Promise<LinkAtivo | null> {
   const { data } = await supabase
     .from("pt_links")
-    .select("id, pt_id, student_id, scope_evolucao")
+    .select("id, pt_id, student_id, scope_evolucao, scope_videos")
     .or(`student_id.eq.${userId},pt_id.eq.${userId}`)
     .eq("status", "ativo")
     .order("created_at", { ascending: false })
@@ -30,6 +31,7 @@ export async function linkAtivo(
     pt_id: data.pt_id,
     student_id: data.student_id,
     scope_evolucao: !!data.scope_evolucao,
+    scope_videos: !!data.scope_videos,
     perspetiva,
     outroId: perspetiva === "aluno" ? data.pt_id : data.student_id,
   };

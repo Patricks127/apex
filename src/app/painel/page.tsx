@@ -106,6 +106,25 @@ async function SeccaoPt({ userId, ptCode }: { userId: string; ptCode: string | n
     .order("updated_at", { ascending: false })
     .overrideTypes<Ligacao[]>();
 
+  // Vídeos dos alunos ainda sem feedback (a RLS já filtra por scope_videos).
+  let videosPorVer = 0;
+  const alunoIds = (alunos ?? []).map((a) => a.aluno?.id).filter((x): x is string => !!x);
+  if (alunoIds.length) {
+    const { data: vids } = await supabase
+      .from("training_videos")
+      .select("id")
+      .in("user_id", alunoIds);
+    const vidIds = (vids ?? []).map((v) => v.id);
+    if (vidIds.length) {
+      const { data: fbs } = await supabase
+        .from("video_feedback")
+        .select("video_id")
+        .in("video_id", vidIds);
+      const comFeedback = new Set((fbs ?? []).map((f) => f.video_id));
+      videosPorVer = vidIds.filter((id) => !comFeedback.has(id)).length;
+    }
+  }
+
   return (
     <>
       <CodigoPt codigoInicial={ptCode} />
@@ -160,12 +179,25 @@ async function SeccaoPt({ userId, ptCode }: { userId: string; ptCode: string | n
             {alunos && alunos.length > 0 ? ` (${alunos.length})` : ""}
           </h2>
           {alunos && alunos.length > 0 ? (
-            <Link
-              href="/chat"
-              className="text-xs font-medium text-zinc-300 underline underline-offset-4 hover:text-zinc-100"
-            >
-              Abrir conversa
-            </Link>
+            <div className="flex items-center gap-3 text-xs font-medium">
+              <Link
+                href="/chat"
+                className="text-zinc-300 underline underline-offset-4 hover:text-zinc-100"
+              >
+                Abrir conversa
+              </Link>
+              <Link
+                href="/videos"
+                className="text-zinc-300 underline underline-offset-4 hover:text-zinc-100"
+              >
+                Ver vídeos
+                {videosPorVer > 0 ? (
+                  <span className="ml-1 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-amber-300">
+                    {videosPorVer}
+                  </span>
+                ) : null}
+              </Link>
+            </div>
           ) : null}
         </div>
         {!alunos || alunos.length === 0 ? (
@@ -216,12 +248,20 @@ async function SeccaoAtleta({ userId }: { userId: string }) {
       <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
         <h2 className="text-sm font-medium text-zinc-400">O teu PT</h2>
         <p className="mt-1 text-sm text-zinc-500">Ainda não estás ligado a nenhum PT.</p>
-        <Link
-          href="/ligar"
-          className="mt-3 inline-block rounded-lg bg-zinc-100 px-4 py-2 text-sm font-semibold text-zinc-900 transition hover:bg-white"
-        >
-          Ligar a um PT
-        </Link>
+        <div className="mt-3 flex gap-2">
+          <Link
+            href="/ligar"
+            className="inline-block rounded-lg bg-zinc-100 px-4 py-2 text-sm font-semibold text-zinc-900 transition hover:bg-white"
+          >
+            Ligar a um PT
+          </Link>
+          <Link
+            href="/videos"
+            className="inline-block rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 transition hover:bg-zinc-800"
+          >
+            Os meus vídeos
+          </Link>
+        </div>
       </section>
     );
   }

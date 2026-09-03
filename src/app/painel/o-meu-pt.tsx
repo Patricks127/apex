@@ -42,12 +42,20 @@ export function OMeuPt({
         <p className="font-mono text-xs text-zinc-500">{ptCode}</p>
       ) : null}
 
-      <Link
-        href="/chat"
-        className="mt-3 inline-block rounded-lg border border-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-200 transition hover:bg-zinc-800"
-      >
-        Abrir conversa
-      </Link>
+      <div className="mt-3 flex gap-2">
+        <Link
+          href="/chat"
+          className="inline-block rounded-lg border border-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-200 transition hover:bg-zinc-800"
+        >
+          Abrir conversa
+        </Link>
+        <Link
+          href="/videos"
+          className="inline-block rounded-lg border border-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-200 transition hover:bg-zinc-800"
+        >
+          Os meus vídeos
+        </Link>
+      </div>
 
       <form action={acao} className="mt-4 flex flex-col gap-4">
         <input type="hidden" name="link_id" value={linkId} />
