@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import {
   atualizarScopes,
@@ -40,6 +41,13 @@ export function OMeuPt({
       {ptCode ? (
         <p className="font-mono text-xs text-zinc-500">{ptCode}</p>
       ) : null}
+
+      <Link
+        href="/chat"
+        className="mt-3 inline-block rounded-lg border border-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-200 transition hover:bg-zinc-800"
+      >
+        Abrir conversa
+      </Link>
 
       <form action={acao} className="mt-4 flex flex-col gap-4">
         <input type="hidden" name="link_id" value={linkId} />

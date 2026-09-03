@@ -154,10 +154,20 @@ async function SeccaoPt({ userId, ptCode }: { userId: string; ptCode: string | n
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-medium text-zinc-400">
-          Alunos ligados
-          {alunos && alunos.length > 0 ? ` (${alunos.length})` : ""}
-        </h2>
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-sm font-medium text-zinc-400">
+            Alunos ligados
+            {alunos && alunos.length > 0 ? ` (${alunos.length})` : ""}
+          </h2>
+          {alunos && alunos.length > 0 ? (
+            <Link
+              href="/chat"
+              className="text-xs font-medium text-zinc-300 underline underline-offset-4 hover:text-zinc-100"
+            >
+              Abrir conversa
+            </Link>
+          ) : null}
+        </div>
         {!alunos || alunos.length === 0 ? (
           <p className="text-sm text-zinc-600">Ainda não tens alunos ligados.</p>
         ) : (
