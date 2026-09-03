@@ -68,18 +68,18 @@ export function uploadComProgresso(opts: {
   path: string;
   blob: Blob;
   contentType: string;
+  bucket?: string; // por omissão "private-media"
+  upsert?: boolean; // por omissão false
   onProgress?: (pct: number) => void;
 }): Promise<void> {
   return new Promise((resolve, reject) => {
+    const bucket = opts.bucket ?? "private-media";
     const xhr = new XMLHttpRequest();
-    xhr.open(
-      "POST",
-      `${opts.supabaseUrl}/storage/v1/object/private-media/${opts.path}`,
-    );
+    xhr.open("POST", `${opts.supabaseUrl}/storage/v1/object/${bucket}/${opts.path}`);
     xhr.setRequestHeader("authorization", `Bearer ${opts.token}`);
     xhr.setRequestHeader("apikey", opts.anonKey);
     xhr.setRequestHeader("content-type", opts.contentType);
-    xhr.setRequestHeader("x-upsert", "false");
+    xhr.setRequestHeader("x-upsert", opts.upsert ? "true" : "false");
     xhr.setRequestHeader("cache-control", "no-store, max-age=0");
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable && opts.onProgress) {

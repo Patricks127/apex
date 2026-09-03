@@ -129,6 +129,13 @@ async function SeccaoPt({ userId, ptCode }: { userId: string; ptCode: string | n
     <>
       <CodigoPt codigoInicial={ptCode} />
 
+      <Link
+        href="/perfil/editar"
+        className="-mt-2 self-start text-xs font-medium text-zinc-300 underline underline-offset-4 hover:text-zinc-100"
+      >
+        Editar o meu perfil público
+      </Link>
+
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-medium text-zinc-400">
           Pedidos pendentes
@@ -248,12 +255,18 @@ async function SeccaoAtleta({ userId }: { userId: string }) {
       <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
         <h2 className="text-sm font-medium text-zinc-400">O teu PT</h2>
         <p className="mt-1 text-sm text-zinc-500">Ainda não estás ligado a nenhum PT.</p>
-        <div className="mt-3 flex gap-2">
+        <div className="mt-3 flex flex-wrap gap-2">
           <Link
             href="/ligar"
             className="inline-block rounded-lg bg-zinc-100 px-4 py-2 text-sm font-semibold text-zinc-900 transition hover:bg-white"
           >
             Ligar a um PT
+          </Link>
+          <Link
+            href="/descobrir"
+            className="inline-block rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 transition hover:bg-zinc-800"
+          >
+            Descobrir PTs
           </Link>
           <Link
             href="/videos"

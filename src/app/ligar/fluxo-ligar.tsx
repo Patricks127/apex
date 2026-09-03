@@ -21,7 +21,7 @@ const ABAS: { id: Aba; etiqueta: string }[] = [
   { id: "procurar", etiqueta: "Procurar" },
 ];
 
-export function FluxoLigar() {
+export function FluxoLigar({ codigoInicial }: { codigoInicial?: string | null }) {
   const [aba, setAba] = useState<Aba>("codigo");
   const [alvo, setAlvo] = useState<Alvo | null>(null);
 
@@ -60,6 +60,7 @@ export function FluxoLigar() {
           key="codigo"
           etiqueta="Código do PT"
           placeholder="RUI-8842"
+          valorInicial={codigoInicial ?? ""}
           onEncontrado={(pt) => setAlvo({ id: pt.id, pt_code: pt.pt_code, nome: pt.name })}
         />
       )}
@@ -87,11 +88,13 @@ function FormResolver({
   etiqueta,
   placeholder,
   hint,
+  valorInicial,
   onEncontrado,
 }: {
   etiqueta: string;
   placeholder: string;
   hint?: string;
+  valorInicial?: string;
   onEncontrado: (pt: NonNullable<ResultadoResolver["pt"]>) => void;
 }) {
   const [estado, acao, pendente] = useActionState(
@@ -113,6 +116,7 @@ function FormResolver({
         autoComplete="off"
         autoCapitalize="characters"
         required
+        defaultValue={valorInicial}
         placeholder={placeholder}
         hint={hint}
       />

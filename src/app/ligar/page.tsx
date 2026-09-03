@@ -9,7 +9,12 @@ export const metadata: Metadata = {
   title: "Ligar a um PT · APEX",
 };
 
-export default async function LigarPage() {
+export default async function LigarPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ pt?: string }>;
+}) {
+  const { pt } = await searchParams;
   const supabase = await createClient();
 
   const {
@@ -57,7 +62,7 @@ export default async function LigarPage() {
 
   return (
     <CartaoAuth>
-      <FluxoLigar />
+      <FluxoLigar codigoInicial={pt ?? null} />
     </CartaoAuth>
   );
 }
