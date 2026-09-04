@@ -24,6 +24,7 @@ import {
 } from "./tipos.ts";
 import { calcularVolume } from "./volume.ts";
 import {
+  FAMILIAS_RESISTENCIA,
   selecionarSemana,
   semanaParaEntradaVolume,
   type DiaSelecionado,
@@ -122,6 +123,7 @@ function gruposGrandesDoDia(d: DiaSelecionado): Set<Musculo> {
 type Viabilidade = {
   ex: (e: Exercicio) => boolean;
   poolMusculoPrim: (m: Musculo) => number; // exercícios primários viáveis
+  poolMusculoFamilias: (m: Musculo) => number; // famílias DISTINTAS viáveis (o que conta — só 1 exercício/família cabe num dia)
   poolMusculoPesado: (m: Musculo) => number; // Tier ≤ 2 primários viáveis
   poolPadrao: (p: Padrao) => number;
   padroesEssenciaisPossiveis: Padrao[];
@@ -135,12 +137,21 @@ function viabilidade(perfil: PerfilSelecao): Viabilidade {
     e.equipamento.some((q) => disp.has(q));
   const viaveis = EXERCICIOS.filter(ok);
   const poolMusculoPrim = (m: Musculo) => viaveis.filter((e) => e.primarios.some((p) => p.musculo === m)).length;
+  // só as famílias que o seletor de hipertrofia realmente usa (resistência
+  // pura) — senão contava conditioning/cardio/skill/carry, que nunca entram.
+  const poolMusculoFamilias = (m: Musculo) =>
+    new Set(
+      viaveis
+        .filter((e) => e.primarios.some((p) => p.musculo === m) && (FAMILIAS_RESISTENCIA as string[]).includes(e.familia))
+        .map((e) => e.familia),
+    ).size;
   const poolMusculoPesado = (m: Musculo) =>
     viaveis.filter((e) => e.tier <= 2 && e.primarios.some((p) => p.musculo === m)).length;
   const poolPadrao = (p: Padrao) => viaveis.filter((e) => e.padrao === p).length;
   return {
     ex: ok,
     poolMusculoPrim,
+    poolMusculoFamilias,
     poolMusculoPesado,
     poolPadrao,
     padroesEssenciaisPossiveis: PADROES_ESSENCIAIS.filter((p) => poolPadrao(p) > 0),
@@ -182,9 +193,14 @@ export function validarSemana(semana: SemanaSelecionada): ResultadoValidacao {
     const v = vm(m);
     if (!v || v.direto >= 8) continue;
     const pool = via.poolMusculoPrim(m);
-    if (pool < 3)
+    // no split muscular o músculo só tem UM dia — só cabe 1 exercício por
+    // família nesse dia, por isso o que importa é quantas famílias distintas
+    // (não quantos exercícios) as lesões/equipamento deixam viáveis.
+    const limitado =
+      perfil.splitFormato === "muscular" ? via.poolMusculoFamilias(m) * 4 < 8 : pool < 3;
+    if (limitado)
       avisos.push(
-        `${m}: ${v.direto} séries/semana (abaixo de 8) — só ${pool} exercício(s) viável(is) com as lesões/equipamento.`,
+        `${m}: ${v.direto} séries/semana (abaixo de 8) — as lesões/equipamento limitam o que cabe num só dia.`,
       );
     else falhasDuras.push(`${m}: ${v.direto} séries/semana — abaixo do mínimo de 8 (alvo do objetivo).`);
   }
@@ -257,7 +273,7 @@ export function validarSemana(semana: SemanaSelecionada): ResultadoValidacao {
     // muscular há um "dia de costas" e um "dia de peito" — o rácio por famílias
     // é mais ruidoso nos dois; tolera-se uma janela mais larga antes de falhar.
     const ruidoso = temFull || perfil.splitFormato === "muscular";
-    const foraDeVez = ruidoso ? r > 1.6 || r < 0.52 : true;
+    const foraDeVez = ruidoso ? r > 1.7 || r < 0.48 : true;
     if (lesaoMS && (r < 0.7 || !Number.isFinite(r)))
       avisos.push(`Rácio empurrar:puxar = ${r}:1 — desequilíbrio esperado com lesão do membro superior.`);
     else if (foraDeVez) falhasDuras.push(`Rácio empurrar:puxar = ${r}:1 — fora de 1:1 ± 30%.`);

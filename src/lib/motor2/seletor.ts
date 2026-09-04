@@ -78,7 +78,7 @@ export const EQUIP_DISPONIVEL: Record<string, Equipamento[]> = {
 };
 
 // Famílias que o seletor de hipertrofia usa (resistência pura).
-const FAMILIAS_RESISTENCIA: Familia[] = [
+export const FAMILIAS_RESISTENCIA: Familia[] = [
   "squat", "hinge", "unilateral_inferior", "knee_flexion", "hip_extension",
   "horizontal_push", "incline_push", "vertical_push", "chest_isolation",
   "vertical_pull", "horizontal_pull", "rear_delt_scap", "lateral_raise",
@@ -124,7 +124,7 @@ const MUSC_DIA: Record<string, Musculo[]> = {
   // split clássico por grupo muscular (1×/semana por músculo)
   peito_triceps: ["peito", "deltoide_anterior", "triceps"],
   costas_biceps: ["dorsais", "trapezio_medio", "deltoide_posterior", "biceps"],
-  pernas_ombros: ["quadriceps", "isquiotibiais", "gluteo", "gemeos", "deltoide_lateral", "deltoide_anterior"],
+  pernas_ombros: ["quadriceps", "isquiotibiais", "gluteo", "gemeos", "deltoide_lateral", "deltoide_anterior", "deltoide_posterior"],
   pernas: ["quadriceps", "isquiotibiais", "gluteo", "gemeos"],
   ombros_bracos: ["deltoide_anterior", "deltoide_lateral", "deltoide_posterior", "biceps", "triceps"],
   peito_dia: ["peito", "deltoide_anterior", "triceps"],
@@ -132,6 +132,24 @@ const MUSC_DIA: Record<string, Musculo[]> = {
   ombros_dia: ["deltoide_anterior", "deltoide_lateral", "deltoide_posterior", "trapezio_medio"],
   bracos_dia: ["biceps", "triceps"],
   pontos_fracos: ["deltoide_lateral", "biceps", "triceps", "gemeos", "deltoide_posterior"],
+};
+
+// Dias com nome composto (split muscular) têm de ter ≥1 exercício primário de
+// CADA músculo/grupo no nome — cada lista interna é um "ou" (qualquer músculo
+// dela satisfaz), cada entrada do array externo é um "e" obrigatório.
+export const GRUPOS_NOMEADOS: Partial<Record<string, Musculo[][]>> = {
+  peito_triceps: [["peito"], ["triceps"]],
+  costas_biceps: [["dorsais"], ["biceps"]],
+  pernas_ombros: [
+    ["quadriceps", "isquiotibiais", "gluteo"],
+    ["deltoide_lateral", "deltoide_anterior", "deltoide_posterior"],
+  ],
+  pernas: [["quadriceps", "isquiotibiais", "gluteo"]],
+  ombros_bracos: [["deltoide_lateral", "deltoide_anterior", "deltoide_posterior"], ["biceps"], ["triceps"]],
+  peito_dia: [["peito"]],
+  costas_dia: [["dorsais"]],
+  ombros_dia: [["deltoide_lateral", "deltoide_anterior", "deltoide_posterior"]],
+  bracos_dia: [["biceps"], ["triceps"]],
 };
 
 const NOME_DIA: Record<string, string> = {
@@ -582,7 +600,8 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
               d.exercicios.length < 9 &&
               !d.exercicios.some((x) => x.exercicio.familia === ex.familia) &&
               // não pôr um exercício num dia que não treina esse músculo
-              d.musculosAlvo.some((m) => ex.primarios.some((p) => p.musculo === m)),
+              d.musculosAlvo.some((m) => ex.primarios.some((p) => p.musculo === m)) &&
+              !(ex.fadigaSistemica === 3 && d.exercicios.filter((x) => x.exercicio.fadigaSistemica === 3).length >= MAX_FADIGA3_DIA),
           );
         if (!dia) continue;
         dia.exercicios.push({
@@ -704,6 +723,7 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
             (d) =>
               !d.exercicios.some((x) => x.exercicio.familia === ex.familia) &&
               estimarMinutos([...d.exercicios, { exercicio: ex, series: SERIES_TIER[ex.tier] }]) <= minutosSessao &&
+              !(ex.fadigaSistemica === 3 && d.exercicios.filter((x) => x.exercicio.fadigaSistemica === 3).length >= MAX_FADIGA3_DIA) &&
               ex.primarios.every(
                 (p) =>
                   (semana.volume.porMusculo.find((v) => v.musculo === p.musculo)?.direto ?? 0) +
@@ -741,15 +761,21 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
         const cand = candidatosBase
           .filter((e) => e.primarios.some((p) => p.musculo === m) && !idsUsados.has(e.id) && !excedeTeto(e, SERIES_TIER[e.tier]))
           .sort((a, b) => a.tier - b.tier);
-        const diaBase = (diasDoMusculo.get(m) ?? semana.dias.map((d) => d.indice))
+        // só dias cujos músculos-alvo incluem `m` — nunca um exercício de um
+        // músculo fora do que o dia se propõe a treinar (mesmo sem espaço).
+        const diaBase = (diasDoMusculo.get(m) ?? [])
           .map((ix) => semana.dias.find((d) => d.indice === ix))
-          .filter((d): d is DiaSelecionado => !!d);
+          .filter((d): d is DiaSelecionado => !!d && d.musculosAlvo.includes(m));
         let mexeu = false;
         for (const ex of cand) {
-          const dia = [...diaBase, ...semana.dias]
-            .filter((d, i, arr) => arr.indexOf(d) === i)
+          const dia = diaBase
             .sort((a, b) => a.exercicios.length - b.exercicios.length)
-            .find((d) => d.exercicios.length < 9 && !d.exercicios.some((x) => x.exercicio.familia === ex.familia));
+            .find(
+              (d) =>
+                d.exercicios.length < 9 &&
+                !d.exercicios.some((x) => x.exercicio.familia === ex.familia) &&
+                !(ex.fadigaSistemica === 3 && d.exercicios.filter((x) => x.exercicio.fadigaSistemica === 3).length >= MAX_FADIGA3_DIA),
+            );
           if (!dia) continue;
           dia.exercicios.push({
             exercicio: ex,
@@ -799,6 +825,66 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
     if (cortou) reordenar(d);
   }
   semana.volume = calcularVolume(semanaParaEntradaVolume(semana), perfil.nivel);
+
+  // ---- 13. split muscular: garantir ≥1 exercício de cada músculo do nome ----
+  //  (por último — nada a seguir pode voltar a tirá-los)
+  if (muscular) {
+    for (const dia of semana.dias) {
+      const grupos = GRUPOS_NOMEADOS[dia.tipo];
+      if (!grupos) continue;
+      const protegidos = new Set<string>();
+      for (const grupo of grupos) {
+        const jaTem = dia.exercicios.find((e) => e.exercicio.primarios.some((p) => grupo.includes(p.musculo)));
+        if (jaTem) {
+          protegidos.add(jaTem.exercicio.id);
+          continue;
+        }
+        const famUsadas = new Set(dia.exercicios.map((e) => e.exercicio.familia));
+        const fs3Atual = dia.exercicios.filter((e) => e.exercicio.fadigaSistemica === 3).length;
+        const cand = candidatosBase
+          .filter((e) => e.primarios.some((p) => grupo.includes(p.musculo)) && !famUsadas.has(e.familia))
+          .sort((a, b) => a.tier - b.tier);
+        // nunca o 3º composto pesado do dia, a não ser que seja mesmo a única opção
+        const semExcesso = cand.filter((e) => !(e.fadigaSistemica === 3 && fs3Atual >= MAX_FADIGA3_DIA));
+        const ex = semExcesso[0] ?? cand[0];
+        if (!ex) {
+          semana.avisos.push(
+            `${dia.nome}: sem exercício viável para ${grupo[0]} com as lesões/equipamento — o dia fica incompleto para esse músculo.`,
+          );
+          continue;
+        }
+        if (dia.exercicios.length >= capDia) {
+          const menor = [...dia.exercicios]
+            .filter((e) => !protegidos.has(e.exercicio.id))
+            .sort((a, b) => b.ordem - a.ordem)[0];
+          if (menor) dia.exercicios = dia.exercicios.filter((x) => x !== menor);
+        }
+        dia.exercicios.push({
+          exercicio: ex,
+          series: SERIES_TIER[ex.tier],
+          ordem: dia.exercicios.length + 1,
+          foco: ex.primarios.some((p) => foco.includes(p.musculo)),
+        });
+        protegidos.add(ex.id);
+        reordenar(dia);
+      }
+      // acerta o tempo sem sacrificar os que acabaram de ser garantidos
+      let guarda3 = 0;
+      while (
+        dia.exercicios.length > 4 &&
+        estimarMinutos(dia.exercicios) > minutosSessao * 1.08 &&
+        guarda3++ < 6
+      ) {
+        const alvo = [...dia.exercicios]
+          .filter((e) => !protegidos.has(e.exercicio.id))
+          .sort((a, b) => b.ordem - a.ordem)[0];
+        if (!alvo) break;
+        dia.exercicios = dia.exercicios.filter((x) => x !== alvo);
+        reordenar(dia);
+      }
+    }
+    semana.volume = calcularVolume(semanaParaEntradaVolume(semana), perfil.nivel);
+  }
 
   return semana;
 }

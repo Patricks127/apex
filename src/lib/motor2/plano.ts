@@ -36,6 +36,27 @@ import {
 import { gerarPlanoValidado } from "./validador.ts";
 import type { Musculo } from "./tipos.ts";
 
+const MUSCULO_LABEL: Record<Musculo, string> = {
+  peito: "Peito",
+  dorsais: "Costas",
+  trapezio_medio: "Trapézio médio",
+  trapezio_superior: "Trapézio superior",
+  deltoide_anterior: "Deltoide anterior",
+  deltoide_lateral: "Deltoide lateral",
+  deltoide_posterior: "Deltoide posterior",
+  biceps: "Bíceps",
+  triceps: "Tríceps",
+  antebraco: "Antebraço",
+  quadriceps: "Quadríceps",
+  isquiotibiais: "Isquiotibiais",
+  gluteo: "Glúteo",
+  adutores: "Adutores",
+  gemeos: "Gémeos",
+  lombar: "Lombar",
+  core: "Core",
+  cardio: "Cardio",
+};
+
 // ---------------------------------------------------------------------------
 // perfil do v1 → perfil do seletor v2
 // ---------------------------------------------------------------------------
@@ -125,6 +146,7 @@ function prescrever(
     mult: number;
     repAdd: number;
     checkin: Set<string>;
+    foco: Musculo[];
   },
 ): ExercicioGerado {
   const ex = e.exercicio;
@@ -178,7 +200,10 @@ function prescrever(
     substituted: false,
   };
   if (cautela) g.caution = true;
-  if (e.foco) g.focusTag = "foco";
+  if (e.foco) {
+    const musculoFoco = ex.primarios.map((p) => p.musculo).find((m) => ctx.foco.includes(m));
+    g.focusTag = musculoFoco ? MUSCULO_LABEL[musculoFoco] : "foco";
+  }
   return g;
 }
 
@@ -209,7 +234,7 @@ export function montarPlano(
   const nDias = Math.min(6, Math.max(3, semana.dias.length));
   const posicoes = CALENDARIO[nDias] ?? CALENDARIO[4];
 
-  const ctx = { objetivo, lvl, mult, repAdd, checkin };
+  const ctx = { objetivo, lvl, mult, repAdd, checkin, foco: semana.perfil.foco ?? [] };
   const treino = new Map<number, DiaSelecionado>();
   semana.dias.slice(0, posicoes.length).forEach((d, i) => treino.set(posicoes[i], d));
 

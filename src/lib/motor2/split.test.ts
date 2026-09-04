@@ -5,6 +5,7 @@ import {
   gerarPlanoValidado,
   gerarPlanoV2,
   EQUIP_DISPONIVEL,
+  GRUPOS_NOMEADOS,
   type PerfilSelecao,
   type SplitFormato,
 } from "./index.ts";
@@ -100,6 +101,75 @@ test("foco no peito continua a pôr peito em 1ª posição no formato muscular",
   const s = selecionarSemana(base({ dias: 5, splitFormato: "muscular", foco: ["peito"] }));
   const diaPeito = s.dias.find((d) => d.nome === "Peito")!;
   assert.ok(diaPeito.exercicios[0].exercicio.primarios.some((p) => p.musculo === "peito"));
+});
+
+// ===========================================================================
+// bug fixes: nenhum exercício num dia errado; todo o dia composto tem os seus músculos
+// ===========================================================================
+test("200 planos no formato muscular: nenhum exercício num dia cujos músculos-alvo não incluam o seu primário", () => {
+  let seed = 11;
+  const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32;
+  const pk = <T,>(a: readonly T[]): T => a[Math.floor(rnd() * a.length)];
+  let verificados = 0;
+  for (let i = 0; i < 200; i++) {
+    const p = base({
+      nivel: pk(NIVEIS),
+      dias: pk(DIAS),
+      equipamento: EQUIP_DISPONIVEL[pk(LOCAIS)],
+      lesoes: [...pk(LESOES)] as PerfilSelecao["lesoes"],
+      foco: [...pk(FOCOS)] as PerfilSelecao["foco"],
+      minutosSessao: pk(MINUTOS),
+      splitFormato: "muscular",
+    });
+    const s = selecionarSemana(p);
+    for (const d of s.dias) {
+      for (const e of d.exercicios) {
+        verificados++;
+        assert.ok(
+          e.exercicio.primarios.some((prim) => d.musculosAlvo.includes(prim.musculo)),
+          `plano ${i} (${p.nivel}/${p.dias}d): ${e.exercicio.id} (primário ${e.exercicio.primarios.map((x) => x.musculo)}) no dia "${d.nome}" (alvo: ${d.musculosAlvo})`,
+        );
+      }
+    }
+  }
+  assert.ok(verificados > 1000, `poucos exercícios verificados (${verificados})`);
+});
+
+test("todo o dia com nome composto tem ≥1 exercício primário de cada músculo do nome", () => {
+  let seed = 23;
+  const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32;
+  const pk = <T,>(a: readonly T[]): T => a[Math.floor(rnd() * a.length)];
+  let diasComGrupo = 0;
+  for (let i = 0; i < 200; i++) {
+    const p = base({
+      nivel: pk(NIVEIS),
+      dias: pk(DIAS),
+      equipamento: EQUIP_DISPONIVEL[pk(LOCAIS)],
+      lesoes: [...pk(LESOES)] as PerfilSelecao["lesoes"],
+      foco: [...pk(FOCOS)] as PerfilSelecao["foco"],
+      minutosSessao: pk(MINUTOS),
+      splitFormato: "muscular",
+    });
+    const s = selecionarSemana(p);
+    for (const d of s.dias) {
+      const grupos = GRUPOS_NOMEADOS[d.tipo];
+      if (!grupos) continue;
+      diasComGrupo++;
+      for (const grupo of grupos) {
+        const tem = d.exercicios.some((e) => e.exercicio.primarios.some((prim) => grupo.includes(prim.musculo)));
+        // só falha se havia exercício viável para o grupo e mesmo assim não foi
+        // incluído — quando as lesões/equipamento não deixam nenhum, o próprio
+        // seletor avisa (verificado no teste de estrutura).
+        if (!tem) {
+          assert.ok(
+            s.avisos.some((a) => new RegExp(grupo[0]).test(a) || /sem exercício viável/.test(a)),
+            `plano ${i} (${p.nivel}/${p.dias}d/lesão=${(p.lesoes ?? []).join(",")}): "${d.nome}" sem exercício de ${grupo.join("/")} e sem aviso`,
+          );
+        }
+      }
+    }
+  }
+  assert.ok(diasComGrupo > 100, `poucos dias com nome composto verificados (${diasComGrupo})`);
 });
 
 // ===========================================================================
