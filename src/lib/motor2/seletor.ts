@@ -42,6 +42,8 @@ export type ObjetivoV2 =
   | "corrida"
   | "calistenia";
 
+export type SplitFormato = "frequencia" | "muscular" | "auto";
+
 export type PerfilSelecao = {
   objetivo: ObjetivoV2;
   nivel: Nivel;
@@ -50,6 +52,9 @@ export type PerfilSelecao = {
   lesoes: Zona[];
   foco?: Musculo[]; // 0–2 músculos prioritários
   minutosSessao?: number; // tempo disponível por sessão (default 75)
+  /** Só hipertrofia. "frequencia" = Upper/Lower·PPL (2×/músculo);
+   *  "muscular" = split clássico por grupo (1×/músculo); "auto" = frequencia. */
+  splitFormato?: SplitFormato;
 };
 
 // Perfis de equipamento por local de treino (o onboarding mapeia local → isto).
@@ -116,13 +121,30 @@ const MUSC_DIA: Record<string, Musculo[]> = {
   pull: ["dorsais", "trapezio_medio", "deltoide_posterior", "biceps"],
   legs: ["quadriceps", "isquiotibiais", "gluteo", "gemeos"],
   full: ["peito", "dorsais", "trapezio_medio", "deltoide_anterior", "deltoide_lateral", "deltoide_posterior", "biceps", "triceps", "quadriceps", "isquiotibiais", "gluteo", "gemeos"],
+  // split clássico por grupo muscular (1×/semana por músculo)
+  peito_triceps: ["peito", "deltoide_anterior", "triceps"],
+  costas_biceps: ["dorsais", "trapezio_medio", "deltoide_posterior", "biceps"],
+  pernas_ombros: ["quadriceps", "isquiotibiais", "gluteo", "gemeos", "deltoide_lateral", "deltoide_anterior"],
+  pernas: ["quadriceps", "isquiotibiais", "gluteo", "gemeos"],
+  ombros_bracos: ["deltoide_anterior", "deltoide_lateral", "deltoide_posterior", "biceps", "triceps"],
+  peito_dia: ["peito", "deltoide_anterior", "triceps"],
+  costas_dia: ["dorsais", "trapezio_medio", "deltoide_posterior", "biceps"],
+  ombros_dia: ["deltoide_anterior", "deltoide_lateral", "deltoide_posterior", "trapezio_medio"],
+  bracos_dia: ["biceps", "triceps"],
+  pontos_fracos: ["deltoide_lateral", "biceps", "triceps", "gemeos", "deltoide_posterior"],
+};
+
+const NOME_DIA: Record<string, string> = {
+  upper: "Superior", lower: "Inferior", push: "Empurrar", pull: "Puxar", legs: "Pernas", full: "Full body",
+  peito_triceps: "Peito + Tríceps", costas_biceps: "Costas + Bíceps", pernas_ombros: "Pernas + Ombros",
+  pernas: "Pernas", ombros_bracos: "Ombros + Braços", peito_dia: "Peito", costas_dia: "Costas",
+  ombros_dia: "Ombros", bracos_dia: "Braços", pontos_fracos: "Pontos fracos",
 };
 
 function splitPara(dias: number): { tipo: string; nome: string }[] {
   const nome = (base: string, i: number, ns: string[]) =>
     ns.filter((x) => x === base).length > 1 ? `${cap(base)} ${String.fromCharCode(65 + i)}` : cap(base);
-  const cap = (s: string) =>
-    ({ upper: "Superior", lower: "Inferior", push: "Empurrar", pull: "Puxar", legs: "Pernas", full: "Full body" }[s] ?? s);
+  const cap = (s: string) => NOME_DIA[s] ?? s;
   let tipos: string[];
   if (dias <= 3) tipos = ["full", "full", "full"];
   else if (dias === 4) tipos = ["upper", "lower", "upper", "lower"];
@@ -132,6 +154,21 @@ function splitPara(dias: number): { tipo: string; nome: string }[] {
   return tipos.map((t) => {
     contador[t] = (contador[t] ?? 0) + 1;
     return { tipo: t, nome: nome(t, contador[t] - 1, tipos) };
+  });
+}
+
+/** Split clássico por grupo muscular — cada músculo 1×/semana (spec do pedido). */
+function splitMuscular(dias: number, foco: Musculo[]): { tipo: string; nome: string }[] {
+  let tipos: string[];
+  if (dias <= 3) tipos = ["peito_triceps", "costas_biceps", "pernas_ombros"];
+  else if (dias === 4) tipos = ["peito_triceps", "costas_biceps", "pernas", "ombros_bracos"];
+  else if (dias === 5) tipos = ["peito_dia", "costas_dia", "pernas", "ombros_dia", "bracos_dia"];
+  else tipos = ["peito_dia", "costas_dia", "pernas", "ombros_dia", "bracos_dia", "pontos_fracos"];
+  return tipos.map((t) => {
+    if (t === "pontos_fracos" && foco.length) {
+      return { tipo: "pontos_fracos", nome: `Pontos fracos (${foco.join(" + ")})` };
+    }
+    return { tipo: t, nome: NOME_DIA[t] ?? t };
   });
 }
 
@@ -223,7 +260,13 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
   }
 
   // ---- split + frequência ----
-  const grelha = splitPara(dias);
+  const muscular = perfil.splitFormato === "muscular";
+  const grelha = muscular ? splitMuscular(dias, foco) : splitPara(dias);
+  if (muscular) {
+    avisos.push(
+      "Split por grupo muscular: cada músculo é treinado 1×/semana. É o formato clássico de ginásio, mas dividir o mesmo volume em 2 sessões costuma dar séries de melhor qualidade — se a progressão abrandar, experimenta Superior/Inferior.",
+    );
+  }
   const diasDoMusculo = new Map<Musculo, number[]>();
   grelha.forEach((g, i) => {
     for (const m of MUSC_DIA[g.tipo]) {
@@ -534,7 +577,13 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
               a.exercicios.filter((x) => ladoDe(x.exercicio) === ladoAlvo).length -
               b.exercicios.filter((x) => ladoDe(x.exercicio) === ladoAlvo).length,
           )
-          .find((d) => d.exercicios.length < 9 && !d.exercicios.some((x) => x.exercicio.familia === ex.familia));
+          .find(
+            (d) =>
+              d.exercicios.length < 9 &&
+              !d.exercicios.some((x) => x.exercicio.familia === ex.familia) &&
+              // não pôr um exercício num dia que não treina esse músculo
+              d.musculosAlvo.some((m) => ex.primarios.some((p) => p.musculo === m)),
+          );
         if (!dia) continue;
         dia.exercicios.push({
           exercicio: ex,

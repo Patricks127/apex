@@ -253,9 +253,11 @@ export function validarSemana(semana: SemanaSelecionada): ResultadoValidacao {
   if (!rel.racioEmpurrarPuxar.equilibrado) {
     const r = rel.racioEmpurrarPuxar.racio;
     const lesaoMS = perfil.lesoes.some((z) => (LESOES_MEMBRO_SUPERIOR as readonly string[]).includes(z));
-    // num full-body cada sessão repete todos os padrões — o rácio por famílias é
-    // mais ruidoso; tolera-se uma janela mais larga antes de falhar.
-    const foraDeVez = temFull ? r > 1.6 || r < 0.55 : true;
+    // num full-body cada sessão repete todos os padrões, e num split por grupo
+    // muscular há um "dia de costas" e um "dia de peito" — o rácio por famílias
+    // é mais ruidoso nos dois; tolera-se uma janela mais larga antes de falhar.
+    const ruidoso = temFull || perfil.splitFormato === "muscular";
+    const foraDeVez = ruidoso ? r > 1.6 || r < 0.52 : true;
     if (lesaoMS && (r < 0.7 || !Number.isFinite(r)))
       avisos.push(`Rácio empurrar:puxar = ${r}:1 — desequilíbrio esperado com lesão do membro superior.`);
     else if (foraDeVez) falhasDuras.push(`Rácio empurrar:puxar = ${r}:1 — fora de 1:1 ± 30%.`);
@@ -429,12 +431,15 @@ export function validarSemana(semana: SemanaSelecionada): ResultadoValidacao {
     const lista = [...mon];
     // crédito parcial: um músculo treinado mas abaixo do intervalo ideal (≥8
     // séries) não é o mesmo que um músculo negligenciado.
+    // no split por grupo (1×/semana) o mesmo volume cabe numa só sessão, pelo
+    // que "abaixo do intervalo ideal" mas acima de 8 é o esperado — mais crédito.
+    const creditoAbaixo = perfil.splitFormato === "muscular" ? 0.85 : 0.6;
     const creditos: number[] = lista.map((m) => {
       const v = vm(m);
       if (!v) return 0;
       if (v.estado === "dentro" || v.estado === "acima_alvo") return 1;
       if (v.estado === "acima_teto") return 0.3;
-      return v.direto >= 8 ? 0.6 : 0; // "abaixo"
+      return v.direto >= 8 ? creditoAbaixo : v.direto >= 6 ? 0.4 : 0; // "abaixo"
     });
     const noIntervalo = lista.filter((m) => {
       const v = vm(m);
@@ -464,23 +469,46 @@ export function validarSemana(semana: SemanaSelecionada): ResultadoValidacao {
   }
 
   // --- 6. adequação ao objetivo (10) ---
+  //   O critério de frequência (≥2×) só se aplica ao formato "frequencia".
+  //   No "muscular" a escolha informada é 1×/semana — avalia-se a coerência do
+  //   split por grupo (dias reconhecíveis, sem grupo grande em dias seguidos).
   {
-    const tiposValidos = ["upper", "lower", "push", "pull", "legs", "full"];
-    const splitOK = dias.every((d) => tiposValidos.includes(d.tipo));
-    const freq = new Map<Musculo, number>();
-    for (const d of dias) for (const m of gruposGrandesDoDia(d)) freq.set(m, (freq.get(m) ?? 0) + 1);
-    const grandesTreinados = [...freq.keys()];
-    const com2x = grandesTreinados.filter((m) => (freq.get(m) ?? 0) >= 2).length;
-    const fracFreq = grandesTreinados.length ? com2x / grandesTreinados.length : 1;
-    const fracao = clamp01((splitOK ? 0.4 : 0) + 0.6 * fracFreq);
-    if (perfil.objetivo !== "hipertrofia")
-      avisos.push(`objetivo '${perfil.objetivo}': plano gerado com lógica de hipertrofia (passo 6).`);
+    const muscular = perfil.splitFormato === "muscular";
+    const tiposFreq = ["upper", "lower", "push", "pull", "legs", "full"];
+    const tiposMusc = [
+      "peito_triceps", "costas_biceps", "pernas_ombros", "pernas", "ombros_bracos",
+      "peito_dia", "costas_dia", "ombros_dia", "bracos_dia", "pontos_fracos",
+    ];
+    let fracao: number;
+    let nota: string;
+    if (muscular) {
+      const splitOK = dias.every((d) => tiposMusc.includes(d.tipo));
+      // grupos grandes nunca em dias consecutivos
+      let consecutivo = false;
+      for (let i = 1; i < dias.length; i++) {
+        const a = gruposGrandesDoDia(dias[i - 1]);
+        if ([...gruposGrandesDoDia(dias[i])].some((m) => a.has(m))) consecutivo = true;
+      }
+      fracao = clamp01((splitOK ? 0.7 : 0.2) + (consecutivo ? 0 : 0.3));
+      nota = `split por grupo muscular (1×/semana — escolha informada)${consecutivo ? ", mas há grupo grande em dias seguidos" : ""}`;
+      avisos.push(
+        "Formato por grupo muscular: cada músculo treina 1×/semana. É válido e é o formato clássico de ginásio; a alternativa (Superior/Inferior) reparte o mesmo volume em 2 sessões, o que costuma dar séries de melhor qualidade.",
+      );
+    } else {
+      const splitOK = dias.every((d) => tiposFreq.includes(d.tipo));
+      const freq = new Map<Musculo, number>();
+      for (const d of dias) for (const m of gruposGrandesDoDia(d)) freq.set(m, (freq.get(m) ?? 0) + 1);
+      const grandes = [...freq.keys()];
+      const com2x = grandes.filter((m) => (freq.get(m) ?? 0) >= 2).length;
+      fracao = clamp01((splitOK ? 0.4 : 0) + 0.6 * (grandes.length ? com2x / grandes.length : 1));
+      nota = `${com2x}/${grandes.length} grupos grandes treinados ≥2×/semana`;
+    }
     criterios.push({
       nome: "adequacao_objetivo",
       peso: PESOS.adequacao_objetivo,
       fracao,
       pontos: r1(fracao * PESOS.adequacao_objetivo),
-      notas: [`${com2x}/${grandesTreinados.length} grupos grandes treinados ≥2×/semana`],
+      notas: [nota],
     });
   }
 

@@ -56,6 +56,8 @@ export interface MotorProfile {
   injuryNote?: string | null;
   focus?: FocusMuscle[];
   splitStyle?: SplitStyle; // só hipertrofia; por omissão "freq"
+  /** Formato do split de hipertrofia (motor v2). "auto" = frequencia. */
+  splitFormat?: "frequencia" | "muscular" | "auto";
   eventDate?: string | null; // não recolhido na parte 1; fica inerte
 }
 

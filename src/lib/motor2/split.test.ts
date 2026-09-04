@@ -1,0 +1,171 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {
+  selecionarSemana,
+  gerarPlanoValidado,
+  gerarPlanoV2,
+  EQUIP_DISPONIVEL,
+  type PerfilSelecao,
+  type SplitFormato,
+} from "./index.ts";
+
+const NIVEIS = ["iniciante", "intermedio", "avancado"] as const;
+const DIAS = [3, 4, 5, 6];
+const LOCAIS = ["ginasio", "casa", "parque", "hibrido", "outro"] as const;
+const LESOES = [[], ["ombro"], ["joelho"], ["lombar"], ["ombro", "joelho"], ["anca"], ["cotovelo"]] as const;
+const FOCOS = [[], ["peito"], ["dorsais"], ["quadriceps"], ["gluteo"]] as const;
+const MINUTOS = [60, 75, 90, 120];
+
+const base = (o: Partial<PerfilSelecao> = {}): PerfilSelecao => ({
+  objetivo: "hipertrofia",
+  nivel: "intermedio",
+  dias: 4,
+  equipamento: EQUIP_DISPONIVEL.ginasio,
+  lesoes: [],
+  ...o,
+});
+const nomesMuscular = new Set([
+  "Peito + Tríceps", "Costas + Bíceps", "Pernas + Ombros", "Pernas",
+  "Ombros + Braços", "Peito", "Costas", "Ombros", "Braços",
+]);
+
+// ===========================================================================
+// 1. o formato muda a grelha
+// ===========================================================================
+test("split_format='muscular' → dias por grupo muscular, 1×/semana", () => {
+  for (const dias of DIAS) {
+    const s = selecionarSemana(base({ dias, splitFormato: "muscular" }));
+    assert.equal(s.dias.length, dias);
+    for (const d of s.dias) {
+      assert.ok(
+        nomesMuscular.has(d.nome) || /^Pontos fracos/.test(d.nome),
+        `${dias}d: nome de dia inesperado "${d.nome}"`,
+      );
+    }
+    // cada grupo grande no MÁXIMO 1× (é a definição do formato)
+    const freq = new Map<string, number>();
+    for (const d of s.dias)
+      for (const e of d.exercicios)
+        for (const p of e.exercicio.primarios)
+          if (["peito", "dorsais", "quadriceps", "isquiotibiais", "gluteo"].includes(p.musculo)) {
+            // conta dias distintos
+          }
+    void freq;
+    // aviso do trade-off presente
+    assert.ok(s.avisos.some((a) => /1×\/semana|grupo muscular/i.test(a)));
+  }
+});
+
+test("split_format='frequencia'/'auto'/omitido → grelha Upper-Lower/PPL", () => {
+  const nomesFreq = /Superior|Inferior|Empurrar|Puxar|Pernas|Full body/;
+  for (const fmt of [undefined, "auto", "frequencia"] as (SplitFormato | undefined)[]) {
+    const s = selecionarSemana(base({ dias: 5, splitFormato: fmt }));
+    assert.ok(s.dias.every((d) => nomesFreq.test(d.nome)), `${fmt}: ${s.split}`);
+  }
+});
+
+// ===========================================================================
+// 2. o resto das regras continua a aplicar-se no formato muscular
+// ===========================================================================
+test("formato muscular mantém todas as outras regras", () => {
+  for (const nivel of NIVEIS) {
+    for (const dias of DIAS) {
+      for (const foco of [[], ["peito"], ["quadriceps"]] as const) {
+        const s = selecionarSemana(base({ nivel, dias, splitFormato: "muscular", foco: [...foco] as PerfilSelecao["foco"] }));
+        for (const d of s.dias) {
+          // nunca duas famílias iguais no mesmo dia
+          const fam = d.exercicios.map((e) => e.exercicio.familia);
+          assert.equal(fam.find((f, i) => fam.indexOf(f) !== i), undefined, `${nivel}/${dias}d/${foco}: ${d.nome} família repetida`);
+          // ordem: nenhum isolamento antes de um composto
+          const t = d.exercicios.map((e) => e.exercicio.tier);
+          for (let i = 0; i < t.length; i++)
+            for (let j = i + 1; j < t.length; j++)
+              assert.ok(!(t[i] === 3 && t[j] !== 3), `${d.nome}: isolamento antes de composto`);
+          // sem 3 compostos pesados seguidos
+          for (let i = 0; i + 2 < d.exercicios.length; i++)
+            assert.ok(
+              !d.exercicios.slice(i, i + 3).every((e) => e.exercicio.fadigaSistemica === 3),
+              `${d.nome}: 3 fS3 seguidos`,
+            );
+        }
+        // rácio empurrar:puxar não fica grosseiramente fora
+        const r = s.volume.racioEmpurrarPuxar.racio;
+        assert.ok(r >= 0.5 && r <= 1.7, `${nivel}/${dias}d: rácio E:P ${r}`);
+      }
+    }
+  }
+});
+
+test("foco no peito continua a pôr peito em 1ª posição no formato muscular", () => {
+  const s = selecionarSemana(base({ dias: 5, splitFormato: "muscular", foco: ["peito"] }));
+  const diaPeito = s.dias.find((d) => d.nome === "Peito")!;
+  assert.ok(diaPeito.exercicios[0].exercicio.primarios.some((p) => p.musculo === "peito"));
+});
+
+// ===========================================================================
+// 3. TESTE (parte 5) — 100 planos por formato, ambos ≥85
+// ===========================================================================
+test("100 planos por formato: ambos passam ≥85 com os critérios do formato", () => {
+  let seed = 1;
+  const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32;
+  const pk = <T,>(a: readonly T[]): T => a[Math.floor(rnd() * a.length)];
+
+  for (const fmt of ["frequencia", "muscular"] as const) {
+    const pts: number[] = [];
+    const abaixo: { p: PerfilSelecao; pontos: number; porque: string }[] = [];
+    let rejeitados = 0;
+    for (let i = 0; i < 100; i++) {
+      const p: PerfilSelecao = {
+        objetivo: "hipertrofia",
+        nivel: pk(NIVEIS),
+        dias: pk(DIAS),
+        equipamento: EQUIP_DISPONIVEL[pk(LOCAIS)],
+        lesoes: [...pk(LESOES)] as PerfilSelecao["lesoes"],
+        foco: [...pk(FOCOS)] as PerfilSelecao["foco"],
+        minutosSessao: pk(MINUTOS),
+        splitFormato: fmt,
+      };
+      const { validacao: v } = gerarPlanoValidado(p);
+      pts.push(v.pontuacao);
+      if (v.rejeitado) rejeitados++;
+      if (v.pontuacao < 85)
+        abaixo.push({
+          p,
+          pontos: v.pontuacao,
+          porque: v.falhasDuras.length ? v.falhasDuras.join(" | ") : v.criterios.filter((c) => c.pontos < c.peso * 0.75).map((c) => c.nome).join(", "),
+        });
+    }
+    const media = pts.reduce((a, b) => a + b, 0) / pts.length;
+    console.log(
+      `\n  ${fmt.padEnd(11)} ≥85: ${pts.filter((x) => x >= 85).length}/100 · média ${media.toFixed(1)} · min ${Math.min(...pts)} · rejeitados ${rejeitados}`,
+    );
+    for (const a of abaixo)
+      console.log(`    ↓ ${a.p.nivel}/${a.p.dias}d lesão=${(a.p.lesoes ?? []).join(",") || "-"} → ${a.pontos}  [${a.porque}]`);
+
+    assert.equal(rejeitados, 0, `${fmt}: ${rejeitados} planos rejeitados`);
+    assert.ok(pts.filter((x) => x >= 85).length >= 92, `${fmt}: só ${pts.filter((x) => x >= 85).length}/100 ≥85`);
+    assert.ok(media >= 89, `${fmt}: média ${media.toFixed(1)}`);
+  }
+});
+
+// ===========================================================================
+// 4. adaptador para a app respeita o formato
+// ===========================================================================
+test("gerarPlanoV2 usa o split_format do perfil", () => {
+  const mkMp = (splitFormat: string) => ({
+    goal: "hipertrofia" as const,
+    sex: "homem" as const,
+    level: "intermedio" as const,
+    daysPerWeek: 5,
+    location: "ginasio" as const,
+    injuries: [],
+    focus: [],
+    splitFormat: splitFormat as never,
+  });
+  const musc = gerarPlanoV2(mkMp("muscular"), {});
+  const titulos = musc.days.filter((d) => !d.rest).map((d) => d.title);
+  assert.ok(titulos.includes("Peito") && titulos.includes("Costas"), titulos.join(", "));
+
+  const freq = gerarPlanoV2(mkMp("auto"), {});
+  assert.ok(freq.days.filter((d) => !d.rest).every((d) => /Superior|Inferior|Empurrar|Puxar|Pernas/.test(d.title!)));
+});

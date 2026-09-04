@@ -17,7 +17,7 @@ export default async function OnboardingPage() {
   const { data: perfil } = await supabase
     .from("profiles")
     .select(
-      "goal, sex, level, days_per_week, location, location_note, injuries, injury_note, focus_muscles",
+      "goal, sex, level, days_per_week, location, location_note, injuries, injury_note, focus_muscles, split_format",
     )
     .eq("id", user.id)
     .single();
@@ -35,6 +35,7 @@ export default async function OnboardingPage() {
           injuries: perfil?.injuries ?? [],
           injury_note: perfil?.injury_note ?? null,
           focus_muscles: perfil?.focus_muscles ?? [],
+          split_format: perfil?.split_format ?? null,
         }}
       />
     </main>

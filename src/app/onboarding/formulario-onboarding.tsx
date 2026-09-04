@@ -27,6 +27,7 @@ export function FormularioOnboarding({
     injuries: string[];
     injury_note: string | null;
     focus_muscles: string[];
+    split_format: string | null;
   };
 }) {
   const [estado, acao, pendente] = useActionState(guardarOnboarding, ESTADO_INICIAL);
@@ -160,6 +161,30 @@ export function FormularioOnboarding({
       </Seccao>
 
       {goal === "hipertrofia" ? (
+        <Seccao
+          titulo="Formato do split"
+          nota="Como queres dividir a semana."
+        >
+          <div className="grid gap-2">
+            <OpcaoDetalhe
+              name="split_format"
+              value="frequencia"
+              titulo="Superior / Inferior"
+              descricao="Cada músculo 2×/semana. Reparte o volume em sessões mais curtas e de melhor qualidade."
+              checkedPorDefeito={inicial.split_format !== "muscular"}
+            />
+            <OpcaoDetalhe
+              name="split_format"
+              value="muscular"
+              titulo="Por grupo muscular"
+              descricao="Peito+Tríceps, Costas+Bíceps, Pernas, Ombros… Cada músculo 1×/semana. É o formato clássico de ginásio."
+              checkedPorDefeito={inicial.split_format === "muscular"}
+            />
+          </div>
+        </Seccao>
+      ) : null}
+
+      {goal === "hipertrofia" ? (
         <Seccao titulo="Algum grupo a reforçar?" nota="Opcional. Acrescenta trabalho extra no dia certo.">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {FOCUS_MUSCLES.map((f) => (
@@ -239,6 +264,28 @@ function Opcao({
         className="sr-only"
       />
       {titulo}
+    </label>
+  );
+}
+
+function OpcaoDetalhe({
+  name,
+  value,
+  titulo,
+  descricao,
+  checkedPorDefeito,
+}: {
+  name: string;
+  value: string;
+  titulo: string;
+  descricao: string;
+  checkedPorDefeito?: boolean;
+}) {
+  return (
+    <label className="cursor-pointer rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-3 transition has-[:checked]:border-zinc-300 has-[:checked]:bg-zinc-800">
+      <input type="radio" name={name} value={value} defaultChecked={checkedPorDefeito} className="sr-only" />
+      <span className="block text-sm font-semibold text-zinc-100">{titulo}</span>
+      <span className="mt-0.5 block text-xs text-zinc-400">{descricao}</span>
     </label>
   );
 }

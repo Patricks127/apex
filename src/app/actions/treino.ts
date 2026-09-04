@@ -63,6 +63,10 @@ export async function guardarOnboarding(
   const injuryNote = String(formData.get("injury_note") ?? "").trim();
   const injuries = formData.getAll("injuries").map(String).filter((v) => INJURY_IDS.includes(v as Injury));
   const focus = formData.getAll("focus_muscles").map(String).filter((v) => FOCUS_IDS.includes(v as FocusMuscle));
+  const splitFormatRaw = String(formData.get("split_format") ?? "auto");
+  const splitFormat = (["frequencia", "muscular", "auto"] as const).includes(splitFormatRaw as never)
+    ? splitFormatRaw
+    : "auto";
 
   const erros: Record<string, string> = {};
   if (!GOAL_IDS.includes(goal as Goal)) erros.goal = "Escolhe um objetivo.";
@@ -99,6 +103,7 @@ export async function guardarOnboarding(
       injuries,
       injury_note: injuries.length ? injuryNote || null : null,
       focus_muscles: goal === "hipertrofia" ? focus : [],
+      split_format: goal === "hipertrofia" ? splitFormat : "auto",
     })
     .eq("id", user.id);
 

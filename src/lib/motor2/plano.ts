@@ -58,6 +58,8 @@ export function perfilV2De(mp: MotorProfile): PerfilSelecao {
     equipamento: EQUIP_DISPONIVEL[mp.location] ?? EQUIP_DISPONIVEL.ginasio,
     lesoes: (mp.injuries ?? []) as PerfilSelecao["lesoes"],
     foco: mp.goal === "hipertrofia" ? foco : [],
+    // "auto" e qualquer outro objetivo → "frequencia"
+    splitFormato: mp.goal === "hipertrofia" && mp.splitFormat === "muscular" ? "muscular" : "frequencia",
   };
 }
 

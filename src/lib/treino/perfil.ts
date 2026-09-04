@@ -28,7 +28,7 @@ export async function carregarPerfilMotor(
   const { data: perfil } = await supabase
     .from("profiles")
     .select(
-      "goal, sex, level, days_per_week, location, location_note, injuries, injury_note, focus_muscles",
+      "goal, sex, level, days_per_week, location, location_note, injuries, injury_note, focus_muscles, split_format",
     )
     .eq("id", userId)
     .single();
@@ -60,6 +60,7 @@ export async function carregarPerfilMotor(
       injuries: (perfil.injuries ?? []) as Injury[],
       injuryNote: perfil.injury_note as string | null,
       focus: (perfil.focus_muscles ?? []) as FocusMuscle[],
+      splitFormat: (perfil.split_format ?? "auto") as "frequencia" | "muscular" | "auto",
     },
     maxes: maxesFromPRs(prs ?? []),
   };
