@@ -25,6 +25,7 @@ import {
 import { calcularVolume } from "./volume.ts";
 import {
   FAMILIAS_RESISTENCIA,
+  GRUPOS_NOMEADOS,
   selecionarSemana,
   semanaParaEntradaVolume,
   type DiaSelecionado,
@@ -196,8 +197,16 @@ export function validarSemana(semana: SemanaSelecionada): ResultadoValidacao {
     // no split muscular o músculo só tem UM dia — só cabe 1 exercício por
     // família nesse dia, por isso o que importa é quantas famílias distintas
     // (não quantos exercícios) as lesões/equipamento deixam viáveis.
+    // Também pode ser o TEMPO a limitar (dia com vários músculos-alvo e pouco
+    // minutosSessao) — o seletor já avisa nesse dia, tratando-se da mesma
+    // troca consciente "tempo manda" e não de um plano mal construído.
+    const diaDoMusculo = dias.find((d) => d.musculosAlvo.includes(m));
+    const limitadoPorTempo =
+      perfil.splitFormato === "muscular" &&
+      !!diaDoMusculo &&
+      avisos.some((a) => a.startsWith(diaDoMusculo.nome) && /não cabem|cortar abaixo do ideal/.test(a));
     const limitado =
-      perfil.splitFormato === "muscular" ? via.poolMusculoFamilias(m) * 4 < 8 : pool < 3;
+      (perfil.splitFormato === "muscular" ? via.poolMusculoFamilias(m) * 4 < 8 : pool < 3) || limitadoPorTempo;
     if (limitado)
       avisos.push(
         `${m}: ${v.direto} séries/semana (abaixo de 8) — as lesões/equipamento limitam o que cabe num só dia.`,
@@ -231,10 +240,19 @@ export function validarSemana(semana: SemanaSelecionada): ResultadoValidacao {
     );
   }
 
-  // 3. duas famílias iguais no mesmo dia (circuitos repetem por desenho)
+  // 3. duas famílias iguais no mesmo dia.
+  //    Exceções: circuitos repetem por desenho; no formato muscular, o
+  //    isolamento (T3) do(s) músculo(s) que dão nome ao dia pode repetir
+  //    família — é a única forma de dar 3–4 variantes próprias (pushdown/
+  //    francês/corda são todos "elbow_extension") quando o músculo só tem
+  //    esta sessão na semana. Compostos (T1/T2) continuam sem exceção.
   for (const d of dias) {
     if (d.tipo === "circuito") continue;
-    const fam = d.exercicios.map((e) => e.exercicio.familia);
+    const nomeados = new Set(perfil.splitFormato === "muscular" ? (GRUPOS_NOMEADOS[d.tipo] ?? []).flat() : []);
+    const excecao = (e: (typeof d.exercicios)[number]) =>
+      e.exercicio.tier === 3 && e.exercicio.primarios.some((p) => nomeados.has(p.musculo));
+    const contam = d.exercicios.filter((e) => !excecao(e));
+    const fam = contam.map((e) => e.exercicio.familia);
     const dup = fam.find((f, i) => fam.indexOf(f) !== i);
     if (dup) falhasDuras.push(`${d.nome}: família repetida no mesmo dia (${dup}).`);
   }

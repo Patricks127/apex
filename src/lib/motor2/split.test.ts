@@ -4,6 +4,7 @@ import {
   selecionarSemana,
   gerarPlanoValidado,
   gerarPlanoV2,
+  estimarMinutos,
   EQUIP_DISPONIVEL,
   GRUPOS_NOMEADOS,
   type PerfilSelecao,
@@ -74,8 +75,14 @@ test("formato muscular mantém todas as outras regras", () => {
       for (const foco of [[], ["peito"], ["quadriceps"]] as const) {
         const s = selecionarSemana(base({ nivel, dias, splitFormato: "muscular", foco: [...foco] as PerfilSelecao["foco"] }));
         for (const d of s.dias) {
-          // nunca duas famílias iguais no mesmo dia
-          const fam = d.exercicios.map((e) => e.exercicio.familia);
+          // nunca duas famílias iguais no mesmo dia — exceto isolamento (T3)
+          // de um músculo que dá nome ao dia: só assim cabem as 3–4 variantes
+          // próprias (pushdown/francês/corda são todos "elbow_extension")
+          // quando esse músculo só tem este dia na semana.
+          const nomeados = new Set(GRUPOS_NOMEADOS[d.tipo]?.flat() ?? []);
+          const excecao = (e: (typeof d.exercicios)[number]) =>
+            e.exercicio.tier === 3 && e.exercicio.primarios.some((p) => nomeados.has(p.musculo));
+          const fam = d.exercicios.filter((e) => !excecao(e)).map((e) => e.exercicio.familia);
           assert.equal(fam.find((f, i) => fam.indexOf(f) !== i), undefined, `${nivel}/${dias}d/${foco}: ${d.nome} família repetida`);
           // ordem: nenhum isolamento antes de um composto
           const t = d.exercicios.map((e) => e.exercicio.tier);
@@ -215,6 +222,114 @@ test("100 planos por formato: ambos passam ≥85 com os critérios do formato", 
     assert.equal(rejeitados, 0, `${fmt}: ${rejeitados} planos rejeitados`);
     assert.ok(pts.filter((x) => x >= 85).length >= 92, `${fmt}: só ${pts.filter((x) => x >= 85).length}/100 ≥85`);
     assert.ok(media >= 89, `${fmt}: média ${media.toFixed(1)}`);
+  }
+});
+
+// ===========================================================================
+// bug fixes (ronda 2): calibração do formato muscular pensada para 1×/semana
+// ===========================================================================
+test("formato muscular, intermédio: dia composto tem ≥6 exercícios", () => {
+  for (const dias of [3, 4] as const) {
+    const s = selecionarSemana(base({ nivel: "intermedio", dias, splitFormato: "muscular" }));
+    for (const d of s.dias) {
+      if (!GRUPOS_NOMEADOS[d.tipo]) continue; // só dias com nome composto (peito+tríceps, etc.)
+      assert.ok(d.exercicios.length >= 6, `${dias}d: "${d.nome}" só tem ${d.exercicios.length} exercícios`);
+    }
+  }
+});
+
+test("formato muscular: cada músculo que dá nome ao dia tem ≥3 exercícios onde é PRIMÁRIO", () => {
+  let seed = 31;
+  const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32;
+  const pk = <T,>(a: readonly T[]): T => a[Math.floor(rnd() * a.length)];
+  let musculosVerificados = 0;
+  for (let i = 0; i < 200; i++) {
+    const p = base({
+      nivel: pk(NIVEIS),
+      dias: pk(DIAS),
+      equipamento: EQUIP_DISPONIVEL[pk(LOCAIS)],
+      lesoes: [...pk(LESOES)] as PerfilSelecao["lesoes"],
+      foco: [...pk(FOCOS)] as PerfilSelecao["foco"],
+      minutosSessao: pk(MINUTOS),
+      splitFormato: "muscular",
+    });
+    const s = selecionarSemana(p);
+    for (const d of s.dias) {
+      const grupos = GRUPOS_NOMEADOS[d.tipo];
+      if (!grupos) continue;
+      for (const grupo of grupos) {
+        const primarios = d.exercicios.filter((e) => e.exercicio.primarios.some((prim) => grupo.includes(prim.musculo))).length;
+        musculosVerificados++;
+        if (primarios < 3) {
+          // só falha se havia margem para mais (tempo/lesões/equipamento não
+          // explicam) — nesse caso o dia já avisa (verificado nos testes de
+          // estrutura); aqui só se garante que não falta sem motivo aparente.
+          assert.ok(
+            s.avisos.some(
+              (a) => new RegExp(grupo[0]).test(a) || /não cabem|sem exercício viável|cortar abaixo do ideal/.test(a),
+            ),
+            `plano ${i} (${p.nivel}/${p.dias}d/lesão=${(p.lesoes ?? []).join(",") || "-"}/min=${p.minutosSessao}): "${d.nome}" só ${primarios} exercício(s) primário(s) de ${grupo.join("/")} e sem aviso`,
+          );
+        }
+      }
+    }
+  }
+  assert.ok(musculosVerificados > 200, `poucos grupos verificados (${musculosVerificados})`);
+});
+
+test("formato muscular: volume semanal continua dentro do teto do nível", () => {
+  // usa o próprio validador como critério — ele já tolera (como aviso, não
+  // falha) a fração residual de secundário em músculos conectivos
+  // (gluteo/core/lombar/trapézios/antebraço/gémeos), a mesma tolerância da
+  // frequência; o que não pode acontecer é o teto do músculo PRINCIPAL do
+  // dia (peito, tríceps, dorsais, biceps, pernas, ombros) estourar.
+  let seed = 47;
+  const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32;
+  const pk = <T,>(a: readonly T[]): T => a[Math.floor(rnd() * a.length)];
+  for (let i = 0; i < 200; i++) {
+    const p = base({
+      nivel: pk(NIVEIS),
+      dias: pk(DIAS),
+      equipamento: EQUIP_DISPONIVEL[pk(LOCAIS)],
+      lesoes: [...pk(LESOES)] as PerfilSelecao["lesoes"],
+      foco: [...pk(FOCOS)] as PerfilSelecao["foco"],
+      minutosSessao: pk(MINUTOS),
+      splitFormato: "muscular",
+    });
+    const { validacao } = gerarPlanoValidado(p);
+    const forasDoTeto = validacao.falhasDuras.filter((f) => /acima do teto/.test(f));
+    assert.equal(
+      forasDoTeto.length,
+      0,
+      `plano ${i} (${p.nivel}/${p.dias}d/lesão=${(p.lesoes ?? []).join(",") || "-"}): ${forasDoTeto.join(" | ")}`,
+    );
+  }
+});
+
+test("formato muscular: nenhum dia excede o tempo disponível sem avisar", () => {
+  let seed = 59;
+  const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32;
+  const pk = <T,>(a: readonly T[]): T => a[Math.floor(rnd() * a.length)];
+  for (let i = 0; i < 200; i++) {
+    const p = base({
+      nivel: pk(NIVEIS),
+      dias: pk(DIAS),
+      equipamento: EQUIP_DISPONIVEL[pk(LOCAIS)],
+      lesoes: [...pk(LESOES)] as PerfilSelecao["lesoes"],
+      foco: [...pk(FOCOS)] as PerfilSelecao["foco"],
+      minutosSessao: pk(MINUTOS),
+      splitFormato: "muscular",
+    });
+    const s = selecionarSemana(p);
+    for (const d of s.dias) {
+      const min = estimarMinutos(d.exercicios);
+      if (min > p.minutosSessao! * 1.08) {
+        assert.ok(
+          s.avisos.some((a) => a.startsWith(d.nome) && /não cabem/.test(a)),
+          `plano ${i} (${p.nivel}/${p.dias}d/min=${p.minutosSessao}): "${d.nome}" ~${min}min excede sem aviso`,
+        );
+      }
+    }
   }
 });
 

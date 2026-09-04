@@ -24,6 +24,7 @@ import {
   calcularVolume,
   type EntradaVolume,
   type RelatorioVolume,
+  type VolumeMusculo,
 } from "./volume.ts";
 import {
   CARDIO_DURO,
@@ -123,15 +124,26 @@ const MUSC_DIA: Record<string, Musculo[]> = {
   full: ["peito", "dorsais", "trapezio_medio", "deltoide_anterior", "deltoide_lateral", "deltoide_posterior", "biceps", "triceps", "quadriceps", "isquiotibiais", "gluteo", "gemeos"],
   // split clássico por grupo muscular (1×/semana por músculo)
   peito_triceps: ["peito", "deltoide_anterior", "triceps"],
-  costas_biceps: ["dorsais", "trapezio_medio", "deltoide_posterior", "biceps"],
+  // deltoide_posterior FORA daqui: em 3d/4d o seu dia próprio é "Pernas +
+  // Ombros"/"Ombros + Braços" — listá-lo também em "Costas + Bíceps"
+  // duplicava-lhe o volume (o loop principal escolhia-lhe um exercício
+  // PRÓPRIO aqui, competindo pelo teto com o exercício que o passo 13 tem de
+  // garantir no dia que leva o seu nome).
+  costas_biceps: ["dorsais", "trapezio_medio", "biceps"],
   pernas_ombros: ["quadriceps", "isquiotibiais", "gluteo", "gemeos", "deltoide_lateral", "deltoide_anterior", "deltoide_posterior"],
   pernas: ["quadriceps", "isquiotibiais", "gluteo", "gemeos"],
   ombros_bracos: ["deltoide_anterior", "deltoide_lateral", "deltoide_posterior", "biceps", "triceps"],
-  peito_dia: ["peito", "deltoide_anterior", "triceps"],
-  costas_dia: ["dorsais", "trapezio_medio", "deltoide_posterior", "biceps"],
+  // "Peito"/"Costas" sozinhos (5–6 dias) NÃO incluem tríceps/bíceps — esses
+  // têm o seu próprio dia ("Braços"); listá-los aqui fá-los-ia aparecer
+  // também no dia de peito/costas E no de braços, duplicando o seu volume.
+  peito_dia: ["peito", "deltoide_anterior"],
+  costas_dia: ["dorsais", "trapezio_medio", "deltoide_posterior"],
   ombros_dia: ["deltoide_anterior", "deltoide_lateral", "deltoide_posterior", "trapezio_medio"],
   bracos_dia: ["biceps", "triceps"],
-  pontos_fracos: ["deltoide_lateral", "biceps", "triceps", "gemeos", "deltoide_posterior"],
+  // músculos que NÃO têm dia próprio no split de 6 dias (ombros/braços já
+  // têm) — senão duplicava volume de um músculo que já foi "fechado" noutro
+  // dia, quebrando a própria definição de 1×/semana do formato.
+  pontos_fracos: ["gemeos", "core", "antebraco", "trapezio_superior", "adutores"],
 };
 
 // Dias com nome composto (split muscular) têm de ter ≥1 exercício primário de
@@ -201,7 +213,7 @@ const LIMITE_FADIGA_SEC_ACUM = 5;
 // Estimativa de duração (min): aquecimento + Σ séries·(trabalho+descanso por
 // fadiga sistémica) + transição por exercício. Igual ao validador.
 const MIN_POR_SERIE: Record<number, number> = { 1: 1.9, 2: 2.4, 3: 3.1 };
-const estimarMinutos = (exs: { exercicio: Exercicio; series: number }[]): number =>
+export const estimarMinutos = (exs: { exercicio: Exercicio; series: number }[]): number =>
   Math.round(
     8 + exs.reduce((a, e) => a + e.series * (MIN_POR_SERIE[e.exercicio.fadigaSistemica] ?? 2.4) + 1, 0),
   );
@@ -258,6 +270,10 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
   const r = INTERVALO_VOLUME[perfil.nivel];
   const base = Math.round((r.min + r.max) / 2);
 
+  // ---- split + frequência ----
+  const muscular = perfil.splitFormato === "muscular";
+  const grelha = muscular ? splitMuscular(dias, foco) : splitPara(dias);
+
   // ---- 1. alvo de volume semanal por músculo ----
   const alvo: Partial<Record<Musculo, number>> = {};
   for (const m of MUSCULOS_ALVO) {
@@ -268,18 +284,19 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
   // reduzir competidores do foco (§3.4.5): os secundários que competem pela
   // performance nos press/puxadas já recebem muito do próprio foco — corta-se
   // o trabalho DIRETO (isolamento) e prefere-se isolamento do foco sem eles.
+  // NÃO se aplica no formato muscular: lá o competidor (ex.: tríceps quando o
+  // foco é peito) só tem ESTE dia na semana — reduzi-lo deixava-o sem volume
+  // próprio nenhum, em vez de sobrar dele noutro dia como na frequência.
   const focoCompetidores = new Set<Musculo>();
-  for (const f of foco) {
-    for (const c of COMPETIDORES[f] ?? []) {
-      if (foco.includes(c)) continue; // se também é foco, não se penaliza
-      focoCompetidores.add(c);
-      alvo[c] = Math.max(2, Math.round(base * 0.3));
+  if (!muscular) {
+    for (const f of foco) {
+      for (const c of COMPETIDORES[f] ?? []) {
+        if (foco.includes(c)) continue; // se também é foco, não se penaliza
+        focoCompetidores.add(c);
+        alvo[c] = Math.max(2, Math.round(base * 0.3));
+      }
     }
   }
-
-  // ---- split + frequência ----
-  const muscular = perfil.splitFormato === "muscular";
-  const grelha = muscular ? splitMuscular(dias, foco) : splitPara(dias);
   if (muscular) {
     avisos.push(
       "Split por grupo muscular: cada músculo é treinado 1×/semana. É o formato clássico de ginásio, mas dividir o mesmo volume em 2 sessões costuma dar séries de melhor qualidade — se a progressão abrandar, experimenta Superior/Inferior.",
@@ -350,6 +367,13 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
     const musculosAlvoDia = MUSC_DIA[g.tipo].filter((m) => MUSCULOS_ALVO.includes(m));
     const ndias = (m: Musculo) => Math.max(1, diasDoMusculo.get(m)?.length ?? 1);
     const alvoDia = (m: Musculo) => (alvo[m] ?? 0) / ndias(m);
+    // no formato muscular, o(s) músculo(s) que dão nome ao dia só têm ESTA
+    // sessão — o isolamento (T3) pode repetir família para lhes dar as 3–4
+    // variantes próprias que um "dia de peito"/"dia de braço" real usa
+    // (pushdown/francês/corda são todos "elbow_extension", mas não são a
+    // mesma coisa: perfis de resistência diferentes, ângulos diferentes).
+    // Compostos (T1/T2) continuam sujeitos à regra normal de família.
+    const musculosNomeados = new Set<Musculo>((GRUPOS_NOMEADOS[g.tipo] ?? []).flat());
 
     const ctx: CtxDia = {
       familias: new Set(),
@@ -386,7 +410,9 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
       }
 
       // penalizações fortes
-      if (ctx.familias.has(ex.familia)) s -= 100;
+      const excecaoFamilia =
+        muscular && ex.tier === 3 && ex.primarios.some((p) => musculosNomeados.has(p.musculo));
+      if (ctx.familias.has(ex.familia) && !excecaoFamilia) s -= 100;
       if (ex.fadigaSistemica === 3 && ctx.fadiga3 >= MAX_FADIGA3_DIA) s -= 100;
 
       // teto semanal (§2.1: "acima do teto, rejeitar"). O trabalho DIRETO
@@ -401,7 +427,7 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
       }
       for (const x of ex.secundarios) {
         const proj = (volSemana.get(x.musculo) ?? 0) + SERIES_TIER[ex.tier] * x.contributo;
-        if (proj > r.teto) s -= 12;
+        if (proj > r.teto) s -= 25;
         else if (proj > r.max) s -= 3;
       }
 
@@ -648,7 +674,9 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
   }
 
   // ---- 9. cortar excesso acima do teto (§2.1: "acima do teto, reduzir") ----
-  {
+  //  extraída como função para poder correr de novo, no fim, no formato
+  //  muscular (onde os passos 11/13 podem acrescentar volume depois deste).
+  const cortarExcesso = (condicao: (v: VolumeMusculo) => boolean, excedente: (v: VolumeMusculo) => number = (v) => v.primario) => {
     const ancoraDoDia = (d: DiaSelecionado, ex: ExercicioPrescrito) => {
       // é o único composto (tier ≤ 2) de um dos músculos-alvo do dia?
       return ex.exercicio.tier <= 2 && ex.exercicio.primarios.some((p) =>
@@ -659,22 +687,38 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
       );
     };
     const protegidos = new Set<Musculo>([...MUSCULOS_GRANDES, ...foco]);
-    // baixar 1 série não pode deixar um músculo protegido abaixo de 8
-    const seguro = (ex: ExercicioPrescrito) =>
-      !ex.exercicio.primarios.some((p) => {
-        if (!protegidos.has(p.musculo)) return false;
-        const atual = semana.volume.porMusculo.find((v) => v.musculo === p.musculo)?.direto ?? 0;
-        return atual - p.contributo < 8;
-      });
+    // baixar 1 série não pode deixar um músculo protegido abaixo de 8; no
+    // formato muscular, também não pode tirar o ÚLTIMO exercício de um
+    // músculo que dá nome ao próprio dia (passo 13 pode não ter chegado ao
+    // alvo de 3, mas cortar até 0 desfaz por completo a garantia).
+    const seguro = (ex: ExercicioPrescrito, d: DiaSelecionado) => {
+      if (
+        ex.exercicio.primarios.some((p) => {
+          if (!protegidos.has(p.musculo)) return false;
+          const atual = semana.volume.porMusculo.find((v) => v.musculo === p.musculo)?.direto ?? 0;
+          return atual - p.contributo < 8;
+        })
+      )
+        return false;
+      if (muscular) {
+        const grupos = GRUPOS_NOMEADOS[d.tipo];
+        if (grupos) {
+          for (const grupo of grupos) {
+            if (!ex.exercicio.primarios.some((p) => grupo.includes(p.musculo))) continue;
+            const contagem = d.exercicios.filter((e) => e.exercicio.primarios.some((p) => grupo.includes(p.musculo))).length;
+            if (contagem <= 1) return false;
+          }
+        }
+      }
+      return true;
+    };
     for (let iter = 0; iter < 6; iter++) {
-      const excesso = semana.volume.porMusculo.find(
-        (v) => v.estado === "acima_teto" && v.primario > v.teto,
-      );
+      const excesso = semana.volume.porMusculo.find((v) => v.estado === "acima_teto" && condicao(v));
       if (!excesso) break;
       const contribs: { d: DiaSelecionado; ex: ExercicioPrescrito }[] = [];
       for (const d of semana.dias)
         for (const ex of d.exercicios)
-          if (ex.exercicio.primarios.some((p) => p.musculo === excesso.musculo) && seguro(ex))
+          if (ex.exercicio.primarios.some((p) => p.musculo === excesso.musculo) && seguro(ex, d))
             contribs.push({ d, ex });
       contribs.sort((a, b) => {
         const anc = Number(ancoraDoDia(a.d, a.ex)) - Number(ancoraDoDia(b.d, b.ex));
@@ -682,7 +726,7 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
         return b.ex.exercicio.tier - a.ex.exercicio.tier; // tier 3 primeiro
       });
       const bump = contribs.find((c) => c.ex.series > 2);
-      if (bump && excesso.primario - excesso.teto <= 1.5) {
+      if (bump && excedente(excesso) - excesso.teto <= 1.5) {
         bump.ex.series -= 1;
         semana.volume = calcularVolume(semanaParaEntradaVolume(semana), perfil.nivel);
         continue;
@@ -700,7 +744,8 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
       reordenar(alvo.d);
       semana.volume = calcularVolume(semanaParaEntradaVolume(semana), perfil.nivel);
     }
-  }
+  };
+  cortarExcesso((v) => v.primario > v.teto);
 
   // ---- 10. cobertura de padrões essenciais em falta — só se houver folga ----
   {
@@ -748,7 +793,10 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
   // ---- 11. piso de volume: nenhum grupo grande / foco abaixo de 8 séries ----
   //  (corre por último, depois do corte de teto, para não se anularem)
   {
-    const tetoMais = (m: Musculo) => (foco.includes(m) ? r.teto + 2 : r.teto + 1);
+    // no formato muscular o teto é rígido (mantém-se o teto semanal, sem
+    // margem) — a folga de +1/+2 é só para frequência, onde o mesmo músculo
+    // ainda tem outro dia a "absorver" o excesso; aqui não tem.
+    const tetoMais = (m: Musculo) => (muscular ? r.teto : foco.includes(m) ? r.teto + 2 : r.teto + 1);
     const excedeTeto = (ex: Exercicio, serie: number) =>
       ex.primarios.some(
         (p) => (semana.volume.porMusculo.find((v) => v.musculo === p.musculo)?.direto ?? 0) + serie * p.contributo > tetoMais(p.musculo),
@@ -826,63 +874,160 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
   }
   semana.volume = calcularVolume(semanaParaEntradaVolume(semana), perfil.nivel);
 
-  // ---- 13. split muscular: garantir ≥1 exercício de cada músculo do nome ----
-  //  (por último — nada a seguir pode voltar a tirá-los)
-  if (muscular) {
+  // ---- 13. split muscular: cada músculo do nome do dia com o seu próprio
+  //  bloco de exercícios (por último — nada a seguir volta a tirar-lhos) ----
+  //  Neste formato o volume semanal de cada músculo cabe numa só sessão, por
+  //  isso a sessão é maior: ~5 exercícios para o músculo principal do dia,
+  //  ~3 para o(s) secundário(s) — referência realista de "dia de peito"/
+  //  "dia de braço" de ginásio. O teto semanal continua a mandar (nunca se
+  //  ultrapassa); se o tempo disponível não chegar, é o tempo que manda — o
+  //  dia fica mais pequeno e um aviso explica.
+  const preencherGruposNomeados = () => {
+    const CONTAGEM_PRINCIPAL = 5;
+    const CONTAGEM_SECUNDARIO = 3;
     for (const dia of semana.dias) {
       const grupos = GRUPOS_NOMEADOS[dia.tipo];
       if (!grupos) continue;
+      const nomeados = new Set<Musculo>(grupos.flat());
       const protegidos = new Set<string>();
-      for (const grupo of grupos) {
-        const jaTem = dia.exercicios.find((e) => e.exercicio.primarios.some((p) => grupo.includes(p.musculo)));
-        if (jaTem) {
-          protegidos.add(jaTem.exercicio.id);
-          continue;
-        }
-        const famUsadas = new Set(dia.exercicios.map((e) => e.exercicio.familia));
-        const fs3Atual = dia.exercicios.filter((e) => e.exercicio.fadigaSistemica === 3).length;
-        const cand = candidatosBase
-          .filter((e) => e.primarios.some((p) => grupo.includes(p.musculo)) && !famUsadas.has(e.familia))
-          .sort((a, b) => a.tier - b.tier);
-        // nunca o 3º composto pesado do dia, a não ser que seja mesmo a única opção
-        const semExcesso = cand.filter((e) => !(e.fadigaSistemica === 3 && fs3Atual >= MAX_FADIGA3_DIA));
-        const ex = semExcesso[0] ?? cand[0];
-        if (!ex) {
-          semana.avisos.push(
-            `${dia.nome}: sem exercício viável para ${grupo[0]} com as lesões/equipamento — o dia fica incompleto para esse músculo.`,
+
+      // exceção de família (igual à do passo principal): isolamento (T3) de
+      // um músculo do nome pode repetir família — só assim cabem as 3–4
+      // variantes próprias (pushdown/francês/corda) quando o músculo só tem
+      // este dia na semana.
+      const familiaBloqueada = (ex: Exercicio) => {
+        if (!dia.exercicios.some((e) => e.exercicio.familia === ex.familia)) return false;
+        return !(ex.tier === 3 && ex.primarios.some((p) => nomeados.has(p.musculo)));
+      };
+      const volAtual = (m: Musculo) => semana.volume.porMusculo.find((v) => v.musculo === m)?.direto ?? 0;
+      const excedeTetoDia = (ex: Exercicio, serie: number) =>
+        ex.primarios.some((p) => volAtual(p.musculo) + serie * p.contributo > r.teto) ||
+        ex.secundarios.some((s) => volAtual(s.musculo) + serie * s.contributo > r.teto);
+
+      grupos.forEach((grupo, gi) => {
+        const alvoContagem = gi === 0 ? CONTAGEM_PRINCIPAL : CONTAGEM_SECUNDARIO;
+        let guarda = 0;
+        while (guarda++ < 10) {
+          const contagem = dia.exercicios.filter((e) => e.exercicio.primarios.some((p) => grupo.includes(p.musculo))).length;
+          if (contagem >= alvoContagem) break;
+          const fs3Atual = dia.exercicios.filter((e) => e.exercicio.fadigaSistemica === 3).length;
+          // exclui o exercício se já foi usado em QUALQUER dia da semana — o
+          // mesmo acessório em 2 dias (ex.: tríceps em "Braços" E em "Pontos
+          // fracos") acumula secundário a mais sem trazer nada de novo.
+          const usados = new Set(semana.dias.flatMap((d) => d.exercicios.map((e) => e.exercicio.id)));
+          const perfisUsados = new Set(
+            dia.exercicios
+              .filter((e) => e.exercicio.primarios.some((p) => grupo.includes(p.musculo)))
+              .map((e) => e.exercicio.perfilResistencia),
           );
-          continue;
+          const candBrutos = candidatosBase.filter(
+            (e) => e.primarios.some((p) => grupo.includes(p.musculo)) && !usados.has(e.id) && !familiaBloqueada(e),
+          );
+          const cand = candBrutos
+            .filter(
+              (e) =>
+                !excedeTetoDia(e, SERIES_TIER[e.tier]) &&
+                !(e.fadigaSistemica === 3 && fs3Atual >= MAX_FADIGA3_DIA),
+            )
+            .sort((a, b) => a.tier - b.tier || Number(perfisUsados.has(a.perfilResistencia)) - Number(perfisUsados.has(b.perfilResistencia)));
+          const ex = cand[0];
+          if (!ex) {
+            if (contagem === 0) {
+              semana.avisos.push(
+                `${dia.nome}: sem exercício viável para ${grupo[0]} com as lesões/equipamento — o dia fica incompleto para esse músculo.`,
+              );
+            } else if (candBrutos.length > 0) {
+              // havia candidatos, mas o teto semanal (ou o limite de compostos
+              // pesados) já está preenchido por volume secundário de outros
+              // dias — o teto manda, o dia fica com menos do que o ideal.
+              semana.avisos.push(
+                `${dia.nome}: ${grupo[0]} já perto do teto semanal com volume secundário de outros dias — fica com ${contagem} exercício(s) próprio(s) em vez do ideal.`,
+              );
+            } else {
+              // sem candidatos NOVOS: o pouco que a base tem para este
+              // músculo (ainda mais reduzido pelas lesões) já foi usado
+              // noutro dia que também o precisa (ex.: tríceps aparece em
+              // "Peito + Tríceps" E em "Ombros + Braços" num split de 4 dias)
+              // — fica com menos do que o ideal em vez de repetir exercício.
+              semana.avisos.push(
+                `${dia.nome}: poucos exercícios de ${grupo[0]} na base para as lesões/equipamento — já usados noutro dia que também o treina; fica com ${contagem} em vez do ideal.`,
+              );
+            }
+            break;
+          }
+          dia.exercicios.push({
+            exercicio: ex,
+            series: SERIES_TIER[ex.tier],
+            ordem: dia.exercicios.length + 1,
+            foco: ex.primarios.some((p) => foco.includes(p.musculo)),
+          });
+          protegidos.add(ex.id);
+          reordenar(dia);
+          semana.volume = calcularVolume(semanaParaEntradaVolume(semana), perfil.nivel);
         }
-        if (dia.exercicios.length >= capDia) {
-          const menor = [...dia.exercicios]
-            .filter((e) => !protegidos.has(e.exercicio.id))
-            .sort((a, b) => b.ordem - a.ordem)[0];
-          if (menor) dia.exercicios = dia.exercicios.filter((x) => x !== menor);
+      });
+
+      // o tempo é quem manda por último: corta o que sobrar do dia (nunca os
+      // que acabaram de ser garantidos) e avisa em vez de simplesmente encher.
+      // NÃO deixa abaixo do piso de 8 séries de um músculo grande nem — se
+      // houver alternativa — abaixo do alvo de contagem de um músculo
+      // nomeado (mesmo quando esse alvo veio do próprio loop principal, não
+      // do passo 13); só corta aí como ÚLTIMO recurso, e avisa.
+      const violaContagemNomeada = (e: ExercicioPrescrito) => {
+        for (const [gi, grupo] of grupos.entries()) {
+          if (!e.exercicio.primarios.some((p) => grupo.includes(p.musculo))) continue;
+          const alvoContagem = gi === 0 ? CONTAGEM_PRINCIPAL : CONTAGEM_SECUNDARIO;
+          const contagem = dia.exercicios.filter((x) => x.exercicio.primarios.some((p) => grupo.includes(p.musculo))).length;
+          if (contagem <= alvoContagem) return true;
         }
-        dia.exercicios.push({
-          exercicio: ex,
-          series: SERIES_TIER[ex.tier],
-          ordem: dia.exercicios.length + 1,
-          foco: ex.primarios.some((p) => foco.includes(p.musculo)),
-        });
-        protegidos.add(ex.id);
-        reordenar(dia);
-      }
-      // acerta o tempo sem sacrificar os que acabaram de ser garantidos
+        return false;
+      };
+      let cortouNomeado = false;
       let guarda3 = 0;
-      while (
-        dia.exercicios.length > 4 &&
-        estimarMinutos(dia.exercicios) > minutosSessao * 1.08 &&
-        guarda3++ < 6
-      ) {
-        const alvo = [...dia.exercicios]
-          .filter((e) => !protegidos.has(e.exercicio.id))
-          .sort((a, b) => b.ordem - a.ordem)[0];
+      while (dia.exercicios.length > 4 && estimarMinutos(dia.exercicios) > minutosSessao * 1.08 && guarda3++ < 10) {
+        const candidatos = dia.exercicios.filter((e) => !protegidos.has(e.exercicio.id));
+        if (!candidatos.length) break;
+        const semFloor8 = candidatos.filter(
+          (e) =>
+            !e.exercicio.primarios.some(
+              (p) => MUSCULOS_GRANDES.includes(p.musculo) && volAtual(p.musculo) - e.series * p.contributo < 8,
+            ),
+        );
+        const semNomeado = semFloor8.filter((e) => !violaContagemNomeada(e));
+        const pool = semNomeado.length ? semNomeado : semFloor8.length ? semFloor8 : candidatos;
+        const alvo = pool.sort((a, b) => b.ordem - a.ordem)[0];
         if (!alvo) break;
+        if (violaContagemNomeada(alvo)) cortouNomeado = true;
         dia.exercicios = dia.exercicios.filter((x) => x !== alvo);
         reordenar(dia);
+        semana.volume = calcularVolume(semanaParaEntradaVolume(semana), perfil.nivel);
+      }
+      if (cortouNomeado) {
+        semana.avisos.push(
+          `${dia.nome}: o tempo disponível obrigou a cortar abaixo do ideal num músculo do nome do dia.`,
+        );
+      }
+      if (estimarMinutos(dia.exercicios) > minutosSessao * 1.08) {
+        semana.avisos.push(
+          `${dia.nome}: ~${estimarMinutos(dia.exercicios)} min não cabem em ${minutosSessao} min — considera mais tempo por sessão ou dividir este dia.`,
+        );
       }
     }
+    semana.volume = calcularVolume(semanaParaEntradaVolume(semana), perfil.nivel);
+  };
+
+  if (muscular) {
+    preencherGruposNomeados();
+
+    // ---- 14. teto final (só muscular) ----
+    //  no formato muscular cada músculo só tem este dia — ao contrário da
+    //  frequência, um excesso "só de secundário" aqui não tem outro dia a
+    //  descontar-lhe, por isso o teto conta em TOTAL (direto), não só
+    //  primário. Os passos 11/13 podem ter empurrado por cima do teto depois
+    //  do corte do passo 9 (que só olhava para o primário) — corre-se outra
+    //  vez, agora com o critério certo para este formato. "Mantém o teto
+    //  semanal" é regra dura, sem exceção de formato.
+    cortarExcesso((v) => v.direto > v.teto, (v) => v.direto);
     semana.volume = calcularVolume(semanaParaEntradaVolume(semana), perfil.nivel);
   }
 
