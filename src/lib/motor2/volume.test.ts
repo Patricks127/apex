@@ -112,22 +112,18 @@ test("mínimo absoluto de 8 séries (§4.1) sinalizado independentemente do nív
 // 4. Rácio empurrar:puxar
 // ===========================================================================
 test("rácio empurrar:puxar calculado corretamente", () => {
-  // lado empurrar (só músculos de empurrar, sem secundários):
-  //   peck_deck 6  → peito 6
-  //   triceps_pushdown_corda 6 → tríceps 6
-  //   elevacao_lateral_maquina 6 → deltoide_lateral 6      => empurrar = 18
-  // lado puxar:
-  //   band_pull_apart 6 → deltoide_posterior 6 + trapézio_médio 6
-  //   rosca_inclinado_halteres 6 → bíceps 6                => puxar = 18
+  // Conta séries por PADRÃO de movimento: empurrar_horizontal/vertical vs
+  // puxar_horizontal/vertical. Isolamentos de braço/deltoide não entram.
+  //   empurrar: supino_barra 9 + press_ombro_maquina 9 = 18
+  //   puxar: remada_curvada_barra 9 + pulldown_barra 9 = 18
   const equilibrado = calcularVolume(
     [
-      { exercicioId: "peck_deck", series: 6 },
-      { exercicioId: "triceps_pushdown_corda", series: 6 },
-      { exercicioId: "elevacao_lateral_maquina", series: 6 },
-      { exercicioId: "band_pull_apart", series: 6 },
-      { exercicioId: "rosca_inclinado_halteres", series: 6 },
+      { exercicioId: "supino_barra", series: 9 },
+      { exercicioId: "press_ombro_maquina", series: 9 },
+      { exercicioId: "remada_curvada_barra", series: 9 },
+      { exercicioId: "pulldown_barra", series: 9 },
     ],
-    "intermedio",
+    "avancado",
   );
   assert.equal(equilibrado.racioEmpurrarPuxar.empurrar, 18);
   assert.equal(equilibrado.racioEmpurrarPuxar.puxar, 18);
@@ -138,8 +134,8 @@ test("rácio empurrar:puxar calculado corretamente", () => {
   // push-heavy: empurrar 20, puxar 10 → 2:1 → desequilibrado, avisa "falta puxar"
   const pushHeavy = calcularVolume(
     [
-      { exercicioId: "peck_deck", series: 20 },
-      { exercicioId: "band_pull_apart", series: 5 }, // dp 5 + tm 5 = puxar 10
+      { exercicioId: "supino_barra", series: 20 },
+      { exercicioId: "remada_curvada_barra", series: 10 },
     ],
     "avancado",
   );
@@ -149,11 +145,11 @@ test("rácio empurrar:puxar calculado corretamente", () => {
   assert.equal(pushHeavy.racioEmpurrarPuxar.equilibrado, false);
   assert.ok(pushHeavy.avisos.some((a) => /empurrar:puxar/.test(a) && /puxar/.test(a)));
 
-  // pull-heavy: 0.5:1 → avisa "falta empurrar"
+  // pull-heavy: 0.25:1 → avisa "falta empurrar"
   const pullHeavy = calcularVolume(
     [
-      { exercicioId: "peck_deck", series: 5 },
-      { exercicioId: "band_pull_apart", series: 10 }, // puxar 20
+      { exercicioId: "supino_barra", series: 5 },
+      { exercicioId: "remada_curvada_barra", series: 20 },
     ],
     "avancado",
   );
@@ -164,8 +160,8 @@ test("rácio empurrar:puxar calculado corretamente", () => {
   // dentro de ±30% continua equilibrado: 13 vs 10 → 1.3
   const limite = calcularVolume(
     [
-      { exercicioId: "peck_deck", series: 13 },
-      { exercicioId: "band_pull_apart", series: 5 },
+      { exercicioId: "supino_barra", series: 13 },
+      { exercicioId: "remada_curvada_barra", series: 10 },
     ],
     "avancado",
   );

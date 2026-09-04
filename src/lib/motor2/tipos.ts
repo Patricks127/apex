@@ -127,7 +127,8 @@ export const MUSCULOS_GRANDES: Musculo[] = [
   "gluteo",
 ];
 
-/** Classificação empurrar/puxar — para o rácio 1:1 ±30% (spec 4.1). */
+/** Músculos de empurrar / puxar (informativo; o rácio §4.1 conta por PADRÃO
+ *  de movimento, ver `calcularVolume`). */
 export const MUSCULOS_EMPURRAR: Musculo[] = [
   "peito",
   "deltoide_anterior",
@@ -140,6 +141,20 @@ export const MUSCULOS_PUXAR: Musculo[] = [
   "trapezio_superior",
   "deltoide_posterior",
   "biceps",
+];
+
+/** Famílias de empurrar / puxar — base do rácio 1:1 ±30% (spec §4.1).
+ *  Conjuntos simétricos (4 vs 4): os isolamentos de peito equilibram os de
+ *  deltoide posterior + trapézio. Braços e deltoide lateral não entram. */
+export const FAMILIAS_EMPURRAR: Familia[] = [
+  "horizontal_push",
+  "incline_push",
+  "vertical_push",
+];
+export const FAMILIAS_PUXAR: Familia[] = [
+  "horizontal_pull",
+  "vertical_pull",
+  "rear_delt_scap",
 ];
 
 // ---------------------------------------------------------------------------

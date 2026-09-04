@@ -8,11 +8,14 @@ import { EXERCICIOS } from "./exercicios.ts";
 import {
   ordemNivel,
   MUSCULOS_GRANDES,
+  FAMILIAS_EMPURRAR,
+  FAMILIAS_PUXAR,
   type Equipamento,
   type Exercicio,
   type Familia,
   type Musculo,
   type Nivel,
+  type Padrao,
   type PerfilResistencia,
   type Zona,
 } from "./tipos.ts";
@@ -38,6 +41,7 @@ export type PerfilSelecao = {
   equipamento: Equipamento[];
   lesoes: Zona[];
   foco?: Musculo[]; // 0–2 músculos prioritários
+  minutosSessao?: number; // tempo disponível por sessão (default 75)
 };
 
 // Perfis de equipamento por local de treino (o onboarding mapeia local → isto).
@@ -131,6 +135,14 @@ const MAX_FADIGA3_DIA = 2;
 const LIMITE_FADIGA_SISTEMICA_DIA = 12;
 const LIMITE_FADIGA_SEC_ACUM = 5;
 
+// Estimativa de duração (min): aquecimento + Σ séries·(trabalho+descanso por
+// fadiga sistémica) + transição por exercício. Igual ao validador.
+const MIN_POR_SERIE: Record<number, number> = { 1: 1.9, 2: 2.4, 3: 3.1 };
+const estimarMinutos = (exs: { exercicio: Exercicio; series: number }[]): number =>
+  Math.round(
+    8 + exs.reduce((a, e) => a + e.series * (MIN_POR_SERIE[e.exercicio.fadigaSistemica] ?? 2.4) + 1, 0),
+  );
+
 export type ExercicioPrescrito = {
   exercicio: Exercicio;
   series: number;
@@ -162,9 +174,17 @@ export function semanaParaEntradaVolume(s: SemanaSelecionada): EntradaVolume {
 
 // ---------------------------------------------------------------------------
 
-export function selecionarSemana(perfil: PerfilSelecao): SemanaSelecionada {
+/**
+ * @param variacao  0 = seleção ótima determinística. >0 escolhe entre os
+ *   candidatos quase-ótimos (score a ≤2 do melhor) — usado pelo validador para
+ *   regenerar um plano que não passou (spec §3.3 passo 5, máx. 3 tentativas).
+ */
+export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSelecionada {
   const avisos: string[] = [];
   const dias = Math.min(6, Math.max(3, Math.round(perfil.dias || 4)));
+  const minutosSessao = Math.max(30, Math.round(perfil.minutosSessao ?? 75));
+  // ~9 min por exercício (séries + descanso + setup) + 6 de aquecimento
+  const capDia = Math.min(CAP_EXERCICIOS_DIA, Math.max(4, Math.round((minutosSessao - 6) / 9)));
   if (perfil.objetivo !== "hipertrofia") {
     avisos.push(
       `Objetivo '${perfil.objetivo}' ainda não é suportado pelo seletor v2 — a usar a lógica de hipertrofia. (Passo 6.)`,
@@ -301,13 +321,20 @@ export function selecionarSemana(perfil: PerfilSelecao): SemanaSelecionada {
       if (ctx.familias.has(ex.familia)) s -= 100;
       if (ex.fadigaSistemica === 3 && ctx.fadiga3 >= MAX_FADIGA3_DIA) s -= 100;
 
-      // teto semanal: não empurrar um músculo (direto + fração de secundário)
-      // acima do teto do nível — trava a acumulação em splits de alta frequência.
+      // teto semanal (§2.1: "acima do teto, rejeitar"). O trabalho DIRETO
+      // primário de um músculo não-foco não deve passar do `max` do nível; o de
+      // um músculo em foco pode chegar ao `teto` mas não passar. Ultrapassar o
+      // teto é veto absoluto (dispara a quebra do ciclo).
       for (const p of ex.primarios) {
-        if ((volSemana.get(p.musculo) ?? 0) + SERIES_TIER[ex.tier] * p.contributo > r.teto) s -= 6;
+        const proj = (volSemana.get(p.musculo) ?? 0) + SERIES_TIER[ex.tier] * p.contributo;
+        const limiteAlto = foco.includes(p.musculo) ? r.teto : r.max;
+        if (proj > r.teto) s -= 500;
+        else if (proj > limiteAlto) s -= 40;
       }
       for (const x of ex.secundarios) {
-        if ((volSemana.get(x.musculo) ?? 0) + SERIES_TIER[ex.tier] * x.contributo > r.teto) s -= 2;
+        const proj = (volSemana.get(x.musculo) ?? 0) + SERIES_TIER[ex.tier] * x.contributo;
+        if (proj > r.teto) s -= 12;
+        else if (proj > r.max) s -= 3;
       }
 
       // competidores do foco: evitar variações de press/puxada que empilham
@@ -339,7 +366,7 @@ export function selecionarSemana(perfil: PerfilSelecao): SemanaSelecionada {
       // limiar de déficit para continuar a adicionar exercícios neste tier
       const limiar = tier === 3 ? 0.5 : 1.0;
       let adicionados = 0;
-      while (adicionados < limite && ctx.escolhidos.length < CAP_EXERCICIOS_DIA) {
+      while (adicionados < limite && ctx.escolhidos.length < capDia) {
         const comDeficit = musculosAlvoDia.filter((m) => deficit(m) > limiar);
         const grandesSemAncora = grandesDia.filter((m) => deficit(m) > 0 && !temAncora(m));
 
@@ -362,16 +389,14 @@ export function selecionarSemana(perfil: PerfilSelecao): SemanaSelecionada {
         }
         if (cand.length === 0) break;
 
-        let best: Exercicio | null = null;
-        let bestScore = -Infinity;
-        for (const c of cand) {
-          const sc = pontuar(c);
-          if (sc > bestScore) {
-            bestScore = sc;
-            best = c;
-          }
-        }
-        if (!best || bestScore <= -50) break;
+        const pontuados = cand
+          .map((c) => ({ c, sc: pontuar(c) }))
+          .sort((a, b) => b.sc - a.sc);
+        const bestScore = pontuados.length ? pontuados[0].sc : -Infinity;
+        if (!pontuados.length || bestScore <= -50) break;
+        // variação: rodar entre os candidatos quase-ótimos (score a ≤2 do topo)
+        const quaseOtimos = pontuados.filter((p) => p.sc >= bestScore - 2);
+        const best = quaseOtimos[variacao % quaseOtimos.length].c;
 
         registaEscolha(best, SERIES_TIER[tier], ctx);
         adicionados += 1;
@@ -451,6 +476,272 @@ export function selecionarSemana(perfil: PerfilSelecao): SemanaSelecionada {
     }
   }
   // recalcular volume se houve trocas
+  semana.volume = calcularVolume(semanaParaEntradaVolume(semana), perfil.nivel);
+
+  // ---- 6. ajustar ao tempo disponível (§4.1: sessão não pode exceder o tempo) ----
+  const reordenar = (d: DiaSelecionado) => {
+    d.exercicios.sort((a, b) => {
+      if (a.exercicio.tier !== b.exercicio.tier) return a.exercicio.tier - b.exercicio.tier;
+      if (a.foco !== b.foco) return a.foco ? -1 : 1;
+      if (a.exercicio.fadigaSistemica !== b.exercicio.fadigaSistemica)
+        return b.exercicio.fadigaSistemica - a.exercicio.fadigaSistemica;
+      if (a.exercicio.exigenciaTecnica !== b.exercicio.exigenciaTecnica)
+        return b.exercicio.exigenciaTecnica - a.exercicio.exigenciaTecnica;
+      return b.exercicio.fadigaLocal - a.exercicio.fadigaLocal;
+    });
+    d.exercicios.forEach((e, idx) => (e.ordem = idx + 1));
+  };
+  for (const d of semana.dias) {
+    let cortou = false;
+    while (d.exercicios.length > 4 && estimarMinutos(d.exercicios) > minutosSessao) {
+      d.exercicios.pop(); // remove o de menor prioridade (maior ordem)
+      cortou = true;
+    }
+    if (cortou) reordenar(d);
+  }
+
+  // ---- 8. equilibrar o rácio empurrar:puxar (§4.1: 1:1 ± 30%) ----
+  {
+    const empSet = new Set<Familia>(FAMILIAS_EMPURRAR);
+    const puxSet = new Set<Familia>(FAMILIAS_PUXAR);
+    const ladoDe = (e: Exercicio): "emp" | "pux" | null => {
+      if (empSet.has(e.familia)) return "emp";
+      if (puxSet.has(e.familia)) return "pux";
+      return null;
+    };
+    for (let iter = 0; iter < 8; iter++) {
+      const rac = semana.volume.racioEmpurrarPuxar;
+      if (rac.equilibrado) break;
+      const faltaEmpurrar = rac.racio < 0.7 || !Number.isFinite(rac.racio);
+      const ladoAlvo: "emp" | "pux" = faltaEmpurrar ? "emp" : "pux";
+      const volM = (m: Musculo) => semana.volume.porMusculo.find((v) => v.musculo === m)?.direto ?? 0;
+      const idsUsados = new Set(semana.dias.flatMap((d) => d.exercicios.map((e) => e.exercicio.id)));
+      const cand = candidatosBase
+        .filter((e) => !idsUsados.has(e.id) && ladoDe(e) === ladoAlvo && volM(e.primarios[0].musculo) + SERIES_TIER[e.tier] <= r.teto)
+        .sort((a, b) => a.tier - b.tier);
+      let colocou = false;
+      for (const ex of cand) {
+        const dia = [...semana.dias]
+          .sort(
+            (a, b) =>
+              a.exercicios.filter((x) => ladoDe(x.exercicio) === ladoAlvo).length -
+              b.exercicios.filter((x) => ladoDe(x.exercicio) === ladoAlvo).length,
+          )
+          .find((d) => d.exercicios.length < 9 && !d.exercicios.some((x) => x.exercicio.familia === ex.familia));
+        if (!dia) continue;
+        dia.exercicios.push({
+          exercicio: ex,
+          series: SERIES_TIER[ex.tier],
+          ordem: dia.exercicios.length + 1,
+          foco: ex.primarios.some((p) => foco.includes(p.musculo)),
+        });
+        reordenar(dia);
+        semana.volume = calcularVolume(semanaParaEntradaVolume(semana), perfil.nivel);
+        colocou = true;
+        break;
+      }
+      if (!colocou) {
+        // sem espaço para novo composto: +1 série num exercício do lado em falta
+        const bump = semana.dias
+          .flatMap((d) => d.exercicios)
+          .filter((e) => ladoDe(e.exercicio) === ladoAlvo && e.series < 5 && volM(e.exercicio.primarios[0].musculo) < r.teto)
+          .sort((a, b) => a.series - b.series)[0];
+        if (bump) {
+          bump.series += 1;
+          semana.volume = calcularVolume(semanaParaEntradaVolume(semana), perfil.nivel);
+          continue;
+        }
+        // último recurso: aparar isolamento (T3) do lado a mais
+        const ladoExcesso: "emp" | "pux" = ladoAlvo === "emp" ? "pux" : "emp";
+        let aparou = false;
+        for (const d of semana.dias) {
+          const alvo = d.exercicios
+            .filter((e) => e.exercicio.tier === 3 && ladoDe(e.exercicio) === ladoExcesso)
+            .sort((a, b) => b.ordem - a.ordem)[0];
+          if (alvo && d.exercicios.length > 3) {
+            if (alvo.series > 2) alvo.series -= 1;
+            else d.exercicios = d.exercicios.filter((x) => x !== alvo);
+            reordenar(d);
+            semana.volume = calcularVolume(semanaParaEntradaVolume(semana), perfil.nivel);
+            aparou = true;
+            break;
+          }
+        }
+        if (!aparou) break;
+      }
+    }
+  }
+
+  // ---- 9. cortar excesso acima do teto (§2.1: "acima do teto, reduzir") ----
+  {
+    const ancoraDoDia = (d: DiaSelecionado, ex: ExercicioPrescrito) => {
+      // é o único composto (tier ≤ 2) de um dos músculos-alvo do dia?
+      return ex.exercicio.tier <= 2 && ex.exercicio.primarios.some((p) =>
+        d.musculosAlvo.includes(p.musculo) &&
+        d.exercicios.filter(
+          (x) => x.exercicio.tier <= 2 && x.exercicio.primarios.some((q) => q.musculo === p.musculo),
+        ).length === 1,
+      );
+    };
+    const protegidos = new Set<Musculo>([...MUSCULOS_GRANDES, ...foco]);
+    // baixar 1 série não pode deixar um músculo protegido abaixo de 8
+    const seguro = (ex: ExercicioPrescrito) =>
+      !ex.exercicio.primarios.some((p) => {
+        if (!protegidos.has(p.musculo)) return false;
+        const atual = semana.volume.porMusculo.find((v) => v.musculo === p.musculo)?.direto ?? 0;
+        return atual - p.contributo < 8;
+      });
+    for (let iter = 0; iter < 6; iter++) {
+      const excesso = semana.volume.porMusculo.find(
+        (v) => v.estado === "acima_teto" && v.primario > v.teto,
+      );
+      if (!excesso) break;
+      const contribs: { d: DiaSelecionado; ex: ExercicioPrescrito }[] = [];
+      for (const d of semana.dias)
+        for (const ex of d.exercicios)
+          if (ex.exercicio.primarios.some((p) => p.musculo === excesso.musculo) && seguro(ex))
+            contribs.push({ d, ex });
+      contribs.sort((a, b) => {
+        const anc = Number(ancoraDoDia(a.d, a.ex)) - Number(ancoraDoDia(b.d, b.ex));
+        if (anc) return anc; // não-âncora primeiro
+        return b.ex.exercicio.tier - a.ex.exercicio.tier; // tier 3 primeiro
+      });
+      const bump = contribs.find((c) => c.ex.series > 2);
+      if (bump && excesso.primario - excesso.teto <= 1.5) {
+        bump.ex.series -= 1;
+        semana.volume = calcularVolume(semanaParaEntradaVolume(semana), perfil.nivel);
+        continue;
+      }
+      const alvo = contribs.find((c) => c.d.exercicios.length > 3);
+      if (!alvo) {
+        if (bump) {
+          bump.ex.series -= 1;
+          semana.volume = calcularVolume(semanaParaEntradaVolume(semana), perfil.nivel);
+          continue;
+        }
+        break;
+      }
+      alvo.d.exercicios = alvo.d.exercicios.filter((x) => x !== alvo.ex);
+      reordenar(alvo.d);
+      semana.volume = calcularVolume(semanaParaEntradaVolume(semana), perfil.nivel);
+    }
+  }
+
+  // ---- 10. cobertura de padrões essenciais em falta — só se houver folga ----
+  {
+    const essenciais: Padrao[] = [
+      "agachar", "dobrar_anca", "empurrar_horizontal", "empurrar_vertical",
+      "puxar_horizontal", "puxar_vertical",
+    ];
+    const presentes = () => new Set(semana.dias.flatMap((d) => d.exercicios.map((e) => e.exercicio.padrao)));
+    for (const pad of essenciais) {
+      if (presentes().has(pad)) continue;
+      const idsUsados = new Set(semana.dias.flatMap((d) => d.exercicios.map((e) => e.exercicio.id)));
+      const cand = candidatosBase
+        .filter((e) => e.padrao === pad && !idsUsados.has(e.id))
+        .sort((a, b) => a.tier - b.tier);
+      for (const ex of cand) {
+        const dia = semana.dias
+          .filter((d) => d.musculosAlvo.some((mm) => ex.primarios.some((p) => p.musculo === mm)))
+          .sort((a, b) => a.exercicios.length - b.exercicios.length)
+          .find(
+            (d) =>
+              !d.exercicios.some((x) => x.exercicio.familia === ex.familia) &&
+              estimarMinutos([...d.exercicios, { exercicio: ex, series: SERIES_TIER[ex.tier] }]) <= minutosSessao &&
+              ex.primarios.every(
+                (p) =>
+                  (semana.volume.porMusculo.find((v) => v.musculo === p.musculo)?.direto ?? 0) +
+                    SERIES_TIER[ex.tier] * p.contributo <=
+                  r.teto,
+              ),
+          );
+        if (!dia) continue;
+        dia.exercicios.push({
+          exercicio: ex,
+          series: SERIES_TIER[ex.tier],
+          ordem: dia.exercicios.length + 1,
+          foco: ex.primarios.some((p) => foco.includes(p.musculo)),
+        });
+        reordenar(dia);
+        semana.volume = calcularVolume(semanaParaEntradaVolume(semana), perfil.nivel);
+        break;
+      }
+    }
+  }
+
+  // ---- 11. piso de volume: nenhum grupo grande / foco abaixo de 8 séries ----
+  //  (corre por último, depois do corte de teto, para não se anularem)
+  {
+    const tetoMais = (m: Musculo) => (foco.includes(m) ? r.teto + 2 : r.teto + 1);
+    const excedeTeto = (ex: Exercicio, serie: number) =>
+      ex.primarios.some(
+        (p) => (semana.volume.porMusculo.find((v) => v.musculo === p.musculo)?.direto ?? 0) + serie * p.contributo > tetoMais(p.musculo),
+      );
+    for (const m of new Set<Musculo>([...MUSCULOS_GRANDES, ...foco])) {
+      const atual = () => semana.volume.porMusculo.find((v) => v.musculo === m)?.direto ?? 0;
+      let guarda = 0;
+      while (atual() < 8 && guarda++ < 6) {
+        const idsUsados = new Set(semana.dias.flatMap((d) => d.exercicios.map((e) => e.exercicio.id)));
+        const cand = candidatosBase
+          .filter((e) => e.primarios.some((p) => p.musculo === m) && !idsUsados.has(e.id) && !excedeTeto(e, SERIES_TIER[e.tier]))
+          .sort((a, b) => a.tier - b.tier);
+        const diaBase = (diasDoMusculo.get(m) ?? semana.dias.map((d) => d.indice))
+          .map((ix) => semana.dias.find((d) => d.indice === ix))
+          .filter((d): d is DiaSelecionado => !!d);
+        let mexeu = false;
+        for (const ex of cand) {
+          const dia = [...diaBase, ...semana.dias]
+            .filter((d, i, arr) => arr.indexOf(d) === i)
+            .sort((a, b) => a.exercicios.length - b.exercicios.length)
+            .find((d) => d.exercicios.length < 9 && !d.exercicios.some((x) => x.exercicio.familia === ex.familia));
+          if (!dia) continue;
+          dia.exercicios.push({
+            exercicio: ex,
+            series: SERIES_TIER[ex.tier],
+            ordem: dia.exercicios.length + 1,
+            foco: ex.primarios.some((p) => foco.includes(p.musculo)),
+          });
+          reordenar(dia);
+          semana.volume = calcularVolume(semanaParaEntradaVolume(semana), perfil.nivel);
+          mexeu = true;
+          break;
+        }
+        if (!mexeu) {
+          const bump = semana.dias
+            .flatMap((d) => d.exercicios)
+            .filter((e) => e.exercicio.primarios.some((p) => p.musculo === m) && e.series < 6 && !excedeTeto(e.exercicio, 1))
+            .sort((a, b) => a.series - b.series)[0];
+          if (!bump) break;
+          bump.series += 1;
+          semana.volume = calcularVolume(semanaParaEntradaVolume(semana), perfil.nivel);
+        }
+      }
+      if (atual() < 8)
+        semana.avisos.push(`${m}: ${atual()} séries/semana — lesões/equipamento/tempo limitam o volume possível.`);
+    }
+  }
+
+  // ---- 12. corte final ao tempo (as passagens 8/10/11 podem ter alongado) ----
+  for (const d of semana.dias) {
+    let cortou = false;
+    while (d.exercicios.length > 4 && estimarMinutos(d.exercicios) > minutosSessao) {
+      // remover o de menor prioridade que não deixe um protegido abaixo de 8
+      const ordenadosPorPrioridade = [...d.exercicios].sort((a, b) => b.ordem - a.ordem);
+      const rem =
+        ordenadosPorPrioridade.find(
+          (e) =>
+            !e.exercicio.primarios.some((p) => {
+              if (![...MUSCULOS_GRANDES, ...foco].includes(p.musculo)) return false;
+              const v = semana.volume.porMusculo.find((x) => x.musculo === p.musculo)?.direto ?? 0;
+              return v - e.series * p.contributo < 8;
+            }),
+        ) ?? ordenadosPorPrioridade[0];
+      d.exercicios = d.exercicios.filter((x) => x !== rem);
+      cortou = true;
+      semana.volume = calcularVolume(semanaParaEntradaVolume(semana), perfil.nivel);
+    }
+    if (cortou) reordenar(d);
+  }
   semana.volume = calcularVolume(semanaParaEntradaVolume(semana), perfil.nivel);
 
   return semana;

@@ -204,8 +204,13 @@ test("cobertura por tier de cada músculo grande (âncora + isolamento)", () => 
   console.log("\n  músculo grande        | T1p T2p T3p | T1s T2s T3s | âncora? iso?");
   console.log("  ----------------------|-------------|-------------|-------------");
 
+  // Músculos que se treinam SOBRETUDO por isolamento + carga secundária de
+  // compostos — não têm (nem precisam de) âncora composta primária própria.
+  const isolamentoPuro = new Set(["deltoide lateral", "bíceps"]);
+
   const semAncora: string[] = [];
   const semIso: string[] = [];
+  const semCargaComposta: string[] = [];
   const semTier1Estrito: string[] = [];
 
   for (const g of grandes) {
@@ -217,29 +222,41 @@ test("cobertura por tier de cada músculo grande (âncora + isolamento)", () => 
     );
     const ancora = prim[0] + prim[1] > 0;
     const iso = prim[2] > 0;
+    const cargaComposta = prim[0] + prim[1] + sec[0] + sec[1] > 0; // pesado, primário OU secundário
     console.log(
       `  ${g.nome.padEnd(21)} |  ${prim[0]}   ${prim[1]}   ${prim[2]}  ` +
         `|  ${sec[0]}   ${sec[1]}   ${sec[2]}  | ${ancora ? "sim" : "NÃO"}    ${iso ? "sim" : "NÃO"}`,
     );
-    if (!ancora) semAncora.push(g.nome);
     if (!iso) semIso.push(g.nome);
+    if (isolamentoPuro.has(g.nome)) {
+      if (!cargaComposta) semCargaComposta.push(g.nome);
+    } else if (!ancora) {
+      semAncora.push(g.nome);
+    }
     if (prim[0] === 0) semTier1Estrito.push(g.nome);
   }
 
   if (semTier1Estrito.length) {
     console.log(
       `\n  (informativo) sem Tier 1 primário estrito: ${semTier1Estrito.join(", ")} — ` +
-        "esperado: bíceps e tríceps nunca são a âncora de uma sessão pesada; " +
-        "recebem carga Tier 1 como secundários (das puxadas e dos press) e têm " +
-        "âncora própria em Tier 2 primário + muito isolamento em Tier 3.",
+        "esperado: bíceps, tríceps e deltoide lateral nunca são a âncora de uma " +
+        "sessão pesada; recebem carga Tier 1/2 como secundários (das puxadas e " +
+        "dos press) e têm o grosso do volume em isolamento Tier 3.",
     );
   }
 
-  // Falha dura: sem âncora (T1+T2 primário) OU sem isolamento (T3 primário).
+  // Falha dura: um grande com âncora composta esperada sem nenhum T1/T2 primário;
+  // um de isolamento puro sem QUALQUER carga pesada (nem secundária); ou qualquer
+  // um sem isolamento T3 primário.
   assert.equal(
     semAncora.length,
     0,
     `músculos grandes SEM âncora (0 exercícios primários em Tier 1+2): ${semAncora.join(", ")}`,
+  );
+  assert.equal(
+    semCargaComposta.length,
+    0,
+    `músculos de isolamento sem qualquer carga pesada (T1/T2 primária ou secundária): ${semCargaComposta.join(", ")}`,
   );
   assert.equal(
     semIso.length,

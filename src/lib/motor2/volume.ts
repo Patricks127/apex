@@ -7,8 +7,9 @@
 import { EXERCICIOS } from "./exercicios.ts";
 import {
   MUSCULOS,
-  MUSCULOS_EMPURRAR,
-  MUSCULOS_PUXAR,
+  FAMILIAS_EMPURRAR,
+  FAMILIAS_PUXAR,
+  type Familia,
   type Musculo,
   type Nivel,
 } from "./tipos.ts";
@@ -156,13 +157,20 @@ export function calcularVolume(
     }
   }
 
-  // rácio empurrar:puxar (§4.1)
-  const somar = (lista: Musculo[]) =>
-    arred(
-      lista.reduce((acc, m) => acc + (prim.get(m) ?? 0) + (sec.get(m) ?? 0), 0),
-    );
-  const empurrar = somar(MUSCULOS_EMPURRAR);
-  const puxar = somar(MUSCULOS_PUXAR);
+  // rácio empurrar:puxar (§4.1) — conta séries pelas FAMÍLIAS de empurrar/puxar
+  // (conjuntos simétricos). Contar por músculo enviesava: os compostos de puxar
+  // irrigam mais músculos listados do que os de empurrar.
+  const empSet = new Set<Familia>(FAMILIAS_EMPURRAR);
+  const puxSet = new Set<Familia>(FAMILIAS_PUXAR);
+  let empurrar = 0;
+  let puxar = 0;
+  for (const [id, series] of seriesPorEx) {
+    const fam = PORMAPA.get(id)!.familia;
+    if (empSet.has(fam)) empurrar += series;
+    else if (puxSet.has(fam)) puxar += series;
+  }
+  empurrar = arred(empurrar);
+  puxar = arred(puxar);
   const racio = puxar === 0 ? (empurrar === 0 ? 1 : Infinity) : arred(empurrar / puxar);
   const equilibrado = racio >= 0.7 && racio <= 1.3;
   if (!equilibrado && Number.isFinite(racio)) {
