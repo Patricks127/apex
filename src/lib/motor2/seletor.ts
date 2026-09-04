@@ -25,6 +25,14 @@ import {
   type EntradaVolume,
   type RelatorioVolume,
 } from "./volume.ts";
+import {
+  CARDIO_DURO,
+  EQUIP_CALISTENIA,
+  PARAMS,
+  grelhaObjetivo,
+  type DiaGrelha,
+  type TipoSessao,
+} from "./objetivos.ts";
 
 export type ObjetivoV2 =
   | "hipertrofia"
@@ -180,16 +188,15 @@ export function semanaParaEntradaVolume(s: SemanaSelecionada): EntradaVolume {
  *   regenerar um plano que não passou (spec §3.3 passo 5, máx. 3 tentativas).
  */
 export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSelecionada {
+  // Só a hipertrofia usa o otimizador de volume (passos 3–4). Os outros
+  // objetivos têm estrutura própria (spec §6) — ver `construirSemanaModal`.
+  if (perfil.objetivo !== "hipertrofia") return construirSemanaModal(perfil, variacao);
+
   const avisos: string[] = [];
   const dias = Math.min(6, Math.max(3, Math.round(perfil.dias || 4)));
   const minutosSessao = Math.max(30, Math.round(perfil.minutosSessao ?? 75));
   // ~9 min por exercício (séries + descanso + setup) + 6 de aquecimento
   const capDia = Math.min(CAP_EXERCICIOS_DIA, Math.max(4, Math.round((minutosSessao - 6) / 9)));
-  if (perfil.objetivo !== "hipertrofia") {
-    avisos.push(
-      `Objetivo '${perfil.objetivo}' ainda não é suportado pelo seletor v2 — a usar a lógica de hipertrofia. (Passo 6.)`,
-    );
-  }
 
   const disp = new Set(perfil.equipamento);
   const foco = (perfil.foco ?? []).slice(0, 2);
@@ -744,5 +751,323 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
   }
   semana.volume = calcularVolume(semanaParaEntradaVolume(semana), perfil.nivel);
 
+  return semana;
+}
+
+// ===========================================================================
+// PASSO 6 — modalidades não-hipertrofia (spec §6) + treino concorrente (§2.5)
+// ===========================================================================
+
+// Ordem de preferência do cardio. Com a força como prioridade (§2.5),
+// bicicleta/remo antes de corrida (menos dano excêntrico nos membros inferiores).
+const CARDIO_Z2_CORRIDA = ["corrida_z2", "bicicleta_z2", "remo_ergometro_z2"];
+const CARDIO_Z2_FORCA = ["bicicleta_z2", "remo_ergometro_z2", "corrida_z2", "skierg_intervalos"];
+const CARDIO_QUALIDADE_CORRIDA = ["corrida_intervalos_vo2", "corrida_tempo_limiar"];
+const CARDIO_QUALIDADE_FORCA = [
+  "bicicleta_intervalos",
+  "remo_ergometro_intervalos",
+  "assault_bike_sprint",
+  "corrida_intervalos_vo2",
+];
+
+/** Ordena os dias para respeitar o treino concorrente (spec §2.5):
+ *  nada de cardio duro imediatamente antes de um dia de pernas pesado. */
+function agendarInterferencia(
+  grelha: DiaGrelha[],
+  _objetivo: ObjetivoV2,
+  avisos: string[],
+): DiaGrelha[] {
+  const g = [...grelha];
+  const duro = (t: TipoSessao) => (CARDIO_DURO as string[]).includes(t);
+  const pernasPesado = (d: DiaGrelha) => d.tipo === "forca_principal" || !!d.pernasPesado;
+  for (let passo = 0; passo < g.length; passo++) {
+    let mexeu = false;
+    for (let i = 1; i < g.length; i++) {
+      if (duro(g[i - 1].tipo) && pernasPesado(g[i])) {
+        // afasta o cardio duro para trás, se houver um dia "neutro" onde encaixar
+        for (let j = i - 2; j >= 0; j--) {
+          if (!duro(g[j].tipo) && !pernasPesado(g[j]) && (j === 0 || !duro(g[j - 1].tipo))) {
+            const [d] = g.splice(i - 1, 1);
+            g.splice(j, 0, d);
+            mexeu = true;
+            break;
+          }
+        }
+        if (!mexeu) {
+          // sem sítio — troca com o dia seguinte para pelo menos não ser adjacente antes
+          if (i + 1 < g.length) {
+            [g[i - 1], g[i + 1]] = [g[i + 1], g[i - 1]];
+            mexeu = true;
+          }
+        }
+      }
+    }
+    if (!mexeu) break;
+  }
+  const aindaColidem = g.some(
+    (d, i) => i > 0 && duro(g[i - 1].tipo) && pernasPesado(d),
+  );
+  if (aindaColidem) {
+    avisos.push("Atenção: o nº de dias não deixa separar totalmente o cardio duro do dia de pernas pesado — coloca um dia de descanso entre eles.");
+  }
+  return g;
+}
+
+type CtxModal = {
+  objetivo: ObjetivoV2;
+  nivel: Nivel;
+  disp: Set<Equipamento>;
+  lesoes: Zona[];
+  foco: Musculo[];
+  minutosSessao: number;
+  forcaPrioridade: boolean;
+  variacao: number;
+  avisos: string[];
+};
+
+const EQUIP_CALIS = new Set<Equipamento>(EQUIP_CALISTENIA);
+const viavelModal = (e: Exercicio, c: CtxModal) =>
+  ordemNivel[e.nivelMinimo] <= ordemNivel[c.nivel] &&
+  !e.contraindicacoes.some((z) => c.lesoes.includes(z)) &&
+  e.equipamento.some((q) => c.disp.has(q)) &&
+  // calistenia: progressão por alavanca/reps → só exercícios de peso corporal
+  (c.objetivo !== "calistenia" ||
+    e.familia === "cardio" ||
+    e.equipamento.some((q) => EQUIP_CALIS.has(q)));
+
+/** Escolhe UM exercício de cardio para um dia. */
+function escolherCardio(
+  g: DiaGrelha,
+  c: CtxModal,
+  avisos: string[],
+): ExercicioPrescrito | null {
+  const corridaPrimeiro = c.objetivo === "corrida";
+  const prefIds =
+    g.zona === "qualidade"
+      ? corridaPrimeiro
+        ? CARDIO_QUALIDADE_CORRIDA
+        : CARDIO_QUALIDADE_FORCA
+      : corridaPrimeiro
+        ? CARDIO_Z2_CORRIDA
+        : CARDIO_Z2_FORCA;
+  const porId = new Map(EXERCICIOS.map((e) => [e.id, e]));
+  const cardios = EXERCICIOS.filter((e) => e.familia === "cardio");
+  const nivelOk = (e: Exercicio) => ordemNivel[e.nivelMinimo] <= ordemNivel[c.nivel];
+  const equipOk = (e: Exercicio) => e.equipamento.some((q) => c.disp.has(q));
+  const contraOk = (e: Exercicio) => !e.contraindicacoes.some((z) => c.lesoes.includes(z));
+
+  // cascata: preferido & totalmente viável → qualquer cardio viável → ignora
+  // equipamento (corre na rua) → ignora contraindicação (com nota de cautela)
+  let pool = prefIds.map((id) => porId.get(id)!).filter((e) => e && viavelModal(e, c));
+  if (!pool.length) pool = cardios.filter(viavelModal_ => nivelOk(viavelModal_) && equipOk(viavelModal_) && contraOk(viavelModal_));
+  if (!pool.length) pool = prefIds.map((id) => porId.get(id)!).filter((e) => e && nivelOk(e) && contraOk(e));
+  if (!pool.length) pool = cardios.filter((e) => nivelOk(e) && contraOk(e));
+  let cautela = false;
+  if (!pool.length) {
+    pool = prefIds.map((id) => porId.get(id)!).filter(Boolean);
+    cautela = true;
+  }
+  if (!pool.length) return null;
+  const pick = pool[c.variacao % pool.length] ?? pool[0];
+  if (cautela) {
+    const zonas = pick.contraindicacoes.filter((z) => c.lesoes.includes(z));
+    if (zonas.length)
+      avisos.push(`${g.nome}: ${pick.nome} está sinalizado para ${zonas.join("/")} — faz sem dor e em piso macio, ou troca por bicicleta/remo.`);
+  }
+  return { exercicio: pick, series: 1, ordem: 1, foco: false };
+}
+
+/** Preenche um dia de FORÇA com N exercícios (greedy, sem repetir família).
+ *  `volSemana` acumula volume PRIMÁRIO direto ao longo da semana — não se
+ *  ultrapassa o teto do nível (evita o 25×/semana de glúteo num split de
+ *  força de alta frequência). */
+function preencherForca(
+  musculos: Musculo[],
+  familiasPermitidas: Familia[] | undefined,
+  alvoN: number,
+  c: CtxModal,
+  volSemana: Map<Musculo, number>,
+  jaEscolhidos: ExercicioPrescrito[] = [],
+): ExercicioPrescrito[] {
+  const fams = familiasPermitidas ?? FAMILIAS_RESISTENCIA;
+  const rank = (p: Exercicio["progressao"]) => (p === "alta" ? 2 : p === "media" ? 1 : 0);
+  const teto = INTERVALO_VOLUME[c.nivel].teto + (c.objetivo === "powerlifting" ? 2 : 0);
+  const pool = EXERCICIOS.filter(
+    (e) =>
+      viavelModal(e, c) &&
+      fams.includes(e.familia) &&
+      e.primarios.some((p) => musculos.includes(p.musculo)),
+  ).sort((a, b) => a.tier - b.tier || rank(b.progressao) - rank(a.progressao));
+  const rot = c.variacao % Math.max(1, pool.length);
+  const ordenado = [...pool.slice(rot), ...pool.slice(0, rot)];
+
+  const escolhidos = [...jaEscolhidos];
+  const famUsadas = new Set(escolhidos.map((e) => e.exercicio.familia));
+  const cobertura = new Map<Musculo, number>();
+  const acresc = (e: Exercicio) => {
+    for (const p of e.primarios) {
+      cobertura.set(p.musculo, (cobertura.get(p.musculo) ?? 0) + 1);
+      volSemana.set(p.musculo, (volSemana.get(p.musculo) ?? 0) + SERIES_TIER[e.tier] * p.contributo);
+    }
+  };
+  for (const e of escolhidos) acresc(e.exercicio);
+
+  const nT1 = () => escolhidos.filter((x) => x.exercicio.tier === 1).length;
+  const estouraTeto = (e: Exercicio) =>
+    e.primarios.some((p) => (volSemana.get(p.musculo) ?? 0) + SERIES_TIER[e.tier] * p.contributo > teto);
+
+  for (const tierAlvo of [1, 2, 3]) {
+    for (const e of ordenado) {
+      if (escolhidos.length >= alvoN) break;
+      if (e.tier !== tierAlvo) continue;
+      if (famUsadas.has(e.familia)) continue;
+      if (e.tier === 1 && nT1() >= 2) continue; // no máx. 2 compostos pesados/dia
+      if (estouraTeto(e)) continue;
+      const pm = e.primarios[0].musculo;
+      const subCoberto = (cobertura.get(pm) ?? 0) < 2;
+      if (!subCoberto && escolhidos.length >= Math.max(3, alvoN - 2)) continue;
+      escolhidos.push({
+        exercicio: e,
+        series: SERIES_TIER[e.tier],
+        ordem: escolhidos.length + 1,
+        foco: e.primarios.some((p) => c.foco.includes(p.musculo)),
+      });
+      famUsadas.add(e.familia);
+      acresc(e);
+    }
+  }
+  return escolhidos;
+}
+
+const LIFT_FAMILIA: Record<string, Familia> = {
+  agachamento: "squat",
+  supino: "horizontal_push",
+  terra: "hinge",
+  press: "vertical_push",
+};
+
+function construirDiaModal(g: DiaGrelha, c: CtxModal, volSemana: Map<Musculo, number>): ExercicioPrescrito[] {
+  const alvoN = Math.min(8, Math.max(4, Math.round((c.minutosSessao - 8) / 11)));
+
+  if (g.tipo === "cardio_z2" || g.tipo === "cardio_qualidade") {
+    const ex = escolherCardio(g, c, c.avisos);
+    return ex ? [ex] : [];
+  }
+
+  if (g.tipo === "circuito") {
+    const fams = g.estacoes ?? (["conditioning", "carry"] as Familia[]);
+    let pool = EXERCICIOS.filter((e) => viavelModal(e, c) && fams.includes(e.familia));
+    // fallback: se as lesões esvaziam o circuito, usa cardio + core seguros
+    if (pool.length < 3)
+      pool = EXERCICIOS.filter(
+        (e) => viavelModal(e, c) && ["conditioning", "carry", "cardio", "core"].includes(e.familia),
+      );
+    pool = pool.sort((a, b) => b.fadigaSistemica - a.fadigaSistemica);
+    const rot = c.variacao % Math.max(1, pool.length);
+    const ord = [...pool.slice(rot), ...pool.slice(0, rot)];
+    const out: ExercicioPrescrito[] = [];
+    const fam = new Set<Familia>();
+    for (const e of ord) {
+      if (out.length >= Math.min(6, alvoN)) break;
+      if (fam.has(e.familia) && out.length >= 3) continue;
+      out.push({ exercicio: e, series: 3, ordem: out.length + 1, foco: false });
+      fam.add(e.familia);
+    }
+    return out;
+  }
+
+  if (g.tipo === "skill") {
+    const skills = EXERCICIOS.filter((e) => e.familia === "skill" && viavelModal(e, c));
+    const rot = c.variacao % Math.max(1, skills.length);
+    const primeiros = [...skills.slice(rot), ...skills.slice(0, rot)]
+      .slice(0, 2)
+      .map((e, i) => ({ exercicio: e, series: 4, ordem: i + 1, foco: false }));
+    const fill = g.familias?.filter((f) => f !== "skill");
+    return rescatar(preencherForca(g.musculos ?? [], fill, alvoN, c, volSemana, primeiros), g, c, alvoN, volSemana);
+  }
+
+  if (g.tipo === "forca_principal") {
+    let base: ExercicioPrescrito[] = [];
+    const fam = g.principal ? LIFT_FAMILIA[g.principal] : undefined;
+    if (fam) {
+      // T1 é o ideal; sem barra (casa/parque) aceita-se o melhor T2 da família
+      const cand = EXERCICIOS.filter(
+        (e) => e.familia === fam && e.tier <= 2 && viavelModal(e, c),
+      ).sort(
+        (a, b) => a.tier - b.tier || b.fadigaSistemica - a.fadigaSistemica || b.exigenciaTecnica - a.exigenciaTecnica,
+      );
+      const principal = cand[c.variacao % Math.max(1, cand.length)] ?? cand[0];
+      if (principal) base = [{ exercicio: principal, series: principal.tier === 1 ? 5 : 4, ordem: 1, foco: false }];
+    }
+    return rescatar(preencherForca(g.musculos ?? [], g.familias, alvoN, c, volSemana, base), g, c, alvoN, volSemana);
+  }
+
+  // forca (hibrido / corrida-manutenção / calistenia PPL)
+  return rescatar(preencherForca(g.musculos ?? [], g.familias, alvoN, c, volSemana), g, c, alvoN, volSemana);
+}
+
+/** Se o dia ficou (quase) vazio por causa das lesões/equipamento, tenta de
+ *  novo sem restrição de família — qualquer exercício seguro para os músculos
+ *  do dia. */
+function rescatar(
+  exs: ExercicioPrescrito[],
+  g: DiaGrelha,
+  c: CtxModal,
+  alvoN: number,
+  volSemana: Map<Musculo, number>,
+): ExercicioPrescrito[] {
+  if (exs.length >= 2 || !g.musculos?.length) return exs;
+  return preencherForca(g.musculos, undefined, alvoN, c, volSemana, exs);
+}
+
+export function construirSemanaModal(perfil: PerfilSelecao, variacao = 0): SemanaSelecionada {
+  const objetivo = perfil.objetivo;
+  const nivel = perfil.nivel;
+  let dias = Math.min(6, Math.max(3, Math.round(perfil.dias || 4)));
+  const minutosSessao = Math.max(30, Math.round(perfil.minutosSessao ?? 75));
+  const params = PARAMS[objetivo];
+  const avisos = [...params.regras];
+
+  // powerlifting: um iniciante não aguenta 5–6 dias de levantamentos pesados
+  if (objetivo === "powerlifting" && nivel === "iniciante" && dias > 4) {
+    avisos.push(`Powerlifting para iniciante: ${dias} dias é demais — ajustei para 4. Prioriza a técnica e a recuperação.`);
+    dias = 4;
+  } else if (objetivo === "powerlifting" && nivel === "intermedio" && dias > 5) {
+    avisos.push("Powerlifting intermédio: ajustei para 5 dias para a recuperação dos levantamentos pesados.");
+    dias = 5;
+  }
+
+  const c: CtxModal = {
+    objetivo,
+    nivel,
+    disp: new Set(perfil.equipamento),
+    lesoes: perfil.lesoes ?? [],
+    foco: (perfil.foco ?? []).slice(0, 2),
+    minutosSessao,
+    forcaPrioridade: objetivo === "hibrido" || objetivo === "hyrox" || objetivo === "powerlifting",
+    variacao,
+    avisos,
+  };
+
+  const volSemana = new Map<Musculo, number>();
+  const grelha = agendarInterferencia(grelhaObjetivo(objetivo, dias), objetivo, avisos);
+
+  const diasSel: DiaSelecionado[] = grelha.map((g, i) => ({
+    indice: i,
+    nome: g.nome,
+    tipo: g.tipo,
+    musculosAlvo: (g.musculos ?? []).slice(),
+    exercicios: construirDiaModal(g, c, volSemana),
+  }));
+
+  const semana: SemanaSelecionada = {
+    perfil,
+    split: grelha.map((g) => g.nome).join(" · "),
+    alvoVolume: {},
+    dias: diasSel,
+    volume: calcularVolume([], nivel),
+    avisos,
+  };
+  semana.volume = calcularVolume(semanaParaEntradaVolume(semana), nivel);
   return semana;
 }

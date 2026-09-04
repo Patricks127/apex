@@ -30,6 +30,7 @@ import {
   type PerfilSelecao,
   type SemanaSelecionada,
 } from "./seletor.ts";
+import { CARDIO_DURO, CATEGORIA, EQUIP_CALISTENIA as EQUIP_CALIS_V, POLARIZADO } from "./objetivos.ts";
 
 // ---------------------------------------------------------------------------
 
@@ -156,6 +157,9 @@ function musculosAlvoObjetivo(perfil: PerfilSelecao): Musculo[] {
 
 export function validarSemana(semana: SemanaSelecionada): ResultadoValidacao {
   const perfil = semana.perfil;
+  if (CATEGORIA[perfil.objetivo] === "endurance") return validarEndurance(semana);
+  if (perfil.objetivo !== "hipertrofia") return validarNaoHipertrofia(semana);
+
   const dias = semana.dias;
   const minutosSessao = Math.max(30, Math.round(perfil.minutosSessao ?? 75));
   const rel = calcularVolume(semanaParaEntradaVolume(semana), perfil.nivel);
@@ -211,15 +215,18 @@ export function validarSemana(semana: SemanaSelecionada): ResultadoValidacao {
     );
   }
 
-  // 3. duas famílias iguais no mesmo dia
+  // 3. duas famílias iguais no mesmo dia (circuitos repetem por desenho)
   for (const d of dias) {
+    if (d.tipo === "circuito") continue;
     const fam = d.exercicios.map((e) => e.exercicio.familia);
     const dup = fam.find((f, i) => fam.indexOf(f) !== i);
     if (dup) falhasDuras.push(`${d.nome}: família repetida no mesmo dia (${dup}).`);
   }
 
   // 4. três ou mais compostos pesados (fadigaSistemica 3) consecutivos
+  //    (não se aplica a circuitos/cardio — a intensidade encadeada é o objetivo)
   for (const d of dias) {
+    if (d.tipo === "circuito" || (CARDIO_DURO as string[]).includes(d.tipo)) continue;
     const seq = d.exercicios.map((e) => e.exercicio.fadigaSistemica);
     for (let i = 0; i + 2 < seq.length; i++)
       if (seq[i] === 3 && seq[i + 1] === 3 && seq[i + 2] === 3)
@@ -230,12 +237,15 @@ export function validarSemana(semana: SemanaSelecionada): ResultadoValidacao {
   //    Compara os alvos do dia (o que o split pretende treinar), não músculos
   //    que aparecem de raspão como primário secundário de um composto. Não se
   //    aplica a full-body (dias de treino com descanso entre si por definição).
+  //    Powerlifting roda os 3 levantamentos por desenho (a fadiga gere-se pela
+  //    intensidade: dia pesado vs dia de volume) — aviso, não falha.
   for (let i = 1; i < dias.length; i++) {
     if (dias[i - 1].tipo === "full" || dias[i].tipo === "full") continue;
     const a = new Set(dias[i - 1].musculosAlvo.filter((m) => MUSCULOS_GRANDES.includes(m)));
     const comum = dias[i].musculosAlvo.filter((m) => MUSCULOS_GRANDES.includes(m) && a.has(m));
-    if (comum.length)
-      falhasDuras.push(`${dias[i - 1].nome} → ${dias[i].nome}: ${comum.join(", ")} em dias consecutivos (<48h).`);
+    if (!comum.length) continue;
+    const msg = `${dias[i - 1].nome} → ${dias[i].nome}: ${comum.join(", ")} em dias consecutivos (<48h).`;
+    falhasDuras.push(msg);
   }
 
   // 6. rácio empurrar:puxar fora de 1:1 ± 30%.
@@ -245,7 +255,7 @@ export function validarSemana(semana: SemanaSelecionada): ResultadoValidacao {
     const lesaoMS = perfil.lesoes.some((z) => (LESOES_MEMBRO_SUPERIOR as readonly string[]).includes(z));
     // num full-body cada sessão repete todos os padrões — o rácio por famílias é
     // mais ruidoso; tolera-se uma janela mais larga antes de falhar.
-    const foraDeVez = temFull ? r > 1.5 || r < 0.58 : true;
+    const foraDeVez = temFull ? r > 1.6 || r < 0.55 : true;
     if (lesaoMS && (r < 0.7 || !Number.isFinite(r)))
       avisos.push(`Rácio empurrar:puxar = ${r}:1 — desequilíbrio esperado com lesão do membro superior.`);
     else if (foraDeVez) falhasDuras.push(`Rácio empurrar:puxar = ${r}:1 — fora de 1:1 ± 30%.`);
@@ -548,4 +558,374 @@ export function gerarPlanoValidado(perfil: PerfilSelecao, maxTentativas = 3): Pl
     if (validacao.aprovado) return cand;
   }
   return melhor as PlanoValidado;
+}
+
+// ===========================================================================
+// PASSO 6 — validação dos objetivos de endurance (corrida)
+// ===========================================================================
+
+const clamp01e = (n: number) => Math.max(0, Math.min(1, n));
+const r1e = (n: number) => Math.round(n * 10) / 10;
+
+/** Minutos estimados de uma sessão de cardio pelo tipo/nome do dia. */
+function minutosCardio(d: DiaSelecionado): number {
+  if (d.tipo === "cardio_qualidade") return 42; // aquecimento + blocos + volta à calma
+  if (/long/i.test(d.nome)) return 80;
+  return 52; // corrida fácil Z2
+}
+
+export function validarEndurance(semana: SemanaSelecionada): ResultadoValidacao {
+  const perfil = semana.perfil;
+  const dias = semana.dias;
+  const iniciante = perfil.nivel === "iniciante";
+  const criterios: Criterio[] = [];
+  const avisos: string[] = [...semana.avisos];
+  const falhasDuras: string[] = [];
+
+  const z2 = dias.filter((d) => d.tipo === "cardio_z2");
+  const qualidade = dias.filter((d) => d.tipo === "cardio_qualidade");
+  const forca = dias.filter((d) => d.tipo === "forca" || d.tipo === "forca_principal");
+  const nCardio = z2.length + qualidade.length;
+
+  // ---- §4.1-equivalente: verificações duras ----
+  if (nCardio < 3) falhasDuras.push(`Só ${nCardio} sessões de corrida/semana — insuficiente para progredir.`);
+  for (let i = 1; i < dias.length; i++)
+    if (dias[i - 1].tipo === "cardio_qualidade" && dias[i].tipo === "cardio_qualidade")
+      falhasDuras.push(`${dias[i - 1].nome} → ${dias[i].nome}: duas sessões de qualidade em dias seguidos.`);
+  if (qualidade.length > 3) falhasDuras.push(`${qualidade.length} sessões de qualidade — excesso de alta intensidade.`);
+  for (let i = 1; i < dias.length; i++) {
+    const a = dias[i - 1].tipo;
+    const b = dias[i].tipo;
+    if ((a === "forca" || a === "forca_principal") && b === "cardio_qualidade")
+      avisos.push(`${dias[i - 1].nome} → ${dias[i].nome}: força na véspera de uma sessão de qualidade (§2.5).`);
+  }
+  for (const d of dias) if (d.exercicios.length === 0) falhasDuras.push(`${d.nome}: dia sem conteúdo.`);
+
+  // ---- distribuição polarizada (30) ----
+  {
+    const minZ2 = z2.reduce((a, d) => a + minutosCardio(d), 0);
+    const minQ = qualidade.reduce((a, d) => a + minutosCardio(d), 0);
+    const totalCardio = minZ2 + minQ || 1;
+    const fracZ12 = minZ2 / totalCardio;
+    const alvo = iniciante ? 0.65 : POLARIZADO.z12min; // principiante: piramidal aceita-se
+    const fracao = clamp01e(fracZ12 >= alvo ? 1 : fracZ12 / alvo);
+    criterios.push({
+      nome: "distribuicao_semanal",
+      peso: 30,
+      fracao,
+      pontos: r1e(fracao * 30),
+      notas: [`${Math.round(fracZ12 * 100)}% do volume em Z1–2 (alvo ≥ ${Math.round(alvo * 100)}%)`],
+    });
+  }
+
+  // ---- volume e consistência (20) ----
+  {
+    const temLongo = z2.some((d) => /long/i.test(d.nome)) || z2.length >= 2;
+    const distintos = new Set(dias.map((d) => d.nome)).size >= Math.min(dias.length, 3);
+    const fracao = clamp01e((nCardio >= 3 ? 0.6 : nCardio / 5) + (temLongo ? 0.25 : 0) + (distintos ? 0.15 : 0));
+    criterios.push({
+      nome: "qualidade_selecao",
+      peso: 20,
+      fracao,
+      pontos: r1e(fracao * 20),
+      notas: [`${nCardio} sessões de corrida${temLongo ? ", com corrida longa" : ""}`],
+    });
+  }
+
+  // ---- qualidade doseada + espaçamento (15) ----
+  {
+    const nQ = qualidade.length;
+    const okDose = nQ >= 1 && nQ <= 2;
+    let espacamento = 1;
+    const idxQ = dias.map((d, i) => (d.tipo === "cardio_qualidade" ? i : -1)).filter((i) => i >= 0);
+    for (let k = 1; k < idxQ.length; k++) if (idxQ[k] - idxQ[k - 1] < 2) espacamento = 0;
+    const fracao = clamp01e((okDose ? 0.6 : nQ === 0 ? 0.2 : 0.35) + 0.4 * espacamento);
+    criterios.push({
+      nome: "gestao_fadiga",
+      peso: 15,
+      fracao,
+      pontos: r1e(fracao * 15),
+      notas: [`${nQ} sessão(ões) de qualidade`],
+    });
+  }
+
+  // ---- força de manutenção controlada (10) ----
+  {
+    const okVolume = forca.length <= 2;
+    let semColisao = true;
+    for (let i = 1; i < dias.length; i++) {
+      const a = dias[i - 1].tipo;
+      const b = dias[i].tipo;
+      if (((a === "forca" || a === "forca_principal") && b === "cardio_qualidade") ||
+          (a === "cardio_qualidade" && (b === "forca" || b === "forca_principal")))
+        semColisao = false;
+    }
+    const fracao = clamp01e((okVolume ? 0.6 : 0.2) + (semColisao ? 0.4 : 0));
+    criterios.push({
+      nome: "adequacao_objetivo",
+      peso: 10,
+      fracao,
+      pontos: r1e(fracao * 10),
+      notas: [`${forca.length} sessão(ões) de força de manutenção`],
+    });
+  }
+
+  // ---- cobertura de padrões de corrida (10) ----
+  {
+    const temFacil = z2.length >= (dias.length >= 5 ? 2 : 1);
+    const temQualidade = qualidade.length >= 1;
+    const fracao = clamp01e((temFacil ? 0.6 : 0) + (temQualidade ? 0.4 : 0));
+    criterios.push({
+      nome: "cobertura_padroes",
+      peso: 10,
+      fracao,
+      pontos: r1e(fracao * 10),
+      notas: [temFacil && temQualidade ? "corrida fácil + qualidade presentes" : "estrutura incompleta"],
+    });
+  }
+
+  // ---- estrutura (10) ----
+  {
+    const nEsperado = Math.min(6, Math.max(3, Math.round(perfil.dias || 4)));
+    const fracao = clamp01e((dias.length === nEsperado ? 0.7 : 0.4) + (dias.every((d) => d.exercicios.length > 0) ? 0.3 : 0));
+    criterios.push({
+      nome: "progressao",
+      peso: 10,
+      fracao,
+      pontos: r1e(fracao * 10),
+      notas: [`${dias.length} dias`],
+    });
+  }
+
+  // eficiência/tempo — as sessões de corrida gerem-se pelo relógio
+  criterios.push({ nome: "eficiencia_tempo", peso: 5, fracao: 1, pontos: 5, notas: ["sessões geridas pelo tempo/distância"] });
+
+  let pontuacao = r1e(criterios.reduce((a, c) => a + c.pontos, 0));
+  if (falhasDuras.length) pontuacao = Math.min(pontuacao, 60);
+  const aprovado = falhasDuras.length === 0 && pontuacao >= 85;
+  const rejeitado = falhasDuras.length > 0 || pontuacao < 75;
+  return { pontuacao, aprovado, precisaRever: !aprovado && !rejeitado, rejeitado, criterios, falhasDuras, avisos };
+}
+
+// ===========================================================================
+// PASSO 6 — validação de powerlifting / calistenia / híbrido / hyrox
+// ===========================================================================
+
+function validarNaoHipertrofia(semana: SemanaSelecionada): ResultadoValidacao {
+  const perfil = semana.perfil;
+  const dias = semana.dias;
+  const obj = perfil.objetivo;
+  const minutosSessao = Math.max(30, Math.round(perfil.minutosSessao ?? 75));
+  const rel = calcularVolume(semanaParaEntradaVolume(semana), perfil.nivel);
+  const vm = (m: Musculo) => rel.porMusculo.find((x) => x.musculo === m);
+  // em calistenia o que é "viável" é só o que se faz com o peso do corpo
+  const via = viabilidade(
+    obj === "calistenia"
+      ? { ...perfil, equipamento: perfil.equipamento.filter((q) => (EQUIP_CALIS_V as string[]).includes(q)) }
+      : perfil,
+  );
+  const misto = CATEGORIA[obj] === "misto";
+
+  const criterios: Criterio[] = [];
+  const avisos: string[] = [...semana.avisos];
+  const falhasDuras: string[] = [];
+
+  const forcaDias = dias.filter((d) => d.tipo === "forca" || d.tipo === "forca_principal" || d.tipo === "skill");
+  const cardioDias = dias.filter((d) => (CARDIO_DURO as string[]).includes(d.tipo) || d.tipo === "cardio_z2");
+  const duroTipo = (t: string) => (CARDIO_DURO as string[]).includes(t);
+
+  // ===== verificações duras =====
+  const vazios = dias.filter((d) => d.exercicios.length === 0);
+  const tolEmpty = obj === "calistenia" || obj === "powerlifting" ? 2 : 1; // lesão limita mais estes
+  if (vazios.length && vazios.length <= tolEmpty)
+    avisos.push(`${vazios.map((d) => d.nome).join(", ")}: sem exercícios viáveis com as lesões/equipamento — usa para descanso/mobilidade.`);
+  else if (vazios.length > tolEmpty)
+    falhasDuras.push(`${vazios.length} dias sem conteúdo — não há como montar o plano com estas lesões/equipamento.`);
+  for (const d of dias) {
+    if (d.exercicios.length === 0) continue;
+    if (d.tipo === "circuito" || d.tipo === "skill") continue; // repetem por desenho
+    const fam = d.exercicios.map((e) => e.exercicio.familia);
+    const dup = fam.find((f, i) => fam.indexOf(f) !== i && f !== "skill");
+    if (dup) falhasDuras.push(`${d.nome}: família repetida no mesmo dia (${dup}).`);
+    if (!duroTipo(d.tipo)) {
+      const seq = d.exercicios.map((e) => e.exercicio.fadigaSistemica);
+      for (let i = 0; i + 2 < seq.length; i++)
+        if (seq[i] === 3 && seq[i + 1] === 3 && seq[i + 2] === 3)
+          falhasDuras.push(`${d.nome}: 3 compostos pesados consecutivos.`);
+    }
+  }
+  // acima do teto — só falha se for EXTREMO (planos estruturais, não otimizados)
+  for (const v of rel.porMusculo) {
+    if (v.estado !== "acima_teto") continue;
+    if (v.primario > v.teto * 1.6)
+      falhasDuras.push(`${v.musculo}: ${v.direto} séries/semana (primário ${v.primario}) — muito acima do teto (${v.teto}).`);
+    else avisos.push(`${v.musculo} ${v.direto} > teto ${v.teto} — aceitável neste objetivo.`);
+  }
+  // tempo
+  for (const d of dias) {
+    const min = estimarMinutosDia(d);
+    if (!duroTipo(d.tipo) && d.tipo !== "cardio_z2" && min > minutosSessao * 1.1)
+      falhasDuras.push(`${d.nome}: ~${min} min > ${minutosSessao} min disponíveis.`);
+  }
+  // treino concorrente (§2.5)
+  for (let i = 1; i < dias.length; i++) {
+    if (duroTipo(dias[i - 1].tipo) && (dias[i].tipo === "forca_principal" || /Inferior|Pernas/i.test(dias[i].nome))) {
+      if (!avisos.some((a) => /não deixa separar/.test(a)))
+        avisos.push(`${dias[i - 1].nome} → ${dias[i].nome}: cardio duro perto de pernas pesado — vê o espaçamento.`);
+    }
+  }
+  // essenciais do objetivo
+  if (misto && cardioDias.length === 0) falhasDuras.push("Objetivo com componente de cardio, mas sem nenhuma sessão de cardio.");
+  if (misto && forcaDias.length === 0) falhasDuras.push("Objetivo com componente de força, mas sem nenhuma sessão de força.");
+
+  const clamp01n = (n: number) => Math.max(0, Math.min(1, n));
+  const r1n = (n: number) => Math.round(n * 10) / 10;
+
+  // ===== 1. estrutura do objetivo (30) =====
+  {
+    let fracao = 1;
+    const notas: string[] = [];
+    if (obj === "powerlifting") {
+      const principais = new Set(
+        dias
+          .filter((d) => d.tipo === "forca_principal")
+          .map((d) => d.exercicios[0]?.exercicio.familia)
+          .filter(Boolean),
+      );
+      // relativo aos levantamentos que a lesão/equipamento deixam treinar
+      // (T1 ideal; sem barra aceita-se um T2 pesado da família)
+      const podeAncora = (fam: string) =>
+        EXERCICIOS.some((e) => e.familia === fam && e.tier <= 2 && via.ex(e));
+      const esperados = (["squat", "hinge", "horizontal_push"] as const).filter(podeAncora);
+      const cobre = esperados.filter((f) => principais.has(f)).length;
+      if (esperados.length) {
+        fracao = cobre / esperados.length;
+        notas.push(`${cobre}/${esperados.length} levantamentos principais viáveis presentes`);
+      } else {
+        fracao = 0.82; // sem barra/carga — força geral com o que há
+        avisos.push("Sem barra disponível, o powerlifting fica limitado a trabalho de força geral.");
+        notas.push("sem levantamentos com barra viáveis");
+      }
+    } else if (obj === "calistenia") {
+      const tipos = dias.map((d) => d.nome.toLowerCase());
+      const ppl = ["empurrar", "puxar", "pernas"].filter((n) => tipos.some((t) => t.includes(n))).length;
+      const skillOk = dias.length < 4 || dias.some((d) => d.tipo === "skill");
+      const semCarga = forcaDias.every((d) =>
+        d.exercicios.every((e) => e.exercicio.familia === "cardio" || e.exercicio.equipamento.some((q) => (["peso_corporal", "barra_fixa", "paralelas", "banda", "trx", "caixa"] as string[]).includes(q))),
+      );
+      fracao = 0.5 * (ppl / 3) + 0.25 * (skillOk ? 1 : 0) + 0.25 * (semCarga ? 1 : 0);
+      notas.push(`PPL ${ppl}/3${skillOk ? " + skill" : ""}${semCarga ? " · só peso corporal" : " · tem carga externa"}`);
+    } else {
+      // hibrido / hyrox
+      const nF = forcaDias.length;
+      const nC = cardioDias.length;
+      const separados = !dias.some(
+        (d) => d.exercicios.some((e) => e.exercicio.familia === "cardio") && d.exercicios.some((e) => e.exercicio.familia !== "cardio") && d.tipo !== "circuito",
+      );
+      const temCircuito = obj !== "hyrox" || dias.some((d) => d.tipo === "circuito");
+      fracao = 0.35 * (nF >= 1 ? 1 : 0) + 0.35 * (nC >= 1 ? 1 : 0) + 0.15 * (separados ? 1 : 0) + 0.15 * (temCircuito ? 1 : 0);
+      notas.push(`${nF} força + ${nC} cardio${separados ? ", em dias separados" : ""}`);
+    }
+    criterios.push({ nome: "adequacao_objetivo", peso: 30, fracao: clamp01n(fracao), pontos: r1n(clamp01n(fracao) * 30), notas });
+  }
+
+  // ===== 2. seleção e âncora (20) =====
+  {
+    let ancoraOK = 0;
+    let ancoraTot = 0;
+    let ordemOK = 0;
+    for (const d of forcaDias) {
+      const tiers = d.exercicios.map((e) => e.exercicio.tier);
+      let ok = true;
+      for (let i = 0; i < tiers.length; i++)
+        for (let j = i + 1; j < tiers.length; j++) if (tiers[i] === 3 && tiers[j] !== 3) ok = false;
+      if (ok) ordemOK++;
+      for (const m of gruposGrandesDoDia(d)) {
+        if (via.poolMusculoPesado(m) === 0) continue;
+        ancoraTot++;
+        if (d.exercicios.some((e) => e.exercicio.tier <= 2 && e.exercicio.primarios.some((p) => p.musculo === m))) ancoraOK++;
+      }
+    }
+    const fr = clamp01n(0.5 * (ancoraTot ? ancoraOK / ancoraTot : 1) + 0.5 * (forcaDias.length ? ordemOK / forcaDias.length : 1));
+    criterios.push({ nome: "qualidade_selecao", peso: 20, fracao: fr, pontos: r1n(fr * 20), notas: [`âncora ${ancoraOK}/${ancoraTot}, ordem ${ordemOK}/${forcaDias.length}`] });
+  }
+
+  // ===== 3. fadiga e ordem semanal (15) =====
+  {
+    let pares = 0;
+    for (let i = 1; i < dias.length; i++) {
+      const a = new Set(dias[i - 1].musculosAlvo.filter((m) => MUSCULOS_GRANDES.includes(m)));
+      if (dias[i].musculosAlvo.some((m) => MUSCULOS_GRANDES.includes(m) && a.has(m))) pares++;
+    }
+    const limite = obj === "powerlifting" ? Math.ceil(dias.length / 2) : 1;
+    const fr = clamp01n(1 - Math.max(0, pares - (limite - 1)) * 0.3);
+    criterios.push({ nome: "gestao_fadiga", peso: 15, fracao: fr, pontos: r1n(fr * 15), notas: [`${pares} par(es) de dias com o mesmo grupo grande`] });
+  }
+
+  // ===== 4. volume suficiente nos motores do objetivo (15) =====
+  {
+    const alvo = obj === "powerlifting"
+      ? (["quadriceps", "gluteo", "isquiotibiais", "peito", "dorsais"] as Musculo[])
+      : misto
+        ? (["quadriceps", "gluteo", "peito", "dorsais"] as Musculo[])
+        : ([...MUSCULOS_GRANDES] as Musculo[]);
+    // misto: a força é suplementar e escala com o nº de dias de força
+    const nForca = forcaDias.length;
+    const piso = misto ? Math.max(2, Math.min(5, nForca * 2)) : 6;
+    const scores = alvo
+      .filter((m) => via.poolMusculoPrim(m) >= 2)
+      .map((m) => {
+        const v = vm(m);
+        if (!v) return 0.3;
+        if (v.direto >= piso) return 1;
+        return Math.max(0.3, v.direto / piso);
+      });
+    const fr = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 1;
+    criterios.push({ nome: "distribuicao_semanal", peso: 15, fracao: clamp01n(fr), pontos: r1n(clamp01n(fr) * 15), notas: [`${scores.filter((s) => s >= 1).length}/${scores.length} motores com volume suficiente`] });
+  }
+
+  // ===== 5. progressão mensurável (10) =====
+  {
+    // Em calistenia a progressão é por reps/alavanca (toda mensurável). Nos
+    // outros pesa mais o que se pode carregar — âncoras (tier ≤ 2) contam a
+    // dobrar face aos isolamentos.
+    const todos = forcaDias.flatMap((d) => d.exercicios);
+    // sem equipamento de carga, a progressão é por reps/alavanca (como calistenia)
+    const semCarga =
+      todos.length > 0 &&
+      todos.filter((e) =>
+        e.exercicio.equipamento.some((q) => ["barra", "halteres", "maquina", "cabos", "kettlebell"].includes(q)),
+      ).length / todos.length < 0.3;
+    const porReps = obj === "calistenia" || semCarga;
+    let peso = 0;
+    let bom = 0;
+    for (const e of todos) {
+      const w = e.exercicio.tier <= 2 ? 2 : 1;
+      peso += w;
+      if (porReps || e.exercicio.progressao !== "baixa") bom += w;
+    }
+    const fr = peso ? bom / peso : 1;
+    criterios.push({
+      nome: "progressao",
+      peso: 10,
+      fracao: clamp01n(fr),
+      pontos: r1n(clamp01n(fr) * 10),
+      notas: [porReps ? "progressão por reps/alavanca" : `${Math.round(fr * 100)}% do trabalho com progressão de carga clara`],
+    });
+  }
+
+  // ===== 6. eficiência / tempo (10) =====
+  {
+    const excesso = dias
+      .filter((d) => !duroTipo(d.tipo) && d.tipo !== "cardio_z2")
+      .map((d) => Math.max(0, estimarMinutosDia(d) - minutosSessao) / minutosSessao);
+    const fr = clamp01n(1 - 1.5 * excesso.reduce((a, b) => a + b, 0));
+    criterios.push({ nome: "eficiencia_tempo", peso: 10, fracao: fr, pontos: r1n(fr * 10), notas: [`sessões de força vs ${minutosSessao} min`] });
+  }
+
+  let pontuacao = r1n(criterios.reduce((a, c) => a + c.pontos, 0));
+  if (falhasDuras.length) pontuacao = Math.min(pontuacao, 60);
+  const aprovado = falhasDuras.length === 0 && pontuacao >= 85;
+  const rejeitado = falhasDuras.length > 0 || pontuacao < 75;
+  return { pontuacao, aprovado, precisaRever: !aprovado && !rejeitado, rejeitado, criterios, falhasDuras, avisos };
 }

@@ -3,7 +3,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { carregarPerfilMotor, janelaRecente } from "@/lib/treino/perfil";
-import { buildDay, type Injury, type Progression } from "@/lib/motor";
+import { type Injury, type Progression } from "@/lib/motor";
+import { gerarPlanoV2 } from "@/lib/motor2";
 import { RegistoTreino } from "./registo-treino";
 
 export const metadata: Metadata = {
@@ -51,10 +52,12 @@ export default async function TreinoDiaPage({
     .limit(1);
   const checkinZones = (checkins?.[0]?.discomfort_zones ?? []) as Injury[];
 
-  const diaGerado = buildDay(ctx.motorProfile, dayIndex, ctx.maxes, {
+  const planoV2 = gerarPlanoV2(ctx.motorProfile, ctx.maxes, {
     progression: prog,
     checkinZones,
   });
+  const diaBruto = planoV2.days[dayIndex];
+  const diaGerado = diaBruto && !diaBruto.rest ? diaBruto : null;
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col px-4 py-8">

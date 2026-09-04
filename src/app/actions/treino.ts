@@ -5,7 +5,6 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { carregarPerfilMotor } from "@/lib/treino/perfil";
 import {
-  buildWeek,
   advanceWeek,
   initProgression,
   referenceLoads,
@@ -20,6 +19,7 @@ import {
   type Progression,
   type Sex,
 } from "@/lib/motor";
+import { gerarPlanoV2 } from "@/lib/motor2";
 
 const GOAL_IDS = GOALS.map((g) => g.id) as Goal[];
 const SEXES: Sex[] = ["homem", "mulher"];
@@ -131,7 +131,7 @@ async function criarPlano(userId: string): Promise<{ erro?: string }> {
   if (!ctx) return { erro: "Completa o onboarding primeiro." };
 
   const progression = initProgression();
-  const plano = buildWeek(ctx.motorProfile, ctx.maxes, { progression });
+  const plano = gerarPlanoV2(ctx.motorProfile, ctx.maxes, { progression });
   const nomeObjetivo = GOALS.find((g) => g.id === ctx.motorProfile.goal)?.short ?? "Plano";
 
   await supabase
@@ -285,7 +285,7 @@ export async function avancarSemana(
   const antesLoads = referenceLoads(ctx.motorProfile, ctx.maxes, prog);
   const novoProg = advanceWeek(prog, ctx.motorProfile, meanRpe, meanComp);
   const depoisLoads = referenceLoads(ctx.motorProfile, ctx.maxes, novoProg);
-  const novoPlano = buildWeek(ctx.motorProfile, ctx.maxes, { progression: novoProg });
+  const novoPlano = gerarPlanoV2(ctx.motorProfile, ctx.maxes, { progression: novoProg });
 
   const { error } = await supabase
     .from("training_plans")

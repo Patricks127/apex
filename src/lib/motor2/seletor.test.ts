@@ -239,10 +239,13 @@ test("estrutura: dias certos, exercícios em todos, frequência ≥2× para gran
   }
 });
 
-test("objetivo não-hipertrofia gera aviso mas devolve um plano", () => {
+test("objetivo não-hipertrofia usa o construtor modal (passo 6)", () => {
   const s = selecionarSemana(base({ objetivo: "powerlifting" }));
-  assert.ok(s.avisos.some((a) => /powerlifting/i.test(a) && /passo 6/i.test(a)));
+  // regras da spec §6 vão para os avisos
+  assert.ok(s.avisos.some((a) => /RIR 3–5/.test(a)));
   assert.ok(s.dias.length === 4 && todosEx(s).length > 0);
+  // dia de levantamento principal existe
+  assert.ok(s.dias.some((d) => d.tipo === "forca_principal"));
 });
 
 test("todos os ids gerados existem na base", () => {
