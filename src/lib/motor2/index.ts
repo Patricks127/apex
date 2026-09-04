@@ -9,6 +9,7 @@ export { EXERCICIOS } from "./exercicios.ts";
 export * from "./volume.ts";
 export * from "./seletor.ts";
 export * from "./validador.ts";
+export * from "./historico.ts";
 
 import { EXERCICIOS } from "./exercicios.ts";
 import type { Exercicio, Familia, Musculo, Padrao } from "./tipos.ts";
