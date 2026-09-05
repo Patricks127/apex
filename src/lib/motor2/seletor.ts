@@ -209,6 +209,54 @@ const MAX_FADIGA3_DIA = 2;
 const LIMITE_FADIGA_SISTEMICA_DIA = 12;
 const LIMITE_FADIGA_SEC_ACUM = 5;
 
+export type MotivoRejeicaoDia =
+  | "musculo_fora_do_alvo"
+  | "familia_no_limite"
+  | "familia_perfil_repetido"
+  | "padrao_composto_no_limite"
+  | "fadiga3_no_limite";
+
+/**
+ * Porta ÚNICA de admissão de um exercício num dia. Todos os caminhos que
+ * acrescentam exercícios a um dia (o loop principal + os passos de
+ * pós-processamento: rácio empurrar:puxar, padrões essenciais, piso de
+ * volume, grupos nomeados) têm de passar por aqui antes de acrescentar. Se
+ * não passa, não entra — mesmo que o dia fique com menos exercícios que o
+ * alvo.
+ *
+ * Regras invioláveis:
+ *  1. o primário do exercício está nos músculos-alvo do dia;
+ *  2. no máx. 2 exercícios por família por dia (1 na frequência), e a 2ª só
+ *     com perfil de resistência diferente da 1ª;
+ *  3. no máx. 3 compostos (Tier 1/2) do mesmo padrão de movimento;
+ *  4. no máx. 2 compostos pesados (fadigaSistemica 3).
+ *
+ * A regra 5 (nunca um isolamento antes de um composto do mesmo músculo) é
+ * garantida pela reordenação por tier que corre a seguir a cada admissão —
+ * ver `reordenar` / o helper `admitir` dentro de `selecionarSemana`.
+ */
+export function validarDia(
+  ex: Exercicio,
+  jaNoDia: readonly Exercicio[],
+  musculosAlvo: readonly Musculo[],
+  muscular: boolean,
+): MotivoRejeicaoDia | null {
+  if (!ex.primarios.some((p) => musculosAlvo.includes(p.musculo))) return "musculo_fora_do_alvo";
+
+  const mesmaFamilia = jaNoDia.filter((e) => e.familia === ex.familia);
+  if (mesmaFamilia.length >= (muscular ? 2 : 1)) return "familia_no_limite";
+  if (muscular && mesmaFamilia.some((e) => e.perfilResistencia === ex.perfilResistencia))
+    return "familia_perfil_repetido";
+
+  if (ex.tier <= 2 && jaNoDia.filter((e) => e.tier <= 2 && e.padrao === ex.padrao).length >= 3)
+    return "padrao_composto_no_limite";
+
+  if (ex.fadigaSistemica === 3 && jaNoDia.filter((e) => e.fadigaSistemica === 3).length >= MAX_FADIGA3_DIA)
+    return "fadiga3_no_limite";
+
+  return null;
+}
+
 // Estimativa de duração (min): aquecimento + Σ séries·(trabalho+descanso por
 // fadiga sistémica) + transição por exercício. Igual ao validador.
 const MIN_POR_SERIE: Record<number, number> = { 1: 1.9, 2: 2.4, 3: 3.1 };
@@ -496,6 +544,8 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
         } else {
           cand = cand.filter((e) => e.primarios.some((p) => comDeficit.includes(p.musculo)));
         }
+        // porta única: nenhum candidato que viole uma regra inviolável do dia
+        cand = cand.filter((e) => validarDia(e, ctx.escolhidos, musculosAlvoDia, muscular) === null);
         if (cand.length === 0) break;
 
         const pontuados = cand
@@ -555,39 +605,8 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
     avisos,
   };
 
-  // ---- 5. reparação de perfis do foco (garantir ≥2) ----
-  for (const f of foco) {
-    const perfisF = perfisSemana.get(f) ?? new Set();
-    if (perfisF.size >= 2) continue;
-    // procurar um dia com ≥2 exercícios do foco e trocar o último (tier 3) por
-    // um candidato de perfil diferente.
-    for (const d of semana.dias) {
-      const doFoco = d.exercicios.filter((e) => e.exercicio.primarios.some((p) => p.musculo === f));
-      if (doFoco.length < 2) continue;
-      const alvoTroca = [...doFoco].sort((a, b) => b.ordem - a.ordem)[0];
-      const subst = candidatosBase
-        .filter(
-          (e) =>
-            e.primarios.some((p) => p.musculo === f) &&
-            !d.exercicios.some((x) => x.exercicio.id === e.id) &&
-            !d.exercicios.some((x) => x.exercicio.familia === e.familia && x.exercicio.id !== alvoTroca.exercicio.id) &&
-            !perfisF.has(e.perfilResistencia),
-        )
-        .sort((a, b) => a.tier - b.tier)[0];
-      if (subst) {
-        alvoTroca.exercicio = subst;
-        alvoTroca.series = SERIES_TIER[subst.tier];
-        perfisF.add(subst.perfilResistencia);
-        perfisSemana.set(f, perfisF);
-        semana.avisos.push(`Foco ${f}: troquei um exercício para cobrir ≥2 perfis de resistência.`);
-        break;
-      }
-    }
-  }
-  // recalcular volume se houve trocas
-  semana.volume = calcularVolume(semanaParaEntradaVolume(semana), perfil.nivel);
-
-  // ---- 6. ajustar ao tempo disponível (§4.1: sessão não pode exceder o tempo) ----
+  // sort por tier (regra 5: isolamento nunca antes de composto), depois foco,
+  // fadiga/exigência. Corre a seguir a QUALQUER passo que acrescente ou troque.
   const reordenar = (d: DiaSelecionado) => {
     d.exercicios.sort((a, b) => {
       if (a.exercicio.tier !== b.exercicio.tier) return a.exercicio.tier - b.exercicio.tier;
@@ -600,6 +619,68 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
     });
     d.exercicios.forEach((e, idx) => (e.ordem = idx + 1));
   };
+
+  // ---- 5. reparação de perfis do foco (garantir ≥2) ----
+  for (const f of foco) {
+    const perfisF = perfisSemana.get(f) ?? new Set();
+    if (perfisF.size >= 2) continue;
+    // procurar um dia com ≥2 exercícios do foco e trocar o último por um
+    // candidato de perfil diferente — que passe pela porta (com o dia SEM o
+    // exercício que vai sair).
+    for (const d of semana.dias) {
+      const doFoco = d.exercicios.filter((e) => e.exercicio.primarios.some((p) => p.musculo === f));
+      if (doFoco.length < 2) continue;
+      const alvoTroca = [...doFoco].sort((a, b) => b.ordem - a.ordem)[0];
+      const diaSemAlvo = d.exercicios.filter((x) => x !== alvoTroca).map((x) => x.exercicio);
+      const subst = candidatosBase
+        .filter(
+          (e) =>
+            e.primarios.some((p) => p.musculo === f) &&
+            !d.exercicios.some((x) => x.exercicio.id === e.id) &&
+            !perfisF.has(e.perfilResistencia) &&
+            validarDia(e, diaSemAlvo, d.musculosAlvo, muscular) === null,
+        )
+        .sort((a, b) => a.tier - b.tier)[0];
+      if (subst) {
+        alvoTroca.exercicio = subst;
+        alvoTroca.series = SERIES_TIER[subst.tier];
+        alvoTroca.foco = subst.primarios.some((p) => foco.includes(p.musculo));
+        reordenar(d); // a troca pode ter mudado o tier — repor a ordem
+        perfisF.add(subst.perfilResistencia);
+        perfisSemana.set(f, perfisF);
+        semana.avisos.push(`Foco ${f}: troquei um exercício para cobrir ≥2 perfis de resistência.`);
+        break;
+      }
+    }
+  }
+  // recalcular volume se houve trocas
+  semana.volume = calcularVolume(semanaParaEntradaVolume(semana), perfil.nivel);
+
+  // ---- 6. ajustar ao tempo disponível (§4.1: sessão não pode exceder o tempo) ----
+
+  // Único ponto de entrada para acrescentar um exercício a um dia nos passos
+  // de pós-processamento. Passa pela porta `validarDia`; se admite, empurra e
+  // reordena (garante a regra 5). Devolve o motivo da recusa (ou null).
+  const podeEntrar = (dia: DiaSelecionado, ex: Exercicio) =>
+    validarDia(
+      ex,
+      dia.exercicios.map((e) => e.exercicio),
+      dia.musculosAlvo,
+      muscular,
+    );
+  const admitir = (dia: DiaSelecionado, ex: Exercicio, series: number): boolean => {
+    if (podeEntrar(dia, ex) !== null) return false;
+    dia.exercicios.push({
+      exercicio: ex,
+      series,
+      ordem: dia.exercicios.length + 1,
+      foco: ex.primarios.some((p) => foco.includes(p.musculo)),
+    });
+    reordenar(dia);
+    semana.volume = calcularVolume(semanaParaEntradaVolume(semana), perfil.nivel);
+    return true;
+  };
+
   for (const d of semana.dias) {
     let cortou = false;
     while (d.exercicios.length > 4 && estimarMinutos(d.exercicios) > minutosSessao) {
@@ -636,23 +717,8 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
               a.exercicios.filter((x) => ladoDe(x.exercicio) === ladoAlvo).length -
               b.exercicios.filter((x) => ladoDe(x.exercicio) === ladoAlvo).length,
           )
-          .find(
-            (d) =>
-              d.exercicios.length < 9 &&
-              !d.exercicios.some((x) => x.exercicio.familia === ex.familia) &&
-              // não pôr um exercício num dia que não treina esse músculo
-              d.musculosAlvo.some((m) => ex.primarios.some((p) => p.musculo === m)) &&
-              !(ex.fadigaSistemica === 3 && d.exercicios.filter((x) => x.exercicio.fadigaSistemica === 3).length >= MAX_FADIGA3_DIA),
-          );
-        if (!dia) continue;
-        dia.exercicios.push({
-          exercicio: ex,
-          series: SERIES_TIER[ex.tier],
-          ordem: dia.exercicios.length + 1,
-          foco: ex.primarios.some((p) => foco.includes(p.musculo)),
-        });
-        reordenar(dia);
-        semana.volume = calcularVolume(semanaParaEntradaVolume(semana), perfil.nivel);
+          .find((d) => d.exercicios.length < 9 && podeEntrar(d, ex) === null);
+        if (!dia || !admitir(dia, ex, SERIES_TIER[ex.tier])) continue;
         colocou = true;
         break;
       }
@@ -777,13 +843,12 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
         .sort((a, b) => a.tier - b.tier);
       for (const ex of cand) {
         const dia = semana.dias
-          .filter((d) => d.musculosAlvo.some((mm) => ex.primarios.some((p) => p.musculo === mm)))
+          .slice()
           .sort((a, b) => a.exercicios.length - b.exercicios.length)
           .find(
             (d) =>
-              !d.exercicios.some((x) => x.exercicio.familia === ex.familia) &&
+              podeEntrar(d, ex) === null &&
               estimarMinutos([...d.exercicios, { exercicio: ex, series: SERIES_TIER[ex.tier] }]) <= minutosSessao &&
-              !(ex.fadigaSistemica === 3 && d.exercicios.filter((x) => x.exercicio.fadigaSistemica === 3).length >= MAX_FADIGA3_DIA) &&
               ex.primarios.every(
                 (p) =>
                   (semana.volume.porMusculo.find((v) => v.musculo === p.musculo)?.direto ?? 0) +
@@ -791,15 +856,7 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
                   r.teto,
               ),
           );
-        if (!dia) continue;
-        dia.exercicios.push({
-          exercicio: ex,
-          series: SERIES_TIER[ex.tier],
-          ordem: dia.exercicios.length + 1,
-          foco: ex.primarios.some((p) => foco.includes(p.musculo)),
-        });
-        reordenar(dia);
-        semana.volume = calcularVolume(semanaParaEntradaVolume(semana), perfil.nivel);
+        if (!dia || !admitir(dia, ex, SERIES_TIER[ex.tier])) continue;
         break;
       }
     }
@@ -833,21 +890,8 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
         for (const ex of cand) {
           const dia = diaBase
             .sort((a, b) => a.exercicios.length - b.exercicios.length)
-            .find(
-              (d) =>
-                d.exercicios.length < 9 &&
-                !d.exercicios.some((x) => x.exercicio.familia === ex.familia) &&
-                !(ex.fadigaSistemica === 3 && d.exercicios.filter((x) => x.exercicio.fadigaSistemica === 3).length >= MAX_FADIGA3_DIA),
-            );
-          if (!dia) continue;
-          dia.exercicios.push({
-            exercicio: ex,
-            series: SERIES_TIER[ex.tier],
-            ordem: dia.exercicios.length + 1,
-            foco: ex.primarios.some((p) => foco.includes(p.musculo)),
-          });
-          reordenar(dia);
-          semana.volume = calcularVolume(semanaParaEntradaVolume(semana), perfil.nivel);
+            .find((d) => d.exercicios.length < 9 && podeEntrar(d, ex) === null);
+          if (!dia || !admitir(dia, ex, SERIES_TIER[ex.tier])) continue;
           mexeu = true;
           break;
         }
@@ -905,21 +949,6 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
       if (!grupos) continue;
       const protegidos = new Set<string>();
 
-      // repetir família é permitido se os perfis diferirem (§2.4, hipertrofia
-      // regional) — veta-se mesma família E mesmo perfil (peck deck + aberturas
-      // na máquina). Tetos por dia: máx. 2 por família, máx. 3 compostos
-      // (T1/T2) do mesmo padrão.
-      const familiaBloqueada = (ex: Exercicio) => {
-        const mf = dia.exercicios.filter((e) => e.exercicio.familia === ex.familia);
-        if (mf.length >= 2) return true;
-        if (mf.some((e) => e.exercicio.perfilResistencia === ex.perfilResistencia)) return true;
-        if (
-          ex.tier <= 2 &&
-          dia.exercicios.filter((e) => e.exercicio.tier <= 2 && e.exercicio.padrao === ex.padrao).length >= 3
-        )
-          return true;
-        return false;
-      };
       const volAtual = (m: Musculo) => semana.volume.porMusculo.find((v) => v.musculo === m)?.direto ?? 0;
       const excedeTetoDia = (ex: Exercicio, serie: number) =>
         ex.primarios.some((p) => volAtual(p.musculo) + serie * p.contributo > r.teto) ||
@@ -942,7 +971,7 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
               .map((e) => e.exercicio.perfilResistencia),
           );
           const candBrutos = candidatosBase.filter(
-            (e) => e.primarios.some((p) => grupo.includes(p.musculo)) && !usados.has(e.id) && !familiaBloqueada(e),
+            (e) => e.primarios.some((p) => grupo.includes(p.musculo)) && !usados.has(e.id) && podeEntrar(dia, e) === null,
           );
           // músculos DO GRUPO já cobertos como primários no dia — um grupo
           // "ou" de vários músculos (ex.: os 3 deltoides) deve cobrir cada
@@ -991,15 +1020,8 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
             }
             break;
           }
-          dia.exercicios.push({
-            exercicio: ex,
-            series: SERIES_TIER[ex.tier],
-            ordem: dia.exercicios.length + 1,
-            foco: ex.primarios.some((p) => foco.includes(p.musculo)),
-          });
+          if (!admitir(dia, ex, SERIES_TIER[ex.tier])) break; // porta recusou — não força
           protegidos.add(ex.id);
-          reordenar(dia);
-          semana.volume = calcularVolume(semanaParaEntradaVolume(semana), perfil.nivel);
         }
       });
 

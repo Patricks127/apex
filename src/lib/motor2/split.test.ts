@@ -5,6 +5,8 @@ import {
   gerarPlanoValidado,
   gerarPlanoV2,
   estimarMinutos,
+  validarDia,
+  exercicioPorId,
   EQUIP_DISPONIVEL,
   GRUPOS_NOMEADOS,
   type PerfilSelecao,
@@ -182,6 +184,90 @@ test("200 planos muscular: nenhum exercício primário de um músculo que é o n
     }
   }
   assert.ok(verificados > 1000, `poucos exercícios verificados (${verificados})`);
+});
+
+// ===========================================================================
+// A PORTA ÚNICA — validarDia. Todos os caminhos que acrescentam exercícios a
+// um dia passam por aqui; nenhum plano gerado pode violar as regras 1-5.
+// ===========================================================================
+test("validarDia — cada regra rejeita pelo motivo certo", () => {
+  const supinoBarra = exercicioPorId("supino_barra")!; // horizontal_push, T1, fs3=2, medio
+  const supinoHalteres = exercicioPorId("supino_halteres")!; // horizontal_push, T2, alongado
+  const floorPress = exercicioPorId("floor_press")!; // horizontal_push, T2, encurtado
+  const supinoInclBarra = exercicioPorId("supino_inclinado_barra")!; // incline_push, T1, medio
+  const peckDeck = exercicioPorId("peck_deck")!; // chest_isolation, T3
+  const rosca = exercicioPorId("rosca_direta_barra")!; // elbow_flexion, T3, biceps
+
+  // 1. primário fora do alvo
+  assert.equal(validarDia(rosca, [], ["peito", "triceps"], true), "musculo_fora_do_alvo");
+  assert.equal(validarDia(supinoBarra, [], ["peito", "triceps"], true), null);
+
+  // 2. máx. 2 por família; a 2ª só com perfil diferente
+  assert.equal(validarDia(supinoHalteres, [supinoBarra], ["peito"], true), null); // 2ª, perfil diferente → OK
+  assert.equal(validarDia(supinoBarra, [supinoBarra], ["peito"], true), "familia_perfil_repetido"); // mesmo perfil
+  assert.equal(validarDia(floorPress, [supinoBarra, supinoHalteres], ["peito"], true), "familia_no_limite"); // 3ª da família
+  // na frequência não há 2ª de todo
+  assert.equal(validarDia(supinoHalteres, [supinoBarra], ["peito"], false), "familia_no_limite");
+
+  // 3. máx. 3 compostos do mesmo padrão (empurrar_horizontal agrupa
+  //    horizontal_push + incline_push); isolamentos (T3) não contam.
+  //    já no dia: 2 h_push (perfis distintos) + 1 incline = 3 compostos
+  //    "empurrar_horizontal". Um 2º incline de perfil diferente passa a regra
+  //    da família mas bate no teto do padrão.
+  const supinoInclHalteres = exercicioPorId("supino_inclinado_halteres")!; // incline_push, alongado
+  assert.equal(
+    validarDia(supinoInclHalteres, [supinoBarra, supinoHalteres, supinoInclBarra], ["peito"], true),
+    "padrao_composto_no_limite",
+  );
+  assert.equal(validarDia(peckDeck, [supinoBarra, supinoHalteres, supinoInclBarra], ["peito"], true), null); // T3 não conta
+
+  // 4. máx. 2 compostos pesados (fadigaSistemica 3) — 3 famílias distintas
+  //    para não bater antes na regra da família
+  const fs3 = [exercicioPorId("agachamento_barra_costas")!, exercicioPorId("agachamento_bulgaro_barra")!]; // squat + unilateral_inferior, fs3=3
+  const outroFs3 = exercicioPorId("terra_trap_bar")!; // hinge, fs3=3
+  assert.equal(validarDia(outroFs3, fs3, ["quadriceps"], true), "fadiga3_no_limite");
+});
+
+test("300 planos: NENHUM dia viola as 5 regras invioláveis (todos os formatos/objetivos)", () => {
+  let seed = 202;
+  const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32;
+  const pk = <T,>(a: readonly T[]): T => a[Math.floor(rnd() * a.length)];
+  const FMT: SplitFormato[] = ["frequencia", "muscular"];
+  let diasVerificados = 0;
+  for (let i = 0; i < 300; i++) {
+    const fmt = pk(FMT);
+    const muscular = fmt === "muscular";
+    const p = base({
+      nivel: pk(NIVEIS),
+      dias: pk(DIAS),
+      equipamento: EQUIP_DISPONIVEL[pk(LOCAIS)],
+      lesoes: [...pk(LESOES)] as PerfilSelecao["lesoes"],
+      foco: [...pk(FOCOS)] as PerfilSelecao["foco"],
+      minutosSessao: pk(MINUTOS),
+      splitFormato: fmt,
+    });
+    const s = selecionarSemana(p);
+    for (const d of s.dias) {
+      diasVerificados++;
+      const vistos: (typeof d.exercicios)[number]["exercicio"][] = [];
+      for (const e of d.exercicios) {
+        // reconstrói o estado "antes de este entrar" e confirma que a porta o teria admitido
+        const motivo = validarDia(e.exercicio, vistos, d.musculosAlvo, muscular);
+        assert.equal(
+          motivo,
+          null,
+          `plano ${i} (${p.nivel}/${p.dias}d/${fmt}): "${d.nome}" contém ${e.exercicio.id} que a porta recusaria — ${motivo} · dia: ${d.exercicios.map((x) => x.exercicio.id).join(", ")}`,
+        );
+        vistos.push(e.exercicio);
+      }
+      // regra 5: nenhum isolamento (T3) antes de um composto (T1/T2)
+      const tiers = d.exercicios.map((e) => e.exercicio.tier);
+      for (let a = 0; a < tiers.length; a++)
+        for (let b = a + 1; b < tiers.length; b++)
+          assert.ok(!(tiers[a] === 3 && tiers[b] !== 3), `plano ${i}: "${d.nome}" tem isolamento antes de composto`);
+    }
+  }
+  assert.ok(diasVerificados > 1000, `poucos dias verificados (${diasVerificados})`);
 });
 
 test("todo o dia com nome composto tem ≥1 exercício primário de cada músculo do nome", () => {
