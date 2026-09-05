@@ -252,19 +252,20 @@ test("100 planos por formato: ambos passam ≥85 com os critérios do formato", 
 // ===========================================================================
 // bug fixes (ronda 2): calibração do formato muscular pensada para 1×/semana
 // ===========================================================================
-test("formato muscular, intermédio: dia composto tem ≥5 exercícios", () => {
-  // nota: era ≥6 antes da restrição à exceção de família (ronda 3). Um dia
-  // "Peito + Tríceps" no pior caso fica em 5: peito tem só 3 famílias na
-  // base (nunca mais, mesmo antes desta restrição) e o tríceps, com só 2
-  // perfis de resistência distintos em toda a base (a maioria é "alongado"),
-  // fica genuinamente limitado a 2 exercícios próprios quando a regra exige
-  // perfis diferentes entre repetições de família — não é falta de tentativa
-  // do seletor, é o teto matemático dos dados.
+test("formato muscular, intermédio: dia composto tem ≥6 exercícios", () => {
+  // ronda 4:
+  //  - "Peito + Tríceps" volta a 6: o tríceps ganhou o 3º perfil de
+  //    resistência (as duas "testa" reclassificadas para "medio" +
+  //    triceps_kickback_cabo novo), por isso chega a 3 exercícios próprios
+  //    mesmo com a regra estrita de perfis diferentes na repetição de família.
+  //  - "Costas + Bíceps" volta a 6: o dorsal ganhou uma 3ª família,
+  //    `lat_isolation` (pullover_cabo movido para lá + pulldown_reto_cabo
+  //    novo), por isso chega a 3 exercícios sem exceção nenhuma.
   for (const dias of [3, 4] as const) {
     const s = selecionarSemana(base({ nivel: "intermedio", dias, splitFormato: "muscular" }));
     for (const d of s.dias) {
       if (!GRUPOS_NOMEADOS[d.tipo]) continue; // só dias com nome composto (peito+tríceps, etc.)
-      assert.ok(d.exercicios.length >= 5, `${dias}d: "${d.nome}" só tem ${d.exercicios.length} exercícios`);
+      assert.ok(d.exercicios.length >= 6, `${dias}d: "${d.nome}" só tem ${d.exercicios.length} exercícios`);
     }
   }
 });

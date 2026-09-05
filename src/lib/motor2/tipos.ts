@@ -21,6 +21,7 @@ export const FAMILIAS = [
   "chest_isolation",
   "vertical_pull",
   "horizontal_pull",
+  "lat_isolation",
   "rear_delt_scap",
   "lateral_raise",
   "elbow_flexion",
@@ -78,6 +79,7 @@ export const FAMILIA_PADRAO: Record<Familia, Padrao> = {
   chest_isolation: "empurrar_horizontal",
   vertical_pull: "puxar_vertical",
   horizontal_pull: "puxar_horizontal",
+  lat_isolation: "puxar_vertical", // pullover / puxada de braço esticado
   rear_delt_scap: "rotacao_externa",
   lateral_raise: "abducao_ombro",
   elbow_flexion: "flexao_cotovelo",

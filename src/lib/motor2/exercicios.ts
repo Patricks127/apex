@@ -679,6 +679,26 @@ export const EXERCICIOS: Exercicio[] = [
     contraindicacoes: ["tornozelo"],
     progressao: "baixa",
   }),
+  ex({
+    id: "gemeos_banda",
+    nome: "Elevação de gémeos com banda elástica",
+    familia: "calf",
+    tier: 3,
+    primarios: [P("gemeos")],
+    secundarios: [],
+    fadigaSistemica: 1,
+    fadigaLocal: 2,
+    exigenciaTecnica: 1,
+    estabilidade: "livre",
+    // resistência ascendente da banda — mais dura no topo (flexão plantar
+    // completa) que no estiramento; enfatiza a posição encurtada, ao
+    // contrário das máquinas de gémeos (pico no alongamento em baixo)
+    perfilResistencia: "encurtado",
+    equipamento: ["banda"],
+    nivelMinimo: "iniciante",
+    contraindicacoes: ["tornozelo"],
+    progressao: "baixa",
+  }),
 
   // =========================================================================
   // HORIZONTAL PUSH — peito
@@ -999,6 +1019,26 @@ export const EXERCICIOS: Exercicio[] = [
     contraindicacoes: [],
     progressao: "media",
   }),
+  ex({
+    id: "elevacao_frontal_cabo",
+    nome: "Elevação frontal no cabo",
+    familia: "vertical_push",
+    tier: 3,
+    primarios: [P("deltoide_anterior")],
+    secundarios: [],
+    fadigaSistemica: 1,
+    fadigaLocal: 2,
+    exigenciaTecnica: 1,
+    estabilidade: "livre",
+    // isolamento: pico com o braço à altura/acima do ombro (flexão), o
+    // cabo mantém tensão no topo — deltoide anterior em posição encurtada,
+    // ao contrário dos presses (pico a meio da amplitude)
+    perfilResistencia: "encurtado",
+    equipamento: ["cabos"],
+    nivelMinimo: "iniciante",
+    contraindicacoes: ["ombro"],
+    progressao: "baixa",
+  }),
 
   // =========================================================================
   // CHEST ISOLATION
@@ -1178,10 +1218,17 @@ export const EXERCICIOS: Exercicio[] = [
     contraindicacoes: [],
     progressao: "media",
   }),
+
+  // =========================================================================
+  // LAT ISOLATION — dorsais, extensão do ombro sem flexão do cotovelo
+  // (pullover / puxada de braço esticado). Família própria: estímulo
+  // distinto das remadas (horizontal_pull) e das puxadas (vertical_pull),
+  // tal como chest_isolation o é face ao horizontal_push.
+  // =========================================================================
   ex({
     id: "pullover_cabo",
     nome: "Pullover no cabo (polia alta)",
-    familia: "vertical_pull",
+    familia: "lat_isolation",
     tier: 3,
     primarios: [P("dorsais")],
     secundarios: [S("triceps"), S("peito")],
@@ -1189,7 +1236,28 @@ export const EXERCICIOS: Exercicio[] = [
     fadigaLocal: 2,
     exigenciaTecnica: 1,
     estabilidade: "livre",
+    // pico com o braço acima da cabeça, dorsal em estiramento
     perfilResistencia: "alongado",
+    equipamento: ["cabos"],
+    nivelMinimo: "iniciante",
+    contraindicacoes: [],
+    progressao: "media",
+  }),
+  ex({
+    id: "pulldown_reto_cabo",
+    nome: "Puxada de braço esticado no cabo (straight-arm)",
+    familia: "lat_isolation",
+    tier: 3,
+    primarios: [P("dorsais")],
+    secundarios: [S("triceps"), S("core")],
+    fadigaSistemica: 1,
+    fadigaLocal: 2,
+    exigenciaTecnica: 1,
+    estabilidade: "livre",
+    // braço esticado desce da frente até junto às coxas, cotovelo fixo —
+    // pico de tensão com o dorsal quase totalmente contraído (braço junto
+    // ao tronco), ao contrário do pullover (pico no estiramento)
+    perfilResistencia: "encurtado",
     equipamento: ["cabos"],
     nivelMinimo: "iniciante",
     contraindicacoes: [],
@@ -1389,6 +1457,26 @@ export const EXERCICIOS: Exercicio[] = [
     nivelMinimo: "iniciante",
     contraindicacoes: [],
     progressao: "baixa",
+  }),
+  ex({
+    id: "crucifixo_invertido_cabo_unilateral",
+    nome: "Crucifixo invertido num braço no cabo (cross-body)",
+    familia: "rear_delt_scap",
+    tier: 3,
+    primarios: [P("deltoide_posterior")],
+    secundarios: [S("trapezio_medio")],
+    fadigaSistemica: 1,
+    fadigaLocal: 1,
+    exigenciaTecnica: 1,
+    estabilidade: "livre",
+    // polia do lado oposto: começa com o braço em adução horizontal à
+    // frente (mão a cruzar a linha média) — deltoide posterior alongado, e
+    // o cabo mantém tensão nessa posição inicial
+    perfilResistencia: "alongado",
+    equipamento: ["cabos"],
+    nivelMinimo: "iniciante",
+    contraindicacoes: [],
+    progressao: "media",
   }),
 
   // =========================================================================
@@ -1690,7 +1778,10 @@ export const EXERCICIOS: Exercicio[] = [
     fadigaLocal: 3,
     exigenciaTecnica: 2,
     estabilidade: "livre",
-    perfilResistencia: "alongado",
+    // braço ~perpendicular ao tronco, pico de tensão com o antebraço
+    // horizontal (cotovelo ~90°) — comprimento médio da cabeça longa, não
+    // o estiramento máximo da extensão overhead (ombro em flexão completa)
+    perfilResistencia: "medio",
     equipamento: ["barra", "banco"],
     nivelMinimo: "intermedio",
     contraindicacoes: ["cotovelo"],
@@ -1707,7 +1798,8 @@ export const EXERCICIOS: Exercicio[] = [
     fadigaLocal: 3,
     exigenciaTecnica: 2,
     estabilidade: "livre",
-    perfilResistencia: "alongado",
+    // ver triceps_testa_barra: pico com cotovelo ~90°, comprimento médio
+    perfilResistencia: "medio",
     equipamento: ["halteres", "banco"],
     nivelMinimo: "iniciante",
     contraindicacoes: ["cotovelo"],
@@ -1764,6 +1856,26 @@ export const EXERCICIOS: Exercicio[] = [
     nivelMinimo: "intermedio",
     contraindicacoes: ["ombro", "cotovelo"],
     progressao: "media",
+  }),
+  ex({
+    id: "triceps_kickback_cabo",
+    nome: "Extensão de tríceps para trás no cabo (kickback)",
+    familia: "elbow_extension",
+    tier: 3,
+    primarios: [P("triceps")],
+    secundarios: [],
+    fadigaSistemica: 1,
+    fadigaLocal: 2,
+    exigenciaTecnica: 1,
+    estabilidade: "livre",
+    // braço paralelo ao chão, ombro em ligeira extensão, tensão constante
+    // do cabo — pico numa posição encurtada-a-média, entre o overhead
+    // (alongado) e o pushdown (encurtado no lockout)
+    perfilResistencia: "medio",
+    equipamento: ["cabos"],
+    nivelMinimo: "iniciante",
+    contraindicacoes: [],
+    progressao: "baixa",
   }),
 
   // =========================================================================

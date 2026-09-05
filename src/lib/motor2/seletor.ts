@@ -82,7 +82,7 @@ export const EQUIP_DISPONIVEL: Record<string, Equipamento[]> = {
 export const FAMILIAS_RESISTENCIA: Familia[] = [
   "squat", "hinge", "unilateral_inferior", "knee_flexion", "hip_extension",
   "horizontal_push", "incline_push", "vertical_push", "chest_isolation",
-  "vertical_pull", "horizontal_pull", "rear_delt_scap", "lateral_raise",
+  "vertical_pull", "horizontal_pull", "lat_isolation", "rear_delt_scap", "lateral_raise",
   "trapezio", "elbow_flexion", "elbow_extension", "calf", "core",
 ];
 
@@ -421,8 +421,12 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
       const pm = ex.primarios[0].musculo;
       const perfisM = perfisSemana.get(pm);
       if (!perfisM || !perfisM.has(ex.perfilResistencia)) {
-        s += 2;
-        if (éFoco) s += 3; // ≥2 perfis no músculo em foco (§3.4.4)
+        // perfil novo para o músculo: bónus — mas NÃO para um isolamento (T3)
+        // que não é foco do dia. Um exercício não deve ganhar lugar só por
+        // preencher uma casa de perfil vazia (era o que fazia a elevação
+        // frontal deslocar a elevação lateral no dia de ombros).
+        if (éFoco) s += 5; // §3.4.4: garantir ≥2 perfis no músculo em foco
+        else if (ex.tier <= 2) s += 2; // compostos mantêm o bónus de variedade
       } else {
         s -= 1; // perfil repetido → penalização leve
       }
@@ -964,13 +968,28 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
           const candBrutos = candidatosBase.filter(
             (e) => e.primarios.some((p) => grupo.includes(p.musculo)) && !usados.has(e.id) && !familiaBloqueada(e),
           );
+          // músculos DO GRUPO já cobertos como primários no dia — um grupo
+          // "ou" de vários músculos (ex.: os 3 deltoides) deve cobrir cada
+          // cabeça antes de dobrar num perfil novo. Cobrir o músculo manda,
+          // variedade de perfil só desempata depois (senão a elevação frontal
+          // "perfil novo" roubava o lugar da lateral no dia de ombros).
+          const musculosCobertos = new Set(
+            dia.exercicios.flatMap((e) => e.exercicio.primarios.map((p) => p.musculo)).filter((m) => grupo.includes(m)),
+          );
+          const cobreMusculoNovo = (e: Exercicio) =>
+            e.primarios.some((p) => grupo.includes(p.musculo) && !musculosCobertos.has(p.musculo));
           const cand = candBrutos
             .filter(
               (e) =>
                 !excedeTetoDia(e, SERIES_TIER[e.tier]) &&
                 !(e.fadigaSistemica === 3 && fs3Atual >= MAX_FADIGA3_DIA),
             )
-            .sort((a, b) => a.tier - b.tier || Number(perfisUsados.has(a.perfilResistencia)) - Number(perfisUsados.has(b.perfilResistencia)));
+            .sort(
+              (a, b) =>
+                a.tier - b.tier ||
+                Number(cobreMusculoNovo(b)) - Number(cobreMusculoNovo(a)) ||
+                Number(perfisUsados.has(a.perfilResistencia)) - Number(perfisUsados.has(b.perfilResistencia)),
+            );
           const ex = cand[0];
           if (!ex) {
             if (contagem === 0) {
