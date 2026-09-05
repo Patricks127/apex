@@ -16,9 +16,12 @@
 
 import { EXERCICIOS } from "./exercicios.ts";
 import {
+  FAMILIAS_EMPURRAR,
+  FAMILIAS_PUXAR,
   MUSCULOS_GRANDES,
   ordemNivel,
   type Exercicio,
+  type Familia,
   type Musculo,
   type Padrao,
 } from "./tipos.ts";
@@ -127,6 +130,8 @@ type Viabilidade = {
   poolMusculoPesado: (m: Musculo) => number; // Tier ≤ 2 primários viáveis
   poolPadrao: (p: Padrao) => number;
   padroesEssenciaisPossiveis: Padrao[];
+  poolEmpurrar: number; // exercícios viáveis nas famílias de empurrar (rácio §4.1)
+  poolPuxar: number; // idem, puxar
 };
 
 function viabilidade(perfil: PerfilSelecao): Viabilidade {
@@ -148,6 +153,10 @@ function viabilidade(perfil: PerfilSelecao): Viabilidade {
   const poolMusculoPesado = (m: Musculo) =>
     viaveis.filter((e) => e.tier <= 2 && e.primarios.some((p) => p.musculo === m)).length;
   const poolPadrao = (p: Padrao) => viaveis.filter((e) => e.padrao === p).length;
+  const poolFamilias = (fams: Familia[]) => {
+    const set = new Set<string>(fams);
+    return viaveis.filter((e) => set.has(e.familia)).length;
+  };
   return {
     ex: ok,
     poolMusculoPrim,
@@ -155,6 +164,8 @@ function viabilidade(perfil: PerfilSelecao): Viabilidade {
     poolMusculoPesado,
     poolPadrao,
     padroesEssenciaisPossiveis: PADROES_ESSENCIAIS.filter((p) => poolPadrao(p) > 0),
+    poolEmpurrar: poolFamilias(FAMILIAS_EMPURRAR),
+    poolPuxar: poolFamilias(FAMILIAS_PUXAR),
   };
 }
 
@@ -291,16 +302,39 @@ export function validarSemana(semana: SemanaSelecionada): ResultadoValidacao {
   //    Lesão do membro superior limita legitimamente o lado de empurrar → aviso.
   if (!rel.racioEmpurrarPuxar.equilibrado) {
     const r = rel.racioEmpurrarPuxar.racio;
-    const lesaoMS = perfil.lesoes.some((z) => (LESOES_MEMBRO_SUPERIOR as readonly string[]).includes(z));
+    const lesoesMS = perfil.lesoes.filter((z) => (LESOES_MEMBRO_SUPERIOR as readonly string[]).includes(z));
+    const lesaoMS = lesoesMS.length > 0;
     // num full-body cada sessão repete todos os padrões, e num split por grupo
     // muscular há um "dia de costas" e um "dia de peito" — o rácio por famílias
     // é mais ruidoso nos dois; tolera-se uma janela mais larga antes de falhar.
     const ruidoso = temFull || perfil.splitFormato === "muscular";
     const foraDeVez = ruidoso ? r > 1.7 || r < 0.48 : true;
-    if (lesaoMS && (r < 0.7 || !Number.isFinite(r)))
+    // o desequilíbrio é ESTRUTURAL (lesão/equipamento, não má seleção) quando
+    // o pool viável do lado fraco é escasso em absoluto ou muito menor que o
+    // do lado forte — aí regenerar não resolve nada, passa com aviso acionável.
+    const faltaPuxar = r > 1.3 || !Number.isFinite(r);
+    const poolFraco = faltaPuxar ? via.poolPuxar : via.poolEmpurrar;
+    const poolForte = faltaPuxar ? via.poolEmpurrar : via.poolPuxar;
+    const limitadoEstrutural = poolFraco < 6 || poolFraco < poolForte * 0.55;
+    if (lesaoMS && (r < 0.7 || !Number.isFinite(r))) {
       avisos.push(`Rácio empurrar:puxar = ${r}:1 — desequilíbrio esperado com lesão do membro superior.`);
-    else if (foraDeVez) falhasDuras.push(`Rácio empurrar:puxar = ${r}:1 — fora de 1:1 ± 30%.`);
-    else avisos.push(`Rácio empurrar:puxar = ${r}:1 — ligeiramente fora de 1:1 ± 30% (full-body).`);
+    } else if (foraDeVez && limitadoEstrutural) {
+      const ladoFraco = faltaPuxar ? "puxar" : "empurrar";
+      const maisQue = faltaPuxar ? "mais empurrar que puxar" : "mais puxar que empurrar";
+      const causa = lesaoMS
+        ? `A tua lesão (${lesoesMS.join(", ")}) e o equipamento disponível limitam`
+        : "O equipamento disponível limita";
+      const quando = lesaoMS
+        ? `Se tiveres acesso a cabos ou máquinas, ou quando ${lesoesMS.length === 1 ? `o ${lesoesMS[0]}` : "a lesão"} permitir,`
+        : "Se tiveres acesso a cabos ou máquinas,";
+      avisos.push(
+        `${causa} muito o trabalho de ${ladoFraco}, o que deixa o plano desequilibrado (${maisQue}). ${quando} o plano reequilibra-se.`,
+      );
+    } else if (foraDeVez) {
+      falhasDuras.push(`Rácio empurrar:puxar = ${r}:1 — fora de 1:1 ± 30%.`);
+    } else {
+      avisos.push(`Rácio empurrar:puxar = ${r}:1 — ligeiramente fora de 1:1 ± 30% (full-body).`);
+    }
   }
 
   // 7. sessão estimada acima do tempo disponível (tolerância de 8%).

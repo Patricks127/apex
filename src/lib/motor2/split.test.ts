@@ -341,6 +341,61 @@ test("formato muscular: nenhum dia excede o tempo disponível sem avisar", () =>
   }
 });
 
+test("rácio empurrar:puxar desequilibrado por lesão+equipamento → passa com aviso acionável, não rejeita", () => {
+  // cotovelo bloqueia todo o isolamento de bíceps; sem cabos/máquina não há
+  // pulldowns nem pullover — o lado de puxar colapsa. Regenerar não resolve
+  // (a causa é estrutural), por isso o plano passa com um aviso que diz o que
+  // fazer.
+  const p = base({
+    nivel: "avancado",
+    dias: 4,
+    equipamento: ["halteres", "banco", "peso_corporal", "banda", "kettlebell", "barra_fixa"] as PerfilSelecao["equipamento"],
+    lesoes: ["cotovelo"],
+    foco: ["dorsais"],
+    minutosSessao: 60,
+    splitFormato: "muscular",
+  });
+  const { validacao: v } = gerarPlanoValidado(p);
+  assert.ok(!v.rejeitado, `não devia rejeitar — falhas: ${v.falhasDuras.join(" | ")}`);
+  assert.ok(
+    !v.falhasDuras.some((f) => /empurrar:puxar/.test(f)),
+    `o rácio não devia estar nas falhas duras: ${v.falhasDuras.join(" | ")}`,
+  );
+  assert.ok(
+    v.avisos.some((a) => /puxar/.test(a) && /cabos ou máquinas/.test(a) && /cotovelo/.test(a)),
+    `falta o aviso acionável sobre o rácio: ${v.avisos.join(" | ")}`,
+  );
+});
+
+test("rácio empurrar:puxar desequilibrado com equipamento completo → continua a rejeitar (regenerar resolve)", () => {
+  // ginásio completo, sem lesão: se um plano sair desequilibrado, a culpa é da
+  // seleção e há opções — tem de falhar para regenerar. Verifica-se que o
+  // caminho "estrutural" NÃO se aplica a um perfil sem limitações.
+  let seed = 303;
+  const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32;
+  const pk = <T,>(a: readonly T[]): T => a[Math.floor(rnd() * a.length)];
+  let verificados = 0;
+  for (let i = 0; i < 200; i++) {
+    const p = base({
+      nivel: pk(NIVEIS),
+      dias: pk(DIAS),
+      equipamento: EQUIP_DISPONIVEL.ginasio,
+      lesoes: [],
+      foco: [...pk(FOCOS)] as PerfilSelecao["foco"],
+      minutosSessao: pk([75, 90, 120]),
+      splitFormato: "muscular",
+    });
+    const { validacao: v } = gerarPlanoValidado(p);
+    verificados++;
+    // um perfil sem limitações nunca deve receber o aviso "estrutural" do rácio
+    assert.ok(
+      !v.avisos.some((a) => /limitam? muito o trabalho de (puxar|empurrar)/.test(a)),
+      `plano ${i} (${p.nivel}/${p.dias}d): recebeu aviso estrutural do rácio sem ter limitações — ${v.avisos.find((a) => /limitam? muito/.test(a))}`,
+    );
+  }
+  assert.ok(verificados > 100);
+});
+
 // ===========================================================================
 // ronda 5: regra de família generalizada — repetir família é OK se os perfis
 // de resistência diferirem (§2.4, hipertrofia regional). O que se veta é
