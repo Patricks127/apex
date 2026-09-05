@@ -7,33 +7,9 @@ import {
   estimarMinutos,
   EQUIP_DISPONIVEL,
   GRUPOS_NOMEADOS,
-  EXERCICIOS,
-  FAMILIAS_RESISTENCIA,
-  ordemNivel,
-  type Musculo,
   type PerfilSelecao,
   type SplitFormato,
 } from "./index.ts";
-
-// famílias de resistência distintas por músculo, VIÁVEIS para este perfil
-// (mesmo filtro que o seletor usa em candidatosBase: nível, lesões,
-// equipamento) — uma lesão pode eliminar a única família alternativa de um
-// músculo que "na base" tem 2 (ex.: ombro bloqueia todo o vertical_pull,
-// deixando dorsais com só horizontal_pull), por isso não dá para usar a
-// contagem estática da base inteira aqui.
-const familiasViaveis = (p: PerfilSelecao, m: Musculo): number => {
-  const disp = new Set(p.equipamento);
-  return new Set(
-    EXERCICIOS.filter(
-      (e) =>
-        e.primarios.some((pr) => pr.musculo === m) &&
-        (FAMILIAS_RESISTENCIA as string[]).includes(e.familia) &&
-        ordemNivel[e.nivelMinimo] <= ordemNivel[p.nivel] &&
-        !e.contraindicacoes.some((z) => (p.lesoes ?? []).includes(z)) &&
-        e.equipamento.some((q) => disp.has(q)),
-    ).map((e) => e.familia),
-  ).size;
-};
 
 const NIVEIS = ["iniciante", "intermedio", "avancado"] as const;
 const DIAS = [3, 4, 5, 6];
@@ -99,15 +75,15 @@ test("formato muscular mantém todas as outras regras", () => {
       for (const foco of [[], ["peito"], ["quadriceps"]] as const) {
         const s = selecionarSemana(base({ nivel, dias, splitFormato: "muscular", foco: [...foco] as PerfilSelecao["foco"] }));
         for (const d of s.dias) {
-          // nunca duas famílias iguais no mesmo dia — exceto isolamento (T3)
-          // de um músculo que dá nome ao dia: só assim cabem as 3–4 variantes
-          // próprias (pushdown/francês/corda são todos "elbow_extension")
-          // quando esse músculo só tem este dia na semana.
-          const nomeados = new Set(GRUPOS_NOMEADOS[d.tipo]?.flat() ?? []);
-          const excecao = (e: (typeof d.exercicios)[number]) =>
-            e.exercicio.tier === 3 && e.exercicio.primarios.some((p) => nomeados.has(p.musculo));
-          const fam = d.exercicios.filter((e) => !excecao(e)).map((e) => e.exercicio.familia);
-          assert.equal(fam.find((f, i) => fam.indexOf(f) !== i), undefined, `${nivel}/${dias}d/${foco}: ${d.nome} família repetida`);
+          // pode repetir família no mesmo dia (§2.4, hipertrofia regional),
+          // MAS nunca com o mesmo perfil de resistência — isso é redundância
+          // (peck deck + aberturas na máquina), não variedade.
+          const chaves = d.exercicios.map((e) => `${e.exercicio.familia}|${e.exercicio.perfilResistencia}`);
+          assert.equal(
+            chaves.find((k, i) => chaves.indexOf(k) !== i),
+            undefined,
+            `${nivel}/${dias}d/${foco}: ${d.nome} — família + perfil de resistência repetidos`,
+          );
           // ordem: nenhum isolamento antes de um composto
           const t = d.exercicios.map((e) => e.exercicio.tier);
           for (let i = 0; i < t.length; i++)
@@ -366,25 +342,15 @@ test("formato muscular: nenhum dia excede o tempo disponível sem avisar", () =>
 });
 
 // ===========================================================================
-// bug fix (ronda 3): a exceção de família estava demasiado larga — peck deck
-// + aberturas na máquina (mesma família E mesmo perfil) num músculo (peito)
-// que tem várias famílias na base. Restringida a: só músculos com < 2
-// famílias (tríceps, bíceps, deltoide lateral, gémeos, ...) E só entre
-// exercícios com perfis de resistência diferentes.
+// ronda 5: regra de família generalizada — repetir família é OK se os perfis
+// de resistência diferirem (§2.4, hipertrofia regional). O que se veta é
+// mesma família E mesmo perfil (peck deck + aberturas na máquina).
 // ===========================================================================
-test("200 planos: família só repete no mesmo dia quando algum músculo primário partilhado é escasso (<2 famílias)", () => {
-  // a exceção é por EXERCÍCIO, não por músculo isolado: pistol squat e step-up
-  // (ambos unilateral_inferior) têm quadríceps E glúteo como co-primários —
-  // se o equipamento só deixa essa família para quadríceps, a repetição é
-  // legítima mesmo o glúteo tendo várias famílias, porque não dá para separar
-  // os dois músculos do MESMO exercício. O que nunca pode acontecer é uma
-  // família repetir-se sem NENHUM músculo primário escasso envolvido (esse é
-  // o caso do peito: peck deck + aberturas, nenhum dos dois primários tem
-  // menos de 2 famílias).
+test("200 planos muscular: nenhuma família se repete no mesmo dia com o mesmo perfil de resistência", () => {
   let seed = 71;
   const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32;
   const pk = <T,>(a: readonly T[]): T => a[Math.floor(rnd() * a.length)];
-  let gruposVerificados = 0;
+  let repeticoesLegitimas = 0; // mesma família, perfis diferentes — o caso que agora se permite
   for (let i = 0; i < 200; i++) {
     const p = base({
       nivel: pk(NIVEIS),
@@ -397,64 +363,80 @@ test("200 planos: família só repete no mesmo dia quando algum músculo primár
     });
     const s = selecionarSemana(p);
     for (const d of s.dias) {
-      const porFamilia = new Map<string, typeof d.exercicios>();
-      for (const e of d.exercicios) {
-        const arr = porFamilia.get(e.exercicio.familia) ?? [];
-        arr.push(e);
-        porFamilia.set(e.exercicio.familia, arr);
-      }
-      for (const [fam, exs] of porFamilia) {
-        if (exs.length < 2) continue;
-        gruposVerificados++;
-        const escassoEnvolvido = exs.some((e) =>
-          e.exercicio.primarios.some((pr) => familiasViaveis(p, pr.musculo) < 2),
-        );
-        assert.ok(
-          escassoEnvolvido,
-          `plano ${i} (${p.nivel}/${p.dias}d/lesão=${(p.lesoes ?? []).join(",") || "-"}): "${d.nome}" repete a família ${fam} (${exs.map((e) => e.exercicio.id).join(", ")}) sem nenhum músculo primário escasso`,
-        );
-      }
+      const chaves = d.exercicios.map((e) => `${e.exercicio.familia}|${e.exercicio.perfilResistencia}`);
+      const dup = chaves.find((k, ix) => chaves.indexOf(k) !== ix);
+      assert.equal(
+        dup,
+        undefined,
+        `plano ${i} (${p.nivel}/${p.dias}d): "${d.nome}" repete família + perfil (${dup}) — ${d.exercicios.map((e) => e.exercicio.id).join(", ")}`,
+      );
+      const familias = d.exercicios.map((e) => e.exercicio.familia);
+      if (familias.some((f, ix) => familias.indexOf(f) !== ix)) repeticoesLegitimas++;
     }
   }
-  assert.ok(gruposVerificados > 20, `poucas repetições verificadas (${gruposVerificados})`);
+  // a regra não é vácua: repetições de família (com perfis distintos) acontecem
+  assert.ok(repeticoesLegitimas > 30, `poucas repetições legítimas observadas (${repeticoesLegitimas})`);
 });
 
-test("família repetida com perfis diferentes: só para músculo com < 2 famílias na base", () => {
-  let seed = 83;
+test("peck deck + aberturas na máquina nunca aparecem no mesmo dia (mesma família E mesmo perfil)", () => {
+  let seed = 91;
   const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32;
   const pk = <T,>(a: readonly T[]): T => a[Math.floor(rnd() * a.length)];
-  let repeticoesVerificadas = 0;
-  for (let i = 0; i < 200; i++) {
+  let comPeitoMaquina = 0;
+  for (let i = 0; i < 300; i++) {
     const p = base({
       nivel: pk(NIVEIS),
       dias: pk(DIAS),
-      equipamento: EQUIP_DISPONIVEL[pk(LOCAIS)],
-      lesoes: [...pk(LESOES)] as PerfilSelecao["lesoes"],
+      equipamento: EQUIP_DISPONIVEL.ginasio,
+      lesoes: [],
       foco: [...pk(FOCOS)] as PerfilSelecao["foco"],
-      minutosSessao: pk(MINUTOS),
+      minutosSessao: pk([90, 120]),
       splitFormato: "muscular",
     });
     const s = selecionarSemana(p);
     for (const d of s.dias) {
-      const porFamilia = new Map<string, typeof d.exercicios>();
-      for (const e of d.exercicios) {
-        const arr = porFamilia.get(e.exercicio.familia) ?? [];
-        arr.push(e);
-        porFamilia.set(e.exercicio.familia, arr);
-      }
-      for (const [fam, exs] of porFamilia) {
-        if (exs.length < 2) continue;
-        repeticoesVerificadas++;
-        const perfis = exs.map((e) => e.exercicio.perfilResistencia);
-        assert.equal(
-          new Set(perfis).size,
-          perfis.length,
-          `plano ${i} (${p.nivel}/${p.dias}d): "${d.nome}" repete família ${fam} com o MESMO perfil de resistência (${perfis.join(",")})`,
-        );
-      }
+      const ids = new Set(d.exercicios.map((e) => e.exercicio.id));
+      if (ids.has("peck_deck") || ids.has("aberturas_maquina")) comPeitoMaquina++;
+      assert.ok(
+        !(ids.has("peck_deck") && ids.has("aberturas_maquina")),
+        `plano ${i} (${p.nivel}/${p.dias}d): "${d.nome}" tem peck_deck E aberturas_maquina`,
+      );
     }
   }
-  assert.ok(repeticoesVerificadas > 20, `poucas repetições verificadas (${repeticoesVerificadas})`);
+  assert.ok(comPeitoMaquina > 20, `poucos dias com isolamento de peito de máquina (${comPeitoMaquina})`);
+});
+
+test("split de 5-6 dias: dias solo (Peito, Costas) têm 5-6 exercícios (limitados pelo teto do nível)", () => {
+  // com a regra generalizada, um "dia de peito" pode ter 3 horizontal_push de
+  // perfis diferentes (medio/alongado/encurtado) + incline + isolamento. O
+  // teto semanal manda: iniciante (teto 14) fica em 4 exercícios × 3 séries,
+  // intermédio (20) em 5-6, avançado (25) em 6-7. Um iniciante NÃO deve fazer
+  // um bro-split de 6 dias com 6 movimentos de peito.
+  let seed = 55;
+  const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32;
+  const pk = <T,>(a: readonly T[]): T => a[Math.floor(rnd() * a.length)];
+  const solo = new Set(["peito_dia", "costas_dia"]);
+  for (let i = 0; i < 120; i++) {
+    const nivel = pk(NIVEIS);
+    const p = base({
+      nivel,
+      dias: pk([5, 6]),
+      equipamento: EQUIP_DISPONIVEL.ginasio,
+      lesoes: [],
+      foco: [...pk(FOCOS)] as PerfilSelecao["foco"],
+      minutosSessao: pk([75, 90, 120]),
+      splitFormato: "muscular",
+    });
+    const s = selecionarSemana(p);
+    const minEsperado = nivel === "iniciante" ? 4 : 5;
+    for (const d of s.dias) {
+      if (!solo.has(d.tipo)) continue;
+      assert.ok(
+        d.exercicios.length >= minEsperado,
+        `plano ${i} (${nivel}/${p.dias}d/min=${p.minutosSessao}): "${d.nome}" só tem ${d.exercicios.length} exercícios (esperado ≥${minEsperado})`,
+      );
+    }
+  }
 });
 
 // ===========================================================================

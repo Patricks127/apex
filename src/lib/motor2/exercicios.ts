@@ -1105,7 +1105,9 @@ export const EXERCICIOS: Exercicio[] = [
     fadigaLocal: 2,
     exigenciaTecnica: 1,
     estabilidade: "maquina",
-    perfilResistencia: "alongado",
+    // é um peck deck — mesmo movimento, mesmo pico de tensão na adução
+    // horizontal (posição encurtada); estava mal classificado como alongado
+    perfilResistencia: "encurtado",
     equipamento: ["maquina"],
     nivelMinimo: "iniciante",
     contraindicacoes: ["ombro"],

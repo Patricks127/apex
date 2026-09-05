@@ -146,8 +146,9 @@ export const MUSCULOS_PUXAR: Musculo[] = [
 ];
 
 /** Famílias de empurrar / puxar — base do rácio 1:1 ±30% (spec §4.1).
- *  Conjuntos simétricos (4 vs 4): os isolamentos de peito equilibram os de
- *  deltoide posterior + trapézio. Braços e deltoide lateral não entram. */
+ *  Conjuntos simétricos: braços, deltoide lateral e os isolamentos
+ *  (chest_isolation / lat_isolation) não entram — a contagem é sobre os
+ *  compostos de padrão. */
 export const FAMILIAS_EMPURRAR: Familia[] = [
   "horizontal_push",
   "incline_push",

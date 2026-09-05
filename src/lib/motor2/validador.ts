@@ -25,7 +25,6 @@ import {
 import { calcularVolume } from "./volume.ts";
 import {
   FAMILIAS_RESISTENCIA,
-  GRUPOS_NOMEADOS,
   selecionarSemana,
   semanaParaEntradaVolume,
   type DiaSelecionado,
@@ -241,34 +240,25 @@ export function validarSemana(semana: SemanaSelecionada): ResultadoValidacao {
   }
 
   // 3. duas famílias iguais no mesmo dia.
-  //    Exceções: circuitos repetem por desenho; no formato muscular, o
-  //    isolamento (T3) do(s) músculo(s) que dão nome ao dia pode repetir
-  //    família — mas só quando o músculo não tem alternativa (< 2 famílias
-  //    viáveis, ex.: tríceps só tem "elbow_extension") E os exercícios têm
-  //    perfis de resistência DIFERENTES entre si — senão é redundância
-  //    (peck deck + aberturas na máquina: mesma família, mesmo perfil), não
-  //    variedade. Um composto (T1/T2) partilhado não precisa de ser
-  //    "elegível" ele próprio (dips + pushdown de cabo são exercícios
-  //    diferentes, não uma repetição) — só isolamento contra isolamento
-  //    exige ambos elegíveis; perfis diferentes continua exigido sempre,
-  //    composto incluído. Tem de haver pelo menos um isolamento elegível —
-  //    dois compostos da mesma família nunca têm exceção.
+  //    Circuitos repetem por desenho. No formato muscular repetir família é
+  //    permitido se TODOS os perfis de resistência diferirem (§2.4,
+  //    hipertrofia regional: comprimentos diferentes = estímulos diferentes)
+  //    — o que se veta é mesma família E mesmo perfil (peck deck + aberturas
+  //    na máquina). Nos outros formatos a regra continua estrita.
   for (const d of dias) {
     if (d.tipo === "circuito") continue;
-    const nomeados = new Set(perfil.splitFormato === "muscular" ? (GRUPOS_NOMEADOS[d.tipo] ?? []).flat() : []);
-    const isolamentoElegivel = (e: (typeof d.exercicios)[number]) =>
-      e.exercicio.tier === 3 &&
-      e.exercicio.primarios.some((p) => nomeados.has(p.musculo) && via.poolMusculoFamilias(p.musculo) < 2);
     const porFamilia: Record<string, typeof d.exercicios> = {};
     for (const e of d.exercicios) (porFamilia[e.exercicio.familia] ??= []).push(e);
     for (const fam of Object.keys(porFamilia)) {
       const exs = porFamilia[fam];
       if (exs.length < 2) continue;
-      const algumIsolamentoElegivel = exs.some(isolamentoElegivel);
-      const todosElegiveis = exs.every((e) => e.exercicio.tier !== 3 || isolamentoElegivel(e));
-      const perfisDistintos = new Set(exs.map((e) => e.exercicio.perfilResistencia)).size === exs.length;
-      if (!algumIsolamentoElegivel || !todosElegiveis || !perfisDistintos)
+      if (perfil.splitFormato === "muscular") {
+        const perfisDistintos = new Set(exs.map((e) => e.exercicio.perfilResistencia)).size === exs.length;
+        if (!perfisDistintos)
+          falhasDuras.push(`${d.nome}: família repetida no mesmo dia com o mesmo perfil de resistência (${fam}).`);
+      } else {
         falhasDuras.push(`${d.nome}: família repetida no mesmo dia (${fam}).`);
+      }
     }
   }
 
