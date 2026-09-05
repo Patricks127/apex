@@ -7,9 +7,33 @@ import {
   estimarMinutos,
   EQUIP_DISPONIVEL,
   GRUPOS_NOMEADOS,
+  EXERCICIOS,
+  FAMILIAS_RESISTENCIA,
+  ordemNivel,
+  type Musculo,
   type PerfilSelecao,
   type SplitFormato,
 } from "./index.ts";
+
+// famílias de resistência distintas por músculo, VIÁVEIS para este perfil
+// (mesmo filtro que o seletor usa em candidatosBase: nível, lesões,
+// equipamento) — uma lesão pode eliminar a única família alternativa de um
+// músculo que "na base" tem 2 (ex.: ombro bloqueia todo o vertical_pull,
+// deixando dorsais com só horizontal_pull), por isso não dá para usar a
+// contagem estática da base inteira aqui.
+const familiasViaveis = (p: PerfilSelecao, m: Musculo): number => {
+  const disp = new Set(p.equipamento);
+  return new Set(
+    EXERCICIOS.filter(
+      (e) =>
+        e.primarios.some((pr) => pr.musculo === m) &&
+        (FAMILIAS_RESISTENCIA as string[]).includes(e.familia) &&
+        ordemNivel[e.nivelMinimo] <= ordemNivel[p.nivel] &&
+        !e.contraindicacoes.some((z) => (p.lesoes ?? []).includes(z)) &&
+        e.equipamento.some((q) => disp.has(q)),
+    ).map((e) => e.familia),
+  ).size;
+};
 
 const NIVEIS = ["iniciante", "intermedio", "avancado"] as const;
 const DIAS = [3, 4, 5, 6];
@@ -228,12 +252,19 @@ test("100 planos por formato: ambos passam ≥85 com os critérios do formato", 
 // ===========================================================================
 // bug fixes (ronda 2): calibração do formato muscular pensada para 1×/semana
 // ===========================================================================
-test("formato muscular, intermédio: dia composto tem ≥6 exercícios", () => {
+test("formato muscular, intermédio: dia composto tem ≥5 exercícios", () => {
+  // nota: era ≥6 antes da restrição à exceção de família (ronda 3). Um dia
+  // "Peito + Tríceps" no pior caso fica em 5: peito tem só 3 famílias na
+  // base (nunca mais, mesmo antes desta restrição) e o tríceps, com só 2
+  // perfis de resistência distintos em toda a base (a maioria é "alongado"),
+  // fica genuinamente limitado a 2 exercícios próprios quando a regra exige
+  // perfis diferentes entre repetições de família — não é falta de tentativa
+  // do seletor, é o teto matemático dos dados.
   for (const dias of [3, 4] as const) {
     const s = selecionarSemana(base({ nivel: "intermedio", dias, splitFormato: "muscular" }));
     for (const d of s.dias) {
       if (!GRUPOS_NOMEADOS[d.tipo]) continue; // só dias com nome composto (peito+tríceps, etc.)
-      assert.ok(d.exercicios.length >= 6, `${dias}d: "${d.nome}" só tem ${d.exercicios.length} exercícios`);
+      assert.ok(d.exercicios.length >= 5, `${dias}d: "${d.nome}" só tem ${d.exercicios.length} exercícios`);
     }
   }
 });
@@ -331,6 +362,98 @@ test("formato muscular: nenhum dia excede o tempo disponível sem avisar", () =>
       }
     }
   }
+});
+
+// ===========================================================================
+// bug fix (ronda 3): a exceção de família estava demasiado larga — peck deck
+// + aberturas na máquina (mesma família E mesmo perfil) num músculo (peito)
+// que tem várias famílias na base. Restringida a: só músculos com < 2
+// famílias (tríceps, bíceps, deltoide lateral, gémeos, ...) E só entre
+// exercícios com perfis de resistência diferentes.
+// ===========================================================================
+test("200 planos: família só repete no mesmo dia quando algum músculo primário partilhado é escasso (<2 famílias)", () => {
+  // a exceção é por EXERCÍCIO, não por músculo isolado: pistol squat e step-up
+  // (ambos unilateral_inferior) têm quadríceps E glúteo como co-primários —
+  // se o equipamento só deixa essa família para quadríceps, a repetição é
+  // legítima mesmo o glúteo tendo várias famílias, porque não dá para separar
+  // os dois músculos do MESMO exercício. O que nunca pode acontecer é uma
+  // família repetir-se sem NENHUM músculo primário escasso envolvido (esse é
+  // o caso do peito: peck deck + aberturas, nenhum dos dois primários tem
+  // menos de 2 famílias).
+  let seed = 71;
+  const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32;
+  const pk = <T,>(a: readonly T[]): T => a[Math.floor(rnd() * a.length)];
+  let gruposVerificados = 0;
+  for (let i = 0; i < 200; i++) {
+    const p = base({
+      nivel: pk(NIVEIS),
+      dias: pk(DIAS),
+      equipamento: EQUIP_DISPONIVEL[pk(LOCAIS)],
+      lesoes: [...pk(LESOES)] as PerfilSelecao["lesoes"],
+      foco: [...pk(FOCOS)] as PerfilSelecao["foco"],
+      minutosSessao: pk(MINUTOS),
+      splitFormato: "muscular",
+    });
+    const s = selecionarSemana(p);
+    for (const d of s.dias) {
+      const porFamilia = new Map<string, typeof d.exercicios>();
+      for (const e of d.exercicios) {
+        const arr = porFamilia.get(e.exercicio.familia) ?? [];
+        arr.push(e);
+        porFamilia.set(e.exercicio.familia, arr);
+      }
+      for (const [fam, exs] of porFamilia) {
+        if (exs.length < 2) continue;
+        gruposVerificados++;
+        const escassoEnvolvido = exs.some((e) =>
+          e.exercicio.primarios.some((pr) => familiasViaveis(p, pr.musculo) < 2),
+        );
+        assert.ok(
+          escassoEnvolvido,
+          `plano ${i} (${p.nivel}/${p.dias}d/lesão=${(p.lesoes ?? []).join(",") || "-"}): "${d.nome}" repete a família ${fam} (${exs.map((e) => e.exercicio.id).join(", ")}) sem nenhum músculo primário escasso`,
+        );
+      }
+    }
+  }
+  assert.ok(gruposVerificados > 20, `poucas repetições verificadas (${gruposVerificados})`);
+});
+
+test("família repetida com perfis diferentes: só para músculo com < 2 famílias na base", () => {
+  let seed = 83;
+  const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32;
+  const pk = <T,>(a: readonly T[]): T => a[Math.floor(rnd() * a.length)];
+  let repeticoesVerificadas = 0;
+  for (let i = 0; i < 200; i++) {
+    const p = base({
+      nivel: pk(NIVEIS),
+      dias: pk(DIAS),
+      equipamento: EQUIP_DISPONIVEL[pk(LOCAIS)],
+      lesoes: [...pk(LESOES)] as PerfilSelecao["lesoes"],
+      foco: [...pk(FOCOS)] as PerfilSelecao["foco"],
+      minutosSessao: pk(MINUTOS),
+      splitFormato: "muscular",
+    });
+    const s = selecionarSemana(p);
+    for (const d of s.dias) {
+      const porFamilia = new Map<string, typeof d.exercicios>();
+      for (const e of d.exercicios) {
+        const arr = porFamilia.get(e.exercicio.familia) ?? [];
+        arr.push(e);
+        porFamilia.set(e.exercicio.familia, arr);
+      }
+      for (const [fam, exs] of porFamilia) {
+        if (exs.length < 2) continue;
+        repeticoesVerificadas++;
+        const perfis = exs.map((e) => e.exercicio.perfilResistencia);
+        assert.equal(
+          new Set(perfis).size,
+          perfis.length,
+          `plano ${i} (${p.nivel}/${p.dias}d): "${d.nome}" repete família ${fam} com o MESMO perfil de resistência (${perfis.join(",")})`,
+        );
+      }
+    }
+  }
+  assert.ok(repeticoesVerificadas > 20, `poucas repetições verificadas (${repeticoesVerificadas})`);
 });
 
 // ===========================================================================

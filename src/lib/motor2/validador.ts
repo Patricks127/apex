@@ -243,18 +243,33 @@ export function validarSemana(semana: SemanaSelecionada): ResultadoValidacao {
   // 3. duas famílias iguais no mesmo dia.
   //    Exceções: circuitos repetem por desenho; no formato muscular, o
   //    isolamento (T3) do(s) músculo(s) que dão nome ao dia pode repetir
-  //    família — é a única forma de dar 3–4 variantes próprias (pushdown/
-  //    francês/corda são todos "elbow_extension") quando o músculo só tem
-  //    esta sessão na semana. Compostos (T1/T2) continuam sem exceção.
+  //    família — mas só quando o músculo não tem alternativa (< 2 famílias
+  //    viáveis, ex.: tríceps só tem "elbow_extension") E os exercícios têm
+  //    perfis de resistência DIFERENTES entre si — senão é redundância
+  //    (peck deck + aberturas na máquina: mesma família, mesmo perfil), não
+  //    variedade. Um composto (T1/T2) partilhado não precisa de ser
+  //    "elegível" ele próprio (dips + pushdown de cabo são exercícios
+  //    diferentes, não uma repetição) — só isolamento contra isolamento
+  //    exige ambos elegíveis; perfis diferentes continua exigido sempre,
+  //    composto incluído. Tem de haver pelo menos um isolamento elegível —
+  //    dois compostos da mesma família nunca têm exceção.
   for (const d of dias) {
     if (d.tipo === "circuito") continue;
     const nomeados = new Set(perfil.splitFormato === "muscular" ? (GRUPOS_NOMEADOS[d.tipo] ?? []).flat() : []);
-    const excecao = (e: (typeof d.exercicios)[number]) =>
-      e.exercicio.tier === 3 && e.exercicio.primarios.some((p) => nomeados.has(p.musculo));
-    const contam = d.exercicios.filter((e) => !excecao(e));
-    const fam = contam.map((e) => e.exercicio.familia);
-    const dup = fam.find((f, i) => fam.indexOf(f) !== i);
-    if (dup) falhasDuras.push(`${d.nome}: família repetida no mesmo dia (${dup}).`);
+    const isolamentoElegivel = (e: (typeof d.exercicios)[number]) =>
+      e.exercicio.tier === 3 &&
+      e.exercicio.primarios.some((p) => nomeados.has(p.musculo) && via.poolMusculoFamilias(p.musculo) < 2);
+    const porFamilia: Record<string, typeof d.exercicios> = {};
+    for (const e of d.exercicios) (porFamilia[e.exercicio.familia] ??= []).push(e);
+    for (const fam of Object.keys(porFamilia)) {
+      const exs = porFamilia[fam];
+      if (exs.length < 2) continue;
+      const algumIsolamentoElegivel = exs.some(isolamentoElegivel);
+      const todosElegiveis = exs.every((e) => e.exercicio.tier !== 3 || isolamentoElegivel(e));
+      const perfisDistintos = new Set(exs.map((e) => e.exercicio.perfilResistencia)).size === exs.length;
+      if (!algumIsolamentoElegivel || !todosElegiveis || !perfisDistintos)
+        falhasDuras.push(`${d.nome}: família repetida no mesmo dia (${fam}).`);
+    }
   }
 
   // 4. três ou mais compostos pesados (fadigaSistemica 3) consecutivos

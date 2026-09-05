@@ -362,18 +362,36 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
       !e.contraindicacoes.some((z) => perfil.lesoes.includes(z)) &&
       e.equipamento.some((q) => disp.has(q)),
   );
+  // famílias distintas viáveis por músculo (para a exceção de família do
+  // formato muscular — só se aplica quando o músculo não tem alternativa).
+  const cacheFamiliasMusculo = new Map<Musculo, number>();
+  const poolFamiliasMusculo = (m: Musculo): number => {
+    const cache = cacheFamiliasMusculo.get(m);
+    if (cache !== undefined) return cache;
+    const n = new Set(candidatosBase.filter((e) => e.primarios.some((p) => p.musculo === m)).map((e) => e.familia)).size;
+    cacheFamiliasMusculo.set(m, n);
+    return n;
+  };
 
   const diasSel: DiaSelecionado[] = grelha.map((g, i) => {
     const musculosAlvoDia = MUSC_DIA[g.tipo].filter((m) => MUSCULOS_ALVO.includes(m));
     const ndias = (m: Musculo) => Math.max(1, diasDoMusculo.get(m)?.length ?? 1);
     const alvoDia = (m: Musculo) => (alvo[m] ?? 0) / ndias(m);
     // no formato muscular, o(s) músculo(s) que dão nome ao dia só têm ESTA
-    // sessão — o isolamento (T3) pode repetir família para lhes dar as 3–4
-    // variantes próprias que um "dia de peito"/"dia de braço" real usa
-    // (pushdown/francês/corda são todos "elbow_extension", mas não são a
-    // mesma coisa: perfis de resistência diferentes, ângulos diferentes).
+    // sessão — o isolamento (T3) pode repetir família, mas SÓ quando o
+    // músculo não tem alternativa (< 2 famílias na base, ex.: tríceps só tem
+    // "elbow_extension") e mesmo aí só se os dois exercícios têm perfis de
+    // resistência DIFERENTES (senão é redundância a sério, não variedade —
+    // peck deck + aberturas na máquina são a mesma família E o mesmo perfil).
+    // Um músculo com ≥2 famílias (peito, dorsais) nunca precisa disto.
     // Compostos (T1/T2) continuam sujeitos à regra normal de família.
     const musculosNomeados = new Set<Musculo>((GRUPOS_NOMEADOS[g.tipo] ?? []).flat());
+    // elegível para a exceção: isolamento (T3) de um músculo nomeado sem
+    // alternativa de família. Um composto (T1/T2) que partilhe a família
+    // NUNCA é elegível — partilhar família com ele é só o mesmo padrão a
+    // repetir-se, não uma variante própria do isolamento.
+    const elegivelExcecao = (e: Exercicio) =>
+      e.tier === 3 && e.primarios.some((p) => musculosNomeados.has(p.musculo) && poolFamiliasMusculo(p.musculo) < 2);
 
     const ctx: CtxDia = {
       familias: new Set(),
@@ -410,8 +428,18 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
       }
 
       // penalizações fortes
+      // um composto (T1/T2) da mesma família não precisa de ser "elegível"
+      // ele próprio (fundos_paralelas + pushdown de cabo são genuinamente
+      // diferentes, não uma repetição) — só isolamentos (T3) contra
+      // isolamentos exigem ambos elegíveis. Perfis diferentes é sempre
+      // exigido, composto incluído.
+      const mesmaFamiliaEscolhidos = ctx.escolhidos.filter((e) => e.familia === ex.familia);
       const excecaoFamilia =
-        muscular && ex.tier === 3 && ex.primarios.some((p) => musculosNomeados.has(p.musculo));
+        muscular &&
+        elegivelExcecao(ex) &&
+        mesmaFamiliaEscolhidos.every(
+          (e) => (e.tier !== 3 || elegivelExcecao(e)) && e.perfilResistencia !== ex.perfilResistencia,
+        );
       if (ctx.familias.has(ex.familia) && !excecaoFamilia) s -= 100;
       if (ex.fadigaSistemica === 3 && ctx.fadiga3 >= MAX_FADIGA3_DIA) s -= 100;
 
@@ -892,12 +920,25 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
       const protegidos = new Set<string>();
 
       // exceção de família (igual à do passo principal): isolamento (T3) de
-      // um músculo do nome pode repetir família — só assim cabem as 3–4
-      // variantes próprias (pushdown/francês/corda) quando o músculo só tem
-      // este dia na semana.
+      // um músculo do nome pode repetir família, mas só quando o músculo não
+      // tem alternativa (< 2 famílias na base) e os perfis de resistência
+      // diferem — senão é redundância (peck deck + aberturas na máquina),
+      // não variedade.
+      const elegivelExcecao = (e: Exercicio) =>
+        e.tier === 3 && e.primarios.some((p) => nomeados.has(p.musculo) && poolFamiliasMusculo(p.musculo) < 2);
       const familiaBloqueada = (ex: Exercicio) => {
-        if (!dia.exercicios.some((e) => e.exercicio.familia === ex.familia)) return false;
-        return !(ex.tier === 3 && ex.primarios.some((p) => nomeados.has(p.musculo)));
+        const mesmaFamilia = dia.exercicios.filter((e) => e.exercicio.familia === ex.familia);
+        if (!mesmaFamilia.length) return false;
+        if (!elegivelExcecao(ex)) return true;
+        // um composto (T1/T2) partilhado não precisa de ser "elegível" ele
+        // próprio (dips + pushdown de cabo são exercícios diferentes, não
+        // uma repetição) — só isolamento (T3) contra isolamento exige ambos
+        // elegíveis. Perfis diferentes é sempre exigido, composto incluído.
+        return mesmaFamilia.some(
+          (e) =>
+            (e.exercicio.tier === 3 && !elegivelExcecao(e.exercicio)) ||
+            e.exercicio.perfilResistencia === ex.perfilResistencia,
+        );
       };
       const volAtual = (m: Musculo) => semana.volume.porMusculo.find((v) => v.musculo === m)?.direto ?? 0;
       const excedeTetoDia = (ex: Exercicio, serie: number) =>
