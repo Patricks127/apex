@@ -252,10 +252,11 @@ export function validarSemana(semana: SemanaSelecionada): ResultadoValidacao {
 
   // 3. duas famílias iguais no mesmo dia.
   //    Circuitos repetem por desenho. No formato muscular repetir família é
-  //    permitido se TODOS os perfis de resistência diferirem (§2.4,
-  //    hipertrofia regional: comprimentos diferentes = estímulos diferentes)
-  //    — o que se veta é mesma família E mesmo perfil (peck deck + aberturas
-  //    na máquina). Nos outros formatos a regra continua estrita.
+  //    permitido se os perfis de resistência diferirem (§2.4, hipertrofia
+  //    regional) — veta-se mesma família E mesmo perfil (peck deck +
+  //    aberturas na máquina), 3+ da mesma família, ou 4+ compostos (T1/T2)
+  //    do mesmo padrão (supino barra + inclinado + halteres + floor press).
+  //    Nos outros formatos a regra continua estrita.
   for (const d of dias) {
     if (d.tipo === "circuito") continue;
     const porFamilia: Record<string, typeof d.exercicios> = {};
@@ -265,11 +266,20 @@ export function validarSemana(semana: SemanaSelecionada): ResultadoValidacao {
       if (exs.length < 2) continue;
       if (perfil.splitFormato === "muscular") {
         const perfisDistintos = new Set(exs.map((e) => e.exercicio.perfilResistencia)).size === exs.length;
-        if (!perfisDistintos)
-          falhasDuras.push(`${d.nome}: família repetida no mesmo dia com o mesmo perfil de resistência (${fam}).`);
+        if (exs.length > 2 || !perfisDistintos)
+          falhasDuras.push(
+            `${d.nome}: família repetida no mesmo dia (${fam}) — máx. 2 por família, com perfis de resistência distintos.`,
+          );
       } else {
         falhasDuras.push(`${d.nome}: família repetida no mesmo dia (${fam}).`);
       }
+    }
+    if (perfil.splitFormato === "muscular") {
+      const porPadraoComposto: Record<string, number> = {};
+      for (const e of d.exercicios)
+        if (e.exercicio.tier <= 2) porPadraoComposto[e.exercicio.padrao] = (porPadraoComposto[e.exercicio.padrao] ?? 0) + 1;
+      for (const [pad, n] of Object.entries(porPadraoComposto))
+        if (n > 3) falhasDuras.push(`${d.nome}: ${n} compostos do padrão "${pad}" no mesmo dia — máx. 3.`);
     }
   }
 

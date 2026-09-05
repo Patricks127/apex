@@ -142,6 +142,48 @@ test("200 planos no formato muscular: nenhum exercício num dia cujos músculos-
   assert.ok(verificados > 1000, `poucos exercícios verificados (${verificados})`);
 });
 
+// O teste acima valida o seletor contra `d.musculosAlvo`, que vem do próprio
+// MUSC_DIA — se MUSC_DIA listar um músculo a mais (ex.: deltoide anterior no
+// dia de peito), o teste passa com o bug lá. Este é independente: um músculo
+// que dá NOME a OUTRO dia do split não pode ter um exercício PRIMÁRIO neste.
+test("200 planos muscular: nenhum exercício primário de um músculo que é o nome de OUTRO dia", () => {
+  let seed = 17;
+  const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32;
+  const pk = <T,>(a: readonly T[]): T => a[Math.floor(rnd() * a.length)];
+  let verificados = 0;
+  for (let i = 0; i < 200; i++) {
+    const p = base({
+      nivel: pk(NIVEIS),
+      dias: pk(DIAS),
+      equipamento: EQUIP_DISPONIVEL[pk(LOCAIS)],
+      lesoes: [...pk(LESOES)] as PerfilSelecao["lesoes"],
+      foco: [...pk(FOCOS)] as PerfilSelecao["foco"],
+      minutosSessao: pk(MINUTOS),
+      splitFormato: "muscular",
+    });
+    const s = selecionarSemana(p);
+    // músculos que dão nome a cada dia (achatando os grupos "ou")
+    const nomeadosPorDia = s.dias.map((d) => new Set((GRUPOS_NOMEADOS[d.tipo] ?? []).flat()));
+    for (let di = 0; di < s.dias.length; di++) {
+      const d = s.dias[di];
+      const proprios = nomeadosPorDia[di];
+      if (!proprios.size) continue;
+      const doutrosDias = new Set<string>();
+      for (let dj = 0; dj < s.dias.length; dj++)
+        if (dj !== di) for (const m of nomeadosPorDia[dj]) if (!proprios.has(m)) doutrosDias.add(m);
+      for (const e of d.exercicios) {
+        verificados++;
+        const intruso = e.exercicio.primarios.find((prim) => doutrosDias.has(prim.musculo) && !proprios.has(prim.musculo));
+        assert.ok(
+          !intruso,
+          `plano ${i} (${p.nivel}/${p.dias}d): "${d.nome}" tem ${e.exercicio.id} — primário ${intruso?.musculo}, que é o nome de outro dia (dia próprio: ${[...proprios].join("/")})`,
+        );
+      }
+    }
+  }
+  assert.ok(verificados > 1000, `poucos exercícios verificados (${verificados})`);
+});
+
 test("todo o dia com nome composto tem ≥1 exercício primário de cada músculo do nome", () => {
   let seed = 23;
   const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32;
@@ -431,6 +473,41 @@ test("200 planos muscular: nenhuma família se repete no mesmo dia com o mesmo p
   }
   // a regra não é vácua: repetições de família (com perfis distintos) acontecem
   assert.ok(repeticoesLegitimas > 30, `poucas repetições legítimas observadas (${repeticoesLegitimas})`);
+});
+
+test("200 planos muscular: máx. 2 exercícios por família e 3 compostos do mesmo padrão por dia", () => {
+  let seed = 131;
+  const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32;
+  const pk = <T,>(a: readonly T[]): T => a[Math.floor(rnd() * a.length)];
+  let diasComPressMultiplo = 0; // dias com ≥3 compostos de empurrar — para a regra não ser vácua
+  for (let i = 0; i < 200; i++) {
+    const p = base({
+      nivel: pk(NIVEIS),
+      dias: pk(DIAS),
+      equipamento: EQUIP_DISPONIVEL[pk(LOCAIS)],
+      lesoes: [...pk(LESOES)] as PerfilSelecao["lesoes"],
+      foco: [...pk(FOCOS)] as PerfilSelecao["foco"],
+      minutosSessao: pk(MINUTOS),
+      splitFormato: "muscular",
+    });
+    const s = selecionarSemana(p);
+    for (const d of s.dias) {
+      const porFamilia: Record<string, number> = {};
+      const porPadraoComposto: Record<string, number> = {};
+      for (const e of d.exercicios) {
+        porFamilia[e.exercicio.familia] = (porFamilia[e.exercicio.familia] ?? 0) + 1;
+        if (e.exercicio.tier <= 2)
+          porPadraoComposto[e.exercicio.padrao] = (porPadraoComposto[e.exercicio.padrao] ?? 0) + 1;
+      }
+      for (const [fam, n] of Object.entries(porFamilia))
+        assert.ok(n <= 2, `plano ${i} (${p.nivel}/${p.dias}d): "${d.nome}" tem ${n} exercícios da família ${fam} (máx. 2)`);
+      for (const [pad, n] of Object.entries(porPadraoComposto)) {
+        assert.ok(n <= 3, `plano ${i} (${p.nivel}/${p.dias}d): "${d.nome}" tem ${n} compostos do padrão ${pad} (máx. 3)`);
+        if (n >= 3) diasComPressMultiplo++;
+      }
+    }
+  }
+  assert.ok(diasComPressMultiplo > 20, `poucos dias com 3 compostos do mesmo padrão (${diasComPressMultiplo})`);
 });
 
 test("peck deck + aberturas na máquina nunca aparecem no mesmo dia (mesma família E mesmo perfil)", () => {

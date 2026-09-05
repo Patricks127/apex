@@ -122,22 +122,21 @@ const MUSC_DIA: Record<string, Musculo[]> = {
   pull: ["dorsais", "trapezio_medio", "deltoide_posterior", "biceps"],
   legs: ["quadriceps", "isquiotibiais", "gluteo", "gemeos"],
   full: ["peito", "dorsais", "trapezio_medio", "deltoide_anterior", "deltoide_lateral", "deltoide_posterior", "biceps", "triceps", "quadriceps", "isquiotibiais", "gluteo", "gemeos"],
-  // split clássico por grupo muscular (1×/semana por músculo)
-  peito_triceps: ["peito", "deltoide_anterior", "triceps"],
-  // deltoide_posterior FORA daqui: em 3d/4d o seu dia próprio é "Pernas +
-  // Ombros"/"Ombros + Braços" — listá-lo também em "Costas + Bíceps"
-  // duplicava-lhe o volume (o loop principal escolhia-lhe um exercício
-  // PRÓPRIO aqui, competindo pelo teto com o exercício que o passo 13 tem de
-  // garantir no dia que leva o seu nome).
+  // split clássico por grupo muscular (1×/semana por músculo).
+  // Estes dias treinam SÓ os músculos do próprio nome + os acoplados sem dia
+  // próprio (gémeos com pernas). Um músculo que tem o SEU dia noutro sítio
+  // (deltoide anterior → "Ombros"/"Ombros + Braços"/"Pernas + Ombros";
+  // deltoide posterior idem; tríceps/bíceps → "Braços") NÃO entra aqui —
+  // senão o loop principal e os passos 10/11 escolhiam-lhe um exercício
+  // PRÓPRIO (ex.: press militar num dia de peito), a fatigá-lo antes dos
+  // press e a duplicar-lhe o volume semanal.
+  peito_triceps: ["peito", "triceps"],
   costas_biceps: ["dorsais", "trapezio_medio", "biceps"],
   pernas_ombros: ["quadriceps", "isquiotibiais", "gluteo", "gemeos", "deltoide_lateral", "deltoide_anterior", "deltoide_posterior"],
   pernas: ["quadriceps", "isquiotibiais", "gluteo", "gemeos"],
   ombros_bracos: ["deltoide_anterior", "deltoide_lateral", "deltoide_posterior", "biceps", "triceps"],
-  // "Peito"/"Costas" sozinhos (5–6 dias) NÃO incluem tríceps/bíceps — esses
-  // têm o seu próprio dia ("Braços"); listá-los aqui fá-los-ia aparecer
-  // também no dia de peito/costas E no de braços, duplicando o seu volume.
-  peito_dia: ["peito", "deltoide_anterior"],
-  costas_dia: ["dorsais", "trapezio_medio", "deltoide_posterior"],
+  peito_dia: ["peito"],
+  costas_dia: ["dorsais", "trapezio_medio"],
   ombros_dia: ["deltoide_anterior", "deltoide_lateral", "deltoide_posterior", "trapezio_medio"],
   bracos_dia: ["biceps", "triceps"],
   // músculos que NÃO têm dia próprio no split de 6 dias (ombros/braços já
@@ -414,13 +413,21 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
       }
 
       // penalizações fortes
-      // repetir família no mesmo dia é permitido (formato muscular) se TODOS
-      // os perfis de resistência diferirem — o que se veta é mesma família E
-      // mesmo perfil (peck deck + aberturas na máquina).
+      // repetir família no mesmo dia é permitido (formato muscular) se os
+      // perfis de resistência diferirem — o que se veta é mesma família E
+      // mesmo perfil (peck deck + aberturas na máquina). Tetos por dia:
+      // no MÁXIMO 2 exercícios por família e 3 COMPOSTOS (T1/T2) do mesmo
+      // padrão (supino barra + inclinado + halteres + floor press são 4
+      // "empurrar_horizontal" — variedade a mais faz-se com outro padrão).
       const mesmaFamiliaEscolhidos = ctx.escolhidos.filter((e) => e.familia === ex.familia);
+      const compostosMesmoPadrao =
+        ex.tier <= 2 ? ctx.escolhidos.filter((e) => e.tier <= 2 && e.padrao === ex.padrao).length : 0;
       const excecaoFamilia =
-        muscular && mesmaFamiliaEscolhidos.every((e) => e.perfilResistencia !== ex.perfilResistencia);
+        muscular &&
+        mesmaFamiliaEscolhidos.length < 2 &&
+        mesmaFamiliaEscolhidos.every((e) => e.perfilResistencia !== ex.perfilResistencia);
       if (ctx.familias.has(ex.familia) && !excecaoFamilia) s -= 100;
+      if (compostosMesmoPadrao >= 3) s -= 100;
       if (ex.fadigaSistemica === 3 && ctx.fadiga3 >= MAX_FADIGA3_DIA) s -= 100;
 
       // teto semanal (§2.1: "acima do teto, rejeitar"). O trabalho DIRETO
@@ -898,13 +905,21 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
       if (!grupos) continue;
       const protegidos = new Set<string>();
 
-      // repetir família no mesmo dia é permitido se TODOS os perfis de
-      // resistência diferirem (§2.4, hipertrofia regional) — o que se veta é
-      // mesma família E mesmo perfil (peck deck + aberturas na máquina).
-      const familiaBloqueada = (ex: Exercicio) =>
-        dia.exercicios.some(
-          (e) => e.exercicio.familia === ex.familia && e.exercicio.perfilResistencia === ex.perfilResistencia,
-        );
+      // repetir família é permitido se os perfis diferirem (§2.4, hipertrofia
+      // regional) — veta-se mesma família E mesmo perfil (peck deck + aberturas
+      // na máquina). Tetos por dia: máx. 2 por família, máx. 3 compostos
+      // (T1/T2) do mesmo padrão.
+      const familiaBloqueada = (ex: Exercicio) => {
+        const mf = dia.exercicios.filter((e) => e.exercicio.familia === ex.familia);
+        if (mf.length >= 2) return true;
+        if (mf.some((e) => e.exercicio.perfilResistencia === ex.perfilResistencia)) return true;
+        if (
+          ex.tier <= 2 &&
+          dia.exercicios.filter((e) => e.exercicio.tier <= 2 && e.exercicio.padrao === ex.padrao).length >= 3
+        )
+          return true;
+        return false;
+      };
       const volAtual = (m: Musculo) => semana.volume.porMusculo.find((v) => v.musculo === m)?.direto ?? 0;
       const excedeTetoDia = (ex: Exercicio, serie: number) =>
         ex.primarios.some((p) => volAtual(p.musculo) + serie * p.contributo > r.teto) ||
