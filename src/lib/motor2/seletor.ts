@@ -287,6 +287,79 @@ export function semanaParaEntradaVolume(s: SemanaSelecionada): EntradaVolume {
 }
 
 // ---------------------------------------------------------------------------
+// Casa+Ginásio (parte 2): atribuição dos dias-tipo por equipamento disponível
+// ---------------------------------------------------------------------------
+
+// As 3 âncoras pesadas de barra do pedido — agachamento (squat), terra
+// (hinge), supino com barra (horizontal_push). Não é "toda a família grande":
+// horizontal_pull (remada) e vertical_push (press) têm variante de halteres
+// tão boa quanto a de barra — não competem pelo equipamento escasso do dia.
+const FAMILIAS_ANCORA_PESADA: Familia[] = ["squat", "hinge", "horizontal_push"];
+
+/** Quanto um dia-tipo do split PRECISA de compostos pesados de barra (0–3). */
+function necessidadeAncora(tipo: string): number {
+  const ms = MUSC_DIA[tipo] ?? [];
+  let n = 0;
+  if (ms.includes("quadriceps") || ms.includes("isquiotibiais")) n += 2; // squat/hinge
+  if (ms.includes("peito")) n += 1; // horizontal_push
+  return n;
+}
+
+/** Quanto um CONJUNTO de equipamento consegue dar das 3 âncoras (0–6): +2 por
+ *  família com Tier 1 disponível, +1 se só tiver Tier 2 (halteres/kettlebell). */
+function capacidadeAncora(disp: Set<Equipamento>, nivel: Nivel): number {
+  let n = 0;
+  for (const fam of FAMILIAS_ANCORA_PESADA) {
+    const viavel = (tier: number) =>
+      EXERCICIOS.some(
+        (e) =>
+          e.familia === fam &&
+          e.tier === tier &&
+          ordemNivel[e.nivelMinimo] <= ordemNivel[nivel] &&
+          e.equipamento.some((q) => disp.has(q)),
+      );
+    if (viavel(1)) n += 2;
+    else if (viavel(2)) n += 1;
+  }
+  return n;
+}
+
+/**
+ * Casa+Ginásio (parte 2): os dias-tipo do split continuam a ser os mesmos —
+ * só se troca QUE POSIÇÃO cada um ocupa, para que os que mais precisam de
+ * compostos pesados caiam nas posições com mais capacidade de os oferecer
+ * (os dias de ginásio). Pareamento guloso: ordenam-se as duas listas
+ * (necessidade do dia-tipo, capacidade da posição) e emparelham-se por
+ * ordem — quem precisa mais fica onde há mais capacidade, e por aí adiante.
+ *
+ * Não existe um dia-tipo à parte para "dia de casa sem âncora": se uma
+ * posição não tiver NENHUM T1/T2 de âncora, o pareamento já a deixou com o
+ * dia-tipo de MENOR necessidade (o composto pesado calha sempre a quem tem
+ * capacidade para o dar) — o resto acontece na escolha de exercícios do
+ * próprio dia (`candidatosPorDia`), que gravita para unilateral/hip
+ * extension quando é o que o equipamento permite.
+ */
+function atribuirGrelhaPorEquipamento<T extends { tipo: string }>(
+  grelha: T[],
+  dispPorDia: (i: number) => Set<Equipamento>,
+  nivel: Nivel,
+): T[] {
+  const capacidade = grelha.map((_, i) => capacidadeAncora(dispPorDia(i), nivel));
+  // equipamento uniforme (não é híbrido, ou híbrido sem variação real de
+  // capacidade entre dias) → nada a otimizar, mantém a ordem original.
+  if (new Set(capacidade).size <= 1) return grelha;
+  const porNecessidade = grelha
+    .map((g, i) => ({ g, i, necessidade: necessidadeAncora(g.tipo) }))
+    .sort((a, b) => b.necessidade - a.necessidade);
+  const porCapacidade = capacidade.map((c, i) => ({ i, c })).sort((a, b) => b.c - a.c);
+  const nova: T[] = new Array(grelha.length);
+  porNecessidade.forEach((item, ordem) => {
+    nova[porCapacidade[ordem].i] = item.g;
+  });
+  return nova;
+}
+
+// ---------------------------------------------------------------------------
 
 /**
  * @param variacao  0 = seleção ótima determinística. >0 escolhe entre os
@@ -309,9 +382,19 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
   const r = INTERVALO_VOLUME[perfil.nivel];
   const base = Math.round((r.min + r.max) / 2);
 
+  // Casa+Ginásio (parte 2): equipamento por dia, quando o perfil o traz —
+  // senão todos os dias usam o conjunto único de sempre (`disp`).
+  const equipPorDia =
+    perfil.equipamentoPorDia && perfil.equipamentoPorDia.length === dias ? perfil.equipamentoPorDia : null;
+  const dispPorDia = (i: number): Set<Equipamento> => (equipPorDia ? new Set(equipPorDia[i]) : disp);
+  const disponivelNoDia = (ex: Exercicio, i: number) => ex.equipamento.some((q) => dispPorDia(i).has(q));
+
   // ---- split + frequência ----
   const muscular = perfil.splitFormato === "muscular";
-  const grelha = muscular ? splitMuscular(dias, foco) : splitPara(dias);
+  const grelhaBase = muscular ? splitMuscular(dias, foco) : splitPara(dias);
+  // atribuição: âncoras pesadas (agachamento/terra/supino com barra) caem nas
+  // posições com mais capacidade de as oferecer (dias de ginásio).
+  const grelha = equipPorDia ? atribuirGrelhaPorEquipamento(grelhaBase, dispPorDia, perfil.nivel) : grelhaBase;
 
   // ---- 1. alvo de volume semanal por músculo ----
   const alvo: Partial<Record<Musculo, number>> = {};
@@ -393,14 +476,25 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
     escolhidos: Exercicio[];
   };
 
-  // candidatos base (exclusões duras, spec §3.3.3)
-  const candidatosBase = EXERCICIOS.filter(
+  // candidatos base (exclusões duras, spec §3.3.3) — nível e lesões são da
+  // semana inteira; equipamento passa a ser POR DIA (Casa+Ginásio, parte 2).
+  const candidatosSemEquip = EXERCICIOS.filter(
     (e) =>
       FAMILIAS_RESISTENCIA.includes(e.familia) &&
       ordemNivel[e.nivelMinimo] <= ordemNivel[perfil.nivel] &&
-      !e.contraindicacoes.some((z) => perfil.lesoes.includes(z)) &&
-      e.equipamento.some((q) => disp.has(q)),
+      !e.contraindicacoes.some((z) => perfil.lesoes.includes(z)),
   );
+  // pool de CADA dia — usado pelo loop principal e por qualquer passo que já
+  // sabe em que dia vai colocar o exercício.
+  const candidatosPorDia: Exercicio[][] = grelha.map((_, i) => {
+    const d = dispPorDia(i);
+    return candidatosSemEquip.filter((e) => e.equipamento.some((q) => d.has(q)));
+  });
+  // pool da SEMANA (união) — usado pelos passos que procuram, entre vários
+  // dias, um sítio onde colocar um candidato; `disponivelNoDia` filtra por
+  // equipamento na hora de escolher o dia.
+  const uniaoEquip = equipPorDia ? new Set(equipPorDia.flat()) : disp;
+  const candidatosBase = candidatosSemEquip.filter((e) => e.equipamento.some((q) => uniaoEquip.has(q)));
 
   const diasSel: DiaSelecionado[] = grelha.map((g, i) => {
     const musculosAlvoDia = MUSC_DIA[g.tipo].filter((m) => MUSCULOS_ALVO.includes(m));
@@ -523,7 +617,7 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
         if (tier === 1 && grandesSemAncora.length === 0 && adicionados >= 1) break;
         if (tier !== 1 && comDeficit.length === 0) break;
 
-        let cand = candidatosBase.filter((e) => e.tier === tier && !jaEscolhido(e));
+        let cand = candidatosPorDia[i].filter((e) => e.tier === tier && !jaEscolhido(e));
         // sem isolamento direto para competidores do foco (§3.4.5)
         if (focoCompetidores.size) {
           cand = cand.filter((e) => !focoCompetidores.has(e.primarios[0].musculo));
@@ -624,7 +718,7 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
       if (doFoco.length < 2) continue;
       const alvoTroca = [...doFoco].sort((a, b) => b.ordem - a.ordem)[0];
       const diaSemAlvo = d.exercicios.filter((x) => x !== alvoTroca).map((x) => x.exercicio);
-      const subst = candidatosBase
+      const subst = candidatosPorDia[d.indice]
         .filter(
           (e) =>
             e.primarios.some((p) => p.musculo === f) &&
@@ -709,7 +803,7 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
               a.exercicios.filter((x) => ladoDe(x.exercicio) === ladoAlvo).length -
               b.exercicios.filter((x) => ladoDe(x.exercicio) === ladoAlvo).length,
           )
-          .find((d) => d.exercicios.length < 9 && podeEntrar(d, ex) === null);
+          .find((d) => d.exercicios.length < 9 && podeEntrar(d, ex) === null && disponivelNoDia(ex, d.indice));
         if (!dia || !admitir(dia, ex, SERIES_TIER[ex.tier])) continue;
         colocou = true;
         break;
@@ -840,6 +934,7 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
           .find(
             (d) =>
               podeEntrar(d, ex) === null &&
+              disponivelNoDia(ex, d.indice) &&
               estimarMinutos([...d.exercicios, { exercicio: ex, series: SERIES_TIER[ex.tier] }]) <= minutosSessao &&
               ex.primarios.every(
                 (p) =>
@@ -882,7 +977,7 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
         for (const ex of cand) {
           const dia = diaBase
             .sort((a, b) => a.exercicios.length - b.exercicios.length)
-            .find((d) => d.exercicios.length < 9 && podeEntrar(d, ex) === null);
+            .find((d) => d.exercicios.length < 9 && podeEntrar(d, ex) === null && disponivelNoDia(ex, d.indice));
           if (!dia || !admitir(dia, ex, SERIES_TIER[ex.tier])) continue;
           mexeu = true;
           break;
@@ -962,7 +1057,7 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
               .filter((e) => e.exercicio.primarios.some((p) => grupo.includes(p.musculo)))
               .map((e) => e.exercicio.perfilResistencia),
           );
-          const candBrutos = candidatosBase.filter(
+          const candBrutos = candidatosPorDia[dia.indice].filter(
             (e) => e.primarios.some((p) => grupo.includes(p.musculo)) && !usados.has(e.id) && podeEntrar(dia, e) === null,
           );
           // músculos DO GRUPO já cobertos como primários no dia — um grupo

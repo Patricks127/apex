@@ -1,11 +1,13 @@
 /* ============================================================
-   APEX — Motor v2 · Casa + Ginásio, parte 1 (modelo de dados)
+   APEX — Motor v2 · Casa + Ginásio
 
-   Estes testes fixam duas coisas:
-   a) `equipamentoPorDia` descreve a semana corretamente;
-   b) a parte 1 é INERTE — o seletor ainda não lê o campo, e os planos gerados
-      são bit-a-bit os mesmos de antes. A parte 2 vira este último teste do
-      avesso (aí os dias de casa TÊM de diferir dos de ginásio).
+   Parte 1 (modelo de dados): `equipamentoPorDia` descreve a semana
+   corretamente; nessa altura era inerte (o seletor ainda não a lia).
+
+   Parte 2 (este ficheiro, secção de baixo): o seletor passa a ler
+   `equipamentoPorDia` — candidatos por dia, âncoras pesadas
+   (agachamento/terra/supino com barra) atribuídas aos dias de ginásio,
+   `validarDia` continua a ser a porta única em todos os dias.
    ============================================================ */
 
 import test from "node:test";
@@ -18,8 +20,9 @@ import {
   equipamentoPorDiaDe,
 } from "./equipamento.ts";
 import { gerarPlanoV2, perfilV2De } from "./plano.ts";
+import { selecionarSemana, validarDia, type PerfilSelecao } from "./seletor.ts";
 import type { MotorProfile } from "../motor/index.ts";
-import type { Equipamento } from "./tipos.ts";
+import type { Equipamento, Familia } from "./tipos.ts";
 
 const mesmoSet = (a: Equipamento[], b: Equipamento[]) =>
   a.length === b.length && a.every((x) => b.includes(x));
@@ -128,15 +131,137 @@ test("perfilV2De preenche equipamentoPorDia (e deriva-o quando o perfil não o t
   assert.deepEqual(explicito.equipamentoPorDia, [["halteres"], ["banda"], ["barra"], ["trx"]]);
 });
 
-test("PARTE 1 é inerte: o conjunto plano e o plano gerado não mudam", () => {
-  // o campo `equipamento` (o que o seletor lê hoje) continua a ser o do local
+test("PARTE 2: equipamentoPorDia deixou de ser inerte — muda o plano gerado", () => {
+  // o campo `equipamento` (o pool "da semana", ainda usado pelos passos que
+  // procuram por vários dias) continua a ser o do local.
   assert.ok(mesmoSet(perfilV2De(mp({ gymDaysPerWeek: 1 })).equipamento, EQUIP_DISPONIVEL.hibrido));
 
   const dias = (p: MotorProfile) => JSON.stringify(gerarPlanoV2(p, {}).days);
-  const semAlternancia = dias(mp());
-  assert.equal(dias(mp({ gymDaysPerWeek: 1 })), semAlternancia);
-  assert.equal(
-    dias(mp({ gymDaysPerWeek: 3, equipamentoPorDia: [["halteres", "peso_corporal"]] })),
-    semAlternancia,
-  );
+  const semDiasDeCasa = dias(mp({ gymDaysPerWeek: 4 })); // 4 de 4 — nenhum dia de casa
+  const comDiasDeCasa = dias(mp({ gymDaysPerWeek: 2 })); // 2 de 4 — alternância real
+  assert.notEqual(comDiasDeCasa, semDiasDeCasa, "equipamentoPorDia devia mudar os exercícios escolhidos");
+});
+
+// ===========================================================================
+// PARTE 2 — o seletor por dia (candidatosPorDia + atribuição de dias-tipo)
+// ===========================================================================
+
+function perfilHibrido(o: {
+  dias: number;
+  diasGinasio: number;
+  nivel?: PerfilSelecao["nivel"];
+  splitFormato?: PerfilSelecao["splitFormato"];
+}): PerfilSelecao {
+  const equipamentoPorDia = equipamentoPorDiaDe({ location: "hibrido", dias: o.dias, diasGinasio: o.diasGinasio });
+  return {
+    objetivo: "hipertrofia",
+    nivel: o.nivel ?? "intermedio",
+    dias: o.dias,
+    equipamento: equipamentoDaSemana(equipamentoPorDia),
+    equipamentoPorDia,
+    lesoes: [],
+    foco: [],
+    splitFormato: o.splitFormato,
+  };
+}
+
+test("Híbrido 5d/3 ginásio: os 2 dias de casa não têm exercício que exija barra, máquina ou cabos", () => {
+  const perfil = perfilHibrido({ dias: 5, diasGinasio: 3 });
+  const semana = selecionarSemana(perfil);
+  for (const i of [3, 4]) {
+    const casaSet = new Set(perfil.equipamentoPorDia![i]);
+    assert.ok(!casaSet.has("barra") && !casaSet.has("maquina") && !casaSet.has("cabos")); // sanity do próprio fixture
+    for (const ex of semana.dias[i].exercicios) {
+      assert.ok(
+        ex.exercicio.equipamento.some((q) => casaSet.has(q)),
+        `${semana.dias[i].nome} (dia de casa): "${ex.exercicio.nome}" (equip=${ex.exercicio.equipamento.join(",")}) não é possível com o equipamento de casa`,
+      );
+    }
+  }
+});
+
+test("Híbrido 5d/3 ginásio: os dias de ginásio mantêm as âncoras pesadas (agachamento/terra com barra)", () => {
+  const perfil = perfilHibrido({ dias: 5, diasGinasio: 3 });
+  const semana = selecionarSemana(perfil);
+  const ANCORAS_INFERIOR: Familia[] = ["squat", "hinge"];
+  const temT1DeBarra = (dia: (typeof semana.dias)[number]) =>
+    dia.exercicios.some(
+      (e) => ANCORAS_INFERIOR.includes(e.exercicio.familia) && e.exercicio.tier === 1 && e.exercicio.equipamento.includes("barra"),
+    );
+  const diasGinasio = [0, 1, 2].map((i) => semana.dias[i]);
+  const diasCasa = [3, 4].map((i) => semana.dias[i]);
+  assert.ok(diasGinasio.some(temT1DeBarra), "nenhum dia de ginásio tem agachamento/terra com barra (Tier 1)");
+  assert.ok(!diasCasa.some(temT1DeBarra), "um dia de casa ficou com agachamento/terra de barra — devia ter ido para o ginásio");
+});
+
+test("Híbrido: nenhum dia viola validarDia (vários dias/ginásio, frequência e muscular)", () => {
+  const combos = [
+    { dias: 3, ginasio: 1 },
+    { dias: 3, ginasio: 2 },
+    { dias: 4, ginasio: 1 },
+    { dias: 4, ginasio: 2 },
+    { dias: 4, ginasio: 3 },
+    { dias: 5, ginasio: 1 },
+    { dias: 5, ginasio: 2 },
+    { dias: 5, ginasio: 3 },
+    { dias: 5, ginasio: 4 },
+    { dias: 6, ginasio: 1 },
+    { dias: 6, ginasio: 3 },
+    { dias: 6, ginasio: 5 },
+  ];
+  let diasVerificados = 0;
+  for (const splitFormato of ["frequencia", "muscular"] as const) {
+    const muscular = splitFormato === "muscular";
+    for (const c of combos) {
+      const perfil = perfilHibrido({ dias: c.dias, diasGinasio: c.ginasio, splitFormato });
+      const semana = selecionarSemana(perfil);
+      for (const d of semana.dias) {
+        diasVerificados++;
+        const vistos: (typeof d.exercicios)[number]["exercicio"][] = [];
+        for (const e of d.exercicios) {
+          const motivo = validarDia(e.exercicio, vistos, d.musculosAlvo, muscular);
+          assert.equal(
+            motivo,
+            null,
+            `${splitFormato} ${c.dias}d/${c.ginasio}gin: "${d.nome}" tem ${e.exercicio.id} que a porta recusaria — ${motivo}`,
+          );
+          vistos.push(e.exercicio);
+        }
+      }
+    }
+  }
+  assert.ok(diasVerificados > 100, `poucos dias verificados (${diasVerificados})`);
+});
+
+test("Híbrido: volume semanal por músculo dentro do intervalo (dias de casa não deixam buracos)", () => {
+  const combos = [
+    { dias: 4, ginasio: 1 },
+    { dias: 4, ginasio: 2 },
+    { dias: 4, ginasio: 3 },
+    { dias: 5, ginasio: 1 },
+    { dias: 5, ginasio: 2 },
+    { dias: 5, ginasio: 3 },
+    { dias: 5, ginasio: 4 },
+    { dias: 6, ginasio: 2 },
+    { dias: 6, ginasio: 4 },
+  ];
+  const GRANDES = ["peito", "dorsais", "quadriceps", "isquiotibiais", "gluteo"] as const;
+  for (const c of combos) {
+    const perfil = perfilHibrido({ dias: c.dias, diasGinasio: c.ginasio });
+    const semana = selecionarSemana(perfil);
+    for (const v of semana.volume.porMusculo) {
+      assert.notEqual(v.estado, "acima_teto", `${c.dias}d/${c.ginasio}gin: ${v.musculo} acima do teto (${v.direto})`);
+    }
+    for (const m of GRANDES) {
+      const vm = semana.volume.porMusculo.find((x) => x.musculo === m);
+      if (!vm) continue;
+      // abaixo de 8 só é aceitável com um aviso a explicar a limitação (mesmo
+      // padrão já usado para lesão/equipamento — spec §4.1)
+      const explicado = semana.avisos.some((a) => a.includes(m));
+      assert.ok(
+        vm.acimaMinimoAbsoluto || explicado,
+        `${c.dias}d/${c.ginasio}gin: ${m} abaixo de 8 séries sem aviso (${vm.direto})`,
+      );
+    }
+  }
 });
