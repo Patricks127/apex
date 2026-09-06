@@ -269,6 +269,9 @@ export type DiaSelecionado = {
   tipo: string;
   musculosAlvo: Musculo[];
   exercicios: ExercicioPrescrito[];
+  /** Equipamento realmente usado NESTE dia (Casa+Ginásio, parte 2/3). Fora de
+   *  "hibrido", ou em objetivos não-hipertrofia, é o mesmo em todos os dias. */
+  equipamento: Equipamento[];
 };
 export type SemanaSelecionada = {
   perfil: PerfilSelecao;
@@ -325,38 +328,45 @@ function capacidadeAncora(disp: Set<Equipamento>, nivel: Nivel): number {
 }
 
 /**
- * Casa+Ginásio (parte 2): os dias-tipo do split continuam a ser os mesmos —
- * só se troca QUE POSIÇÃO cada um ocupa, para que os que mais precisam de
- * compostos pesados caiam nas posições com mais capacidade de os oferecer
- * (os dias de ginásio). Pareamento guloso: ordenam-se as duas listas
- * (necessidade do dia-tipo, capacidade da posição) e emparelham-se por
- * ordem — quem precisa mais fica onde há mais capacidade, e por aí adiante.
+ * Casa+Ginásio (parte 2): a ORDEM dos dias-tipo do split NUNCA muda — é essa
+ * ordem, escolhida a dedo em `splitPara`/`splitMuscular`, que já evita dois
+ * grupos grandes em dias consecutivos (§4.1). O que se decide aqui é qual dos
+ * N conjuntos de equipamento da semana (uns de ginásio, outros de casa) se
+ * usa em CADA posição — pareamento guloso entre "necessidade" do dia-tipo
+ * (o seu MUSC_DIA pede agachamento/terra/supino com barra?) e "capacidade"
+ * de cada conjunto de equipamento: quem precisa mais fica com quem pode dar
+ * mais. Devolve, para cada posição i do split, o ÍNDICE do conjunto de
+ * `equipDisponivel` a usar nessa posição.
  *
- * Não existe um dia-tipo à parte para "dia de casa sem âncora": se uma
- * posição não tiver NENHUM T1/T2 de âncora, o pareamento já a deixou com o
- * dia-tipo de MENOR necessidade (o composto pesado calha sempre a quem tem
- * capacidade para o dar) — o resto acontece na escolha de exercícios do
- * próprio dia (`candidatosPorDia`), que gravita para unilateral/hip
- * extension quando é o que o equipamento permite.
+ * (Uma primeira versão reordenava os PRÓPRIOS dias-tipo — partia a
+ * segurança de adjacência do split: "Inferior" podia acabar ao lado de
+ * "Pernas", os dois de perna. Mapear o EQUIPAMENTO em vez do dia-tipo
+ * mantém a sequência original intacta e resolve isso na raiz.)
+ *
+ * Não existe um dia-tipo à parte para "dia de casa sem âncora": se um
+ * conjunto de equipamento não tiver NENHUM T1/T2 de âncora, o pareamento já
+ * o deixou com o dia-tipo de MENOR necessidade — o resto acontece na escolha
+ * de exercícios do próprio dia (`candidatosPorDia`), que gravita para
+ * unilateral/hip extension quando é o que o equipamento permite.
  */
-function atribuirGrelhaPorEquipamento<T extends { tipo: string }>(
-  grelha: T[],
-  dispPorDia: (i: number) => Set<Equipamento>,
+function mapearEquipamentoPorNecessidade(
+  grelha: { tipo: string }[],
+  equipDisponivel: Equipamento[][],
   nivel: Nivel,
-): T[] {
-  const capacidade = grelha.map((_, i) => capacidadeAncora(dispPorDia(i), nivel));
+): number[] {
+  const capacidade = equipDisponivel.map((eq) => capacidadeAncora(new Set(eq), nivel));
   // equipamento uniforme (não é híbrido, ou híbrido sem variação real de
-  // capacidade entre dias) → nada a otimizar, mantém a ordem original.
-  if (new Set(capacidade).size <= 1) return grelha;
+  // capacidade entre dias) → nada a otimizar, cada posição usa o seu próprio.
+  if (new Set(capacidade).size <= 1) return grelha.map((_, i) => i);
   const porNecessidade = grelha
-    .map((g, i) => ({ g, i, necessidade: necessidadeAncora(g.tipo) }))
+    .map((g, i) => ({ i, necessidade: necessidadeAncora(g.tipo) }))
     .sort((a, b) => b.necessidade - a.necessidade);
   const porCapacidade = capacidade.map((c, i) => ({ i, c })).sort((a, b) => b.c - a.c);
-  const nova: T[] = new Array(grelha.length);
+  const mapa: number[] = new Array(grelha.length);
   porNecessidade.forEach((item, ordem) => {
-    nova[porCapacidade[ordem].i] = item.g;
+    mapa[item.i] = porCapacidade[ordem].i;
   });
-  return nova;
+  return mapa;
 }
 
 // ---------------------------------------------------------------------------
@@ -382,19 +392,19 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
   const r = INTERVALO_VOLUME[perfil.nivel];
   const base = Math.round((r.min + r.max) / 2);
 
-  // Casa+Ginásio (parte 2): equipamento por dia, quando o perfil o traz —
-  // senão todos os dias usam o conjunto único de sempre (`disp`).
-  const equipPorDia =
-    perfil.equipamentoPorDia && perfil.equipamentoPorDia.length === dias ? perfil.equipamentoPorDia : null;
-  const dispPorDia = (i: number): Set<Equipamento> => (equipPorDia ? new Set(equipPorDia[i]) : disp);
-  const disponivelNoDia = (ex: Exercicio, i: number) => ex.equipamento.some((q) => dispPorDia(i).has(q));
-
   // ---- split + frequência ----
   const muscular = perfil.splitFormato === "muscular";
-  const grelhaBase = muscular ? splitMuscular(dias, foco) : splitPara(dias);
-  // atribuição: âncoras pesadas (agachamento/terra/supino com barra) caem nas
-  // posições com mais capacidade de as oferecer (dias de ginásio).
-  const grelha = equipPorDia ? atribuirGrelhaPorEquipamento(grelhaBase, dispPorDia, perfil.nivel) : grelhaBase;
+  const grelha = muscular ? splitMuscular(dias, foco) : splitPara(dias);
+
+  // Casa+Ginásio (parte 2): equipamento por dia, quando o perfil o traz — a
+  // ORDEM dos dias-tipo acima nunca muda (mantém a segurança de adjacência
+  // do split); o que se decide é que CONJUNTO de equipamento cada posição
+  // usa, para as âncoras pesadas caírem onde há mais capacidade de as dar.
+  const equipPorDia =
+    perfil.equipamentoPorDia && perfil.equipamentoPorDia.length === dias ? perfil.equipamentoPorDia : null;
+  const mapaEquip = equipPorDia ? mapearEquipamentoPorNecessidade(grelha, equipPorDia, perfil.nivel) : null;
+  const dispPorDia = (i: number): Set<Equipamento> => (equipPorDia ? new Set(equipPorDia[mapaEquip![i]]) : disp);
+  const disponivelNoDia = (ex: Exercicio, i: number) => ex.equipamento.some((q) => dispPorDia(i).has(q));
 
   // ---- 1. alvo de volume semanal por músculo ----
   const alvo: Partial<Record<Musculo, number>> = {};
@@ -674,6 +684,7 @@ export function selecionarSemana(perfil: PerfilSelecao, variacao = 0): SemanaSel
       tipo: g.tipo,
       musculosAlvo: musculosAlvoDia,
       exercicios: ordenados,
+      equipamento: [...dispPorDia(i)],
     };
   });
 
@@ -1445,6 +1456,17 @@ function rescatar(
   return preencherForca(g.musculos, undefined, alvoN, c, volSemana, exs);
 }
 
+/**
+ * LIMITAÇÃO CONHECIDA (Casa+Ginásio): este caminho (objetivos não-hipertrofia
+ * — powerlifting, híbrido, hyrox, corrida, calistenia) usa UM equipamento
+ * único (`c.disp`) para a semana inteira; `equipamentoPorDia` não é lido
+ * aqui. Decisão consciente, não esquecimento: powerlifting sem barra não faz
+ * sentido (o objetivo É levantar; um dia "de casa" não o serve), corrida e
+ * calistenia quase não dependem de equipamento (é o corpo/estrada), e resta
+ * só o híbrido — o caso menos comum dos cinco. Se aparecer um utilizador
+ * real nesse caso, trata-se então (o mesmo padrão desta parte — candidatos
+ * por dia + `DiaSelecionado.equipamento` — replica-se para aqui).
+ */
 export function construirSemanaModal(perfil: PerfilSelecao, variacao = 0): SemanaSelecionada {
   const objetivo = perfil.objetivo;
   const nivel = perfil.nivel;
@@ -1483,6 +1505,7 @@ export function construirSemanaModal(perfil: PerfilSelecao, variacao = 0): Seman
     tipo: g.tipo,
     musculosAlvo: (g.musculos ?? []).slice(),
     exercicios: construirDiaModal(g, c, volSemana),
+    equipamento: [...c.disp],
   }));
 
   const semana: SemanaSelecionada = {

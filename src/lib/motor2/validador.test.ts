@@ -87,6 +87,7 @@ test("§4.1 — volume primário acima do teto falha (exceto glúteo em full-bod
         nome: "D1",
         tipo: "upper",
         musculosAlvo: ["peito"],
+        equipamento: EQUIP_DISPONIVEL.ginasio,
         exercicios: [
           { exercicio: pick("supino_barra"), series: 12, ordem: 1, foco: false },
           { exercicio: pick("peck_deck"), series: 12, ordem: 2, foco: false },

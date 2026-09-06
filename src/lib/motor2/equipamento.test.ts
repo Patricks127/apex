@@ -165,22 +165,30 @@ function perfilHibrido(o: {
   };
 }
 
+// A ordem dos dias-tipo do split nunca muda (parte 2 mapeia EQUIPAMENTO por
+// posição, não dias-tipo) — por isso os testes classificam "dia de casa" vs
+// "dia de ginásio" pelo `equipamento` de cada `DiaSelecionado`, nunca por
+// índice fixo.
+const ehDiaDeGinasio = (dia: { equipamento: Equipamento[] }) => dia.equipamento.includes("barra");
+
 test("Híbrido 5d/3 ginásio: os 2 dias de casa não têm exercício que exija barra, máquina ou cabos", () => {
   const perfil = perfilHibrido({ dias: 5, diasGinasio: 3 });
   const semana = selecionarSemana(perfil);
-  for (const i of [3, 4]) {
-    const casaSet = new Set(perfil.equipamentoPorDia![i]);
-    assert.ok(!casaSet.has("barra") && !casaSet.has("maquina") && !casaSet.has("cabos")); // sanity do próprio fixture
-    for (const ex of semana.dias[i].exercicios) {
+  const diasCasa = semana.dias.filter((d) => !ehDiaDeGinasio(d));
+  assert.equal(diasCasa.length, 2, `esperava 2 dias de casa, houve ${diasCasa.length}`);
+  for (const dia of diasCasa) {
+    const casaSet = new Set(dia.equipamento);
+    assert.ok(!casaSet.has("barra") && !casaSet.has("maquina") && !casaSet.has("cabos"));
+    for (const ex of dia.exercicios) {
       assert.ok(
         ex.exercicio.equipamento.some((q) => casaSet.has(q)),
-        `${semana.dias[i].nome} (dia de casa): "${ex.exercicio.nome}" (equip=${ex.exercicio.equipamento.join(",")}) não é possível com o equipamento de casa`,
+        `${dia.nome} (dia de casa): "${ex.exercicio.nome}" (equip=${ex.exercicio.equipamento.join(",")}) não é possível com o equipamento de casa`,
       );
     }
   }
 });
 
-test("Híbrido 5d/3 ginásio: os dias de ginásio mantêm as âncoras pesadas (agachamento/terra com barra)", () => {
+test("Híbrido 5d/3 ginásio: os dias de ginásio mantêm as âncoras pesadas (agachamento/terra com barra); os de casa não", () => {
   const perfil = perfilHibrido({ dias: 5, diasGinasio: 3 });
   const semana = selecionarSemana(perfil);
   const ANCORAS_INFERIOR: Familia[] = ["squat", "hinge"];
@@ -188,10 +196,39 @@ test("Híbrido 5d/3 ginásio: os dias de ginásio mantêm as âncoras pesadas (a
     dia.exercicios.some(
       (e) => ANCORAS_INFERIOR.includes(e.exercicio.familia) && e.exercicio.tier === 1 && e.exercicio.equipamento.includes("barra"),
     );
-  const diasGinasio = [0, 1, 2].map((i) => semana.dias[i]);
-  const diasCasa = [3, 4].map((i) => semana.dias[i]);
+  const diasGinasio = semana.dias.filter(ehDiaDeGinasio);
+  const diasCasa = semana.dias.filter((d) => !ehDiaDeGinasio(d));
+  assert.equal(diasGinasio.length, 3);
   assert.ok(diasGinasio.some(temT1DeBarra), "nenhum dia de ginásio tem agachamento/terra com barra (Tier 1)");
   assert.ok(!diasCasa.some(temT1DeBarra), "um dia de casa ficou com agachamento/terra de barra — devia ter ido para o ginásio");
+});
+
+test("Híbrido: grupos grandes nunca ficam em dias consecutivos, mesmo depois de mapear o equipamento por necessidade", () => {
+  // regressão: uma primeira versão da atribuição REORDENAVA os dias-tipo e
+  // podia pôr "Inferior" ao lado de "Pernas" (os dois de quad/isquio/gluteo)
+  // — a ordem do split já evitava isto; mapear o EQUIPAMENTO em vez do
+  // dia-tipo tinha de preservar essa garantia.
+  const GRANDES = new Set(["peito", "dorsais", "quadriceps", "isquiotibiais", "gluteo"]);
+  const combos = [
+    { dias: 4, ginasio: 1 }, { dias: 4, ginasio: 2 }, { dias: 4, ginasio: 3 },
+    { dias: 5, ginasio: 1 }, { dias: 5, ginasio: 2 }, { dias: 5, ginasio: 3 }, { dias: 5, ginasio: 4 },
+    { dias: 6, ginasio: 1 }, { dias: 6, ginasio: 2 }, { dias: 6, ginasio: 3 }, { dias: 6, ginasio: 4 }, { dias: 6, ginasio: 5 },
+  ];
+  for (const splitFormato of ["frequencia", "muscular"] as const) {
+    for (const c of combos) {
+      const perfil = perfilHibrido({ dias: c.dias, diasGinasio: c.ginasio, splitFormato });
+      const semana = selecionarSemana(perfil);
+      for (let i = 1; i < semana.dias.length; i++) {
+        const a = new Set(semana.dias[i - 1].musculosAlvo.filter((m) => GRANDES.has(m)));
+        const clash = semana.dias[i].musculosAlvo.filter((m) => GRANDES.has(m) && a.has(m));
+        assert.equal(
+          clash.length,
+          0,
+          `${splitFormato} ${c.dias}d/${c.ginasio}gin: "${semana.dias[i - 1].nome}" → "${semana.dias[i].nome}" repetem grupo grande (${clash.join(",")})`,
+        );
+      }
+    }
+  }
 });
 
 test("Híbrido: nenhum dia viola validarDia (vários dias/ginásio, frequência e muscular)", () => {
