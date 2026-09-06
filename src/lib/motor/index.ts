@@ -11,6 +11,9 @@
    treino, progressão semana-a-semana, check-in pós-treino.
    ============================================================ */
 
+// O vocabulário de equipamento é o do motor v2 (uma só lista para os dois).
+import type { Equipamento } from "../motor2/tipos.ts";
+
 // ---------------------------------------------------------------------------
 // Tipos
 // ---------------------------------------------------------------------------
@@ -52,6 +55,14 @@ export interface MotorProfile {
   daysPerWeek: number; // 3–6 (fora disso é ajustado)
   location: Location;
   locationNote?: string | null;
+  /** Só "hibrido": quantos dos `daysPerWeek` são no ginásio (os outros em casa). */
+  gymDaysPerWeek?: number | null;
+  /**
+   * Equipamento disponível em CADA dia de treino (motor v2). Índice = dia do
+   * split, comprimento = `daysPerWeek`. Fora de "hibrido" todos os dias são
+   * iguais. Ausente → derivado de `location` (ver `equipamentoPorDiaDe`).
+   */
+  equipamentoPorDia?: Equipamento[][];
   injuries?: Injury[];
   injuryNote?: string | null;
   focus?: FocusMuscle[];

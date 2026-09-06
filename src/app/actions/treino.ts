@@ -19,7 +19,7 @@ import {
   type Progression,
   type Sex,
 } from "@/lib/motor";
-import { gerarPlanoV2 } from "@/lib/motor2";
+import { gerarPlanoV2, EQUIP_CASA_IDS, type Equipamento } from "@/lib/motor2";
 
 const GOAL_IDS = GOALS.map((g) => g.id) as Goal[];
 const SEXES: Sex[] = ["homem", "mulher"];
@@ -67,6 +67,12 @@ export async function guardarOnboarding(
   const splitFormat = (["frequencia", "muscular", "auto"] as const).includes(splitFormatRaw as never)
     ? splitFormatRaw
     : "auto";
+  const gymDaysRaw = String(formData.get("gym_days_per_week") ?? "");
+  const gymDays = Number.parseInt(gymDaysRaw, 10);
+  const homeEquipment = formData
+    .getAll("home_equipment")
+    .map(String)
+    .filter((v) => EQUIP_CASA_IDS.includes(v as Equipamento));
 
   const erros: Record<string, string> = {};
   if (!GOAL_IDS.includes(goal as Goal)) erros.goal = "Escolhe um objetivo.";
@@ -81,6 +87,13 @@ export async function guardarOnboarding(
     erros.location_note = "Descreve o local de treino.";
   }
   if (locationNote.length > 120) erros.location_note = "Máximo 120 caracteres.";
+  // Casa + Ginásio: pelo menos um dia de cada lado — senão o local é outro.
+  if (location === "hibrido") {
+    const maxGinasio = Number.isInteger(daysPerWeek) ? daysPerWeek - 1 : 5;
+    if (!Number.isInteger(gymDays) || gymDays < 1 || gymDays > maxGinasio) {
+      erros.gym_days_per_week = "Escolhe quantos dias treinas no ginásio (pelo menos um em casa).";
+    }
+  }
   if (injuryNote.length > 200) erros.injury_note = "Máximo 200 caracteres.";
 
   if (Object.keys(erros).length > 0) return { erros };
@@ -104,6 +117,10 @@ export async function guardarOnboarding(
       injury_note: injuries.length ? injuryNote || null : null,
       focus_muscles: goal === "hipertrofia" ? focus : [],
       split_format: goal === "hipertrofia" ? splitFormat : "auto",
+      // As duas colunas do local vão sempre juntas (o CHECK da 010 compara
+      // gym_days_per_week com days_per_week).
+      gym_days_per_week: location === "hibrido" ? gymDays : null,
+      home_equipment: location === "hibrido" ? homeEquipment : [],
     })
     .eq("id", user.id);
 

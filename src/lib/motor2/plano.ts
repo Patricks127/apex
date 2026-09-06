@@ -26,6 +26,7 @@ import {
   type Progression,
 } from "../motor/index.ts";
 import { PARAMS } from "./objetivos.ts";
+import { equipamentoPorDiaDe } from "./equipamento.ts";
 import {
   EQUIP_DISPONIVEL,
   type DiaSelecionado,
@@ -72,11 +73,24 @@ const FOCO_V1_V2: Record<string, Musculo[]> = {
 
 export function perfilV2De(mp: MotorProfile): PerfilSelecao {
   const foco = (mp.focus ?? []).flatMap((f) => FOCO_V1_V2[f] ?? []).slice(0, 2);
+  // Perfis antigos (e os testes que montam um MotorProfile à mão) não trazem
+  // `equipamentoPorDia` — deriva-se do local, que é o que já se fazia.
+  const equipamentoPorDia =
+    mp.equipamentoPorDia && mp.equipamentoPorDia.length > 0
+      ? mp.equipamentoPorDia
+      : equipamentoPorDiaDe({
+          location: mp.location,
+          dias: mp.daysPerWeek,
+          diasGinasio: mp.gymDaysPerWeek,
+        });
   return {
     objetivo: mp.goal,
     nivel: mp.level as Level,
     dias: mp.daysPerWeek,
+    // PARTE 1: o conjunto plano mantém-se o de hoje (o seletor ainda não lê
+    // `equipamentoPorDia`), para o comportamento gerado não mudar.
     equipamento: EQUIP_DISPONIVEL[mp.location] ?? EQUIP_DISPONIVEL.ginasio,
+    equipamentoPorDia,
     lesoes: (mp.injuries ?? []) as PerfilSelecao["lesoes"],
     foco: mp.goal === "hipertrofia" ? foco : [],
     // "auto" e qualquer outro objetivo → "frequencia"

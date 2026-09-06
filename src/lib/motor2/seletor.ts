@@ -49,7 +49,15 @@ export type PerfilSelecao = {
   objetivo: ObjetivoV2;
   nivel: Nivel;
   dias: number; // 3–6
+  /** Conjunto usado na seleção. Em "Casa + Ginásio" é a união da semana. */
   equipamento: Equipamento[];
+  /**
+   * Equipamento de cada dia (índice = dia do split, comprimento = `dias`).
+   * Existe para "Casa + Ginásio" ser alternância real; nos outros locais todos
+   * os dias são iguais. PARTE 1: o seletor ainda NÃO lê este campo — passa a
+   * lê-lo na parte 2, onde a atribuição dia-tipo ↔ local também é decidida.
+   */
+  equipamentoPorDia?: Equipamento[][];
   lesoes: Zona[];
   foco?: Musculo[]; // 0–2 músculos prioritários
   minutosSessao?: number; // tempo disponível por sessão (default 75)
@@ -58,25 +66,9 @@ export type PerfilSelecao = {
   splitFormato?: SplitFormato;
 };
 
-// Perfis de equipamento por local de treino (o onboarding mapeia local → isto).
-export const EQUIP_DISPONIVEL: Record<string, Equipamento[]> = {
-  ginasio: [
-    "barra", "halteres", "maquina", "cabos", "peso_corporal", "kettlebell",
-    "banda", "trx", "barra_fixa", "paralelas", "banco", "caixa", "corda_saltar",
-    "sled", "remo_ergometro", "bicicleta", "passadeira", "wall_ball", "skierg",
-  ],
-  hibrido: [
-    "barra", "halteres", "maquina", "cabos", "peso_corporal", "kettlebell",
-    "banda", "trx", "barra_fixa", "paralelas", "banco", "caixa", "bicicleta",
-    "passadeira", "remo_ergometro",
-  ],
-  casa: ["halteres", "banco", "peso_corporal", "banda", "kettlebell", "barra_fixa"],
-  parque: ["peso_corporal", "barra_fixa", "paralelas", "banda", "caixa"],
-  outro: [
-    "barra", "halteres", "maquina", "cabos", "peso_corporal", "kettlebell",
-    "banda", "barra_fixa", "paralelas", "banco",
-  ],
-};
+// Perfis de equipamento por local de treino. Vivem em `equipamento.ts` (módulo
+// folha: o onboarding importa-o sem arrastar o seletor para o bundle do cliente).
+export { EQUIP_DISPONIVEL } from "./equipamento.ts";
 
 // Famílias que o seletor de hipertrofia usa (resistência pura).
 export const FAMILIAS_RESISTENCIA: Familia[] = [

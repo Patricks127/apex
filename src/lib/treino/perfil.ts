@@ -15,6 +15,8 @@ import {
   type MotorProfile,
   type Sex,
 } from "@/lib/motor";
+import { equipamentoPorDiaDe } from "@/lib/motor2";
+import type { Equipamento } from "@/lib/motor2";
 
 /**
  * Lê o perfil (colunas de onboarding) + personal_records e monta o
@@ -28,7 +30,7 @@ export async function carregarPerfilMotor(
   const { data: perfil } = await supabase
     .from("profiles")
     .select(
-      "goal, sex, level, days_per_week, location, location_note, injuries, injury_note, focus_muscles, split_format",
+      "goal, sex, level, days_per_week, location, location_note, injuries, injury_note, focus_muscles, split_format, gym_days_per_week, home_equipment",
     )
     .eq("id", userId)
     .single();
@@ -49,14 +51,26 @@ export async function carregarPerfilMotor(
     .select("lift, value_kg")
     .eq("user_id", userId);
 
+  const location = perfil.location as Location;
+  const daysPerWeek = perfil.days_per_week as number;
+  const gymDaysPerWeek = (perfil.gym_days_per_week ?? null) as number | null;
+  const homeEquipment = (perfil.home_equipment ?? []) as Equipamento[];
+
   return {
     motorProfile: {
       goal: perfil.goal as Goal,
       sex: perfil.sex as Sex,
       level: perfil.level as Level,
-      daysPerWeek: perfil.days_per_week as number,
-      location: perfil.location as Location,
+      daysPerWeek,
+      location,
       locationNote: perfil.location_note as string | null,
+      gymDaysPerWeek,
+      equipamentoPorDia: equipamentoPorDiaDe({
+        location,
+        dias: daysPerWeek,
+        diasGinasio: gymDaysPerWeek,
+        equipamentoCasa: homeEquipment,
+      }),
       injuries: (perfil.injuries ?? []) as Injury[],
       injuryNote: perfil.injury_note as string | null,
       focus: (perfil.focus_muscles ?? []) as FocusMuscle[],

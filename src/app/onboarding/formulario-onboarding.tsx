@@ -9,6 +9,9 @@ import {
   INJURIES,
   FOCUS_MUSCLES,
 } from "@/lib/motor";
+// Módulo folha do motor v2 — não arrasta o seletor/base de exercícios para o
+// bundle do cliente.
+import { EQUIP_CASA_OMISSAO, EQUIP_CASA_OPCOES } from "@/lib/motor2/equipamento";
 import { guardarOnboarding, type EstadoOnboarding } from "@/app/actions/treino";
 import { AvisoErro } from "@/app/_ui/campos";
 
@@ -28,12 +31,18 @@ export function FormularioOnboarding({
     injury_note: string | null;
     focus_muscles: string[];
     split_format: string | null;
+    gym_days_per_week: number | null;
+    home_equipment: string[];
   };
 }) {
   const [estado, acao, pendente] = useActionState(guardarOnboarding, ESTADO_INICIAL);
   const [goal, setGoal] = useState(inicial.goal ?? "");
   const [location, setLocation] = useState(inicial.location ?? "");
+  const [dias, setDias] = useState(inicial.days_per_week ?? 0);
   const [temLesao, setTemLesao] = useState(inicial.injuries.length > 0);
+
+  // Casa + Ginásio: pelo menos um dia de cada lado (senão o local é o outro).
+  const opcoesGinasio = dias >= 3 ? Array.from({ length: dias - 1 }, (_, i) => i + 1) : [];
 
   return (
     <form action={acao} className="flex flex-col gap-7" noValidate>
@@ -99,6 +108,7 @@ export function FormularioOnboarding({
               titulo={String(n)}
               centro
               checkedPorDefeito={inicial.days_per_week === n}
+              onChange={() => setDias(n)}
             />
           ))}
         </div>
@@ -130,6 +140,61 @@ export function FormularioOnboarding({
           <span className="text-xs text-red-400">{estado.erros.location_note}</span>
         ) : null}
       </Seccao>
+
+      {location === "hibrido" ? (
+        <>
+          <Seccao
+            titulo="Quantos dias treinas no ginásio?"
+            nota="Os restantes são em casa. O motor põe os levantamentos pesados nos dias de ginásio."
+            erro={estado.erros?.gym_days_per_week}
+          >
+            {opcoesGinasio.length > 0 ? (
+              <>
+                <div className="grid grid-cols-5 gap-2">
+                  {opcoesGinasio.map((n) => (
+                    <Opcao
+                      key={n}
+                      name="gym_days_per_week"
+                      value={String(n)}
+                      titulo={String(n)}
+                      centro
+                      checkedPorDefeito={inicial.gym_days_per_week === n}
+                    />
+                  ))}
+                </div>
+                <p className="text-xs text-zinc-500">
+                  {inicial.gym_days_per_week && inicial.gym_days_per_week < dias
+                    ? `${inicial.gym_days_per_week} no ginásio · ${dias - inicial.gym_days_per_week} em casa`
+                    : `De ${dias} dias de treino.`}
+                </p>
+              </>
+            ) : (
+              <p className="text-xs text-zinc-500">Escolhe primeiro os dias por semana.</p>
+            )}
+          </Seccao>
+
+          <Seccao
+            titulo="O que tens em casa?"
+            nota="Nos dias de casa o motor troca as âncoras de barra pela variante mais próxima do que tens."
+          >
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {EQUIP_CASA_OPCOES.map((e) => (
+                <Check
+                  key={e.id}
+                  name="home_equipment"
+                  value={e.id}
+                  titulo={e.label}
+                  defaultChecked={
+                    inicial.home_equipment.length > 0
+                      ? inicial.home_equipment.includes(e.id)
+                      : (EQUIP_CASA_OMISSAO as string[]).includes(e.id)
+                  }
+                />
+              ))}
+            </div>
+          </Seccao>
+        </>
+      ) : null}
 
       <Seccao
         titulo="Lesões ou zonas a poupar"

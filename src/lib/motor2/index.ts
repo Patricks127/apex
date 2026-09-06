@@ -8,6 +8,16 @@ export * from "./tipos.ts";
 export { EXERCICIOS } from "./exercicios.ts";
 export * from "./volume.ts";
 export * from "./seletor.ts";
+// Explícito (e não `export *`): o `EQUIP_DISPONIVEL` já sai por `seletor.ts`.
+export {
+  EQUIP_CASA_IDS,
+  EQUIP_CASA_OMISSAO,
+  EQUIP_CASA_OPCOES,
+  equipamentoCasaDe,
+  equipamentoDaSemana,
+  equipamentoPorDiaDe,
+  type EntradaEquipamentoDia,
+} from "./equipamento.ts";
 export * from "./validador.ts";
 export * from "./historico.ts";
 export * from "./objetivos.ts";
