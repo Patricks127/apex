@@ -20,6 +20,7 @@ import {
   FAMILIAS_PUXAR,
   MUSCULOS_GRANDES,
   ordemNivel,
+  type Equipamento,
   type Exercicio,
   type Familia,
   type Musculo,
@@ -134,8 +135,16 @@ type Viabilidade = {
   poolPuxar: number; // idem, puxar
 };
 
-function viabilidade(perfil: PerfilSelecao): Viabilidade {
-  const disp = new Set(perfil.equipamento);
+/**
+ * Casa+Ginásio (parte 3): como acima, mas contra um conjunto de equipamento
+ * explícito — não o da semana inteira. Um músculo cujo(s) único(s) dia(s)
+ * são em casa não pode ser julgado pelo que só é possível no ginásio, só
+ * porque ESSE existe noutro dia da semana. `viabilidade()` (a versão sem
+ * `disp`) fica só para os critérios que são mesmo da semana inteira —
+ * cobertura de padrões (presente OU NÃO em qualquer dia) e o rácio
+ * empurrar:puxar (medido sobre o volume da semana toda).
+ */
+function viabilidadeComEquipamento(perfil: PerfilSelecao, disp: Set<Equipamento>): Viabilidade {
   const ok = (e: Exercicio) =>
     ordemNivel[e.nivelMinimo] <= ordemNivel[perfil.nivel] &&
     !e.contraindicacoes.some((z) => perfil.lesoes.includes(z)) &&
@@ -167,6 +176,23 @@ function viabilidade(perfil: PerfilSelecao): Viabilidade {
     poolEmpurrar: poolFamilias(FAMILIAS_EMPURRAR),
     poolPuxar: poolFamilias(FAMILIAS_PUXAR),
   };
+}
+
+function viabilidade(perfil: PerfilSelecao): Viabilidade {
+  return viabilidadeComEquipamento(perfil, new Set(perfil.equipamento));
+}
+
+/** União do equipamento dos dias que treinam `m` como alvo — o que está
+ *  realmente ao alcance desse músculo, não da semana inteira. */
+function equipamentoDoMusculo(dias: DiaSelecionado[], m: Musculo): Set<Equipamento> {
+  const doMusculo = dias.filter((d) => d.musculosAlvo.includes(m));
+  const eq = new Set<Equipamento>();
+  for (const d of doMusculo) for (const q of d.equipamento) eq.add(q);
+  // salvaguarda: se por algum motivo nenhum dia declara `m` como alvo (não
+  // devia acontecer), cai para a semana inteira em vez de ficar vazio.
+  if (eq.size) return eq;
+  for (const d of dias) for (const q of d.equipamento) eq.add(q);
+  return eq;
 }
 
 // Músculos "alvo do objetivo" para a §4.1 (mínimo de 8 séries): grupos grandes
@@ -203,7 +229,11 @@ export function validarSemana(semana: SemanaSelecionada): ResultadoValidacao {
   for (const m of alvoObjetivo) {
     const v = vm(m);
     if (!v || v.direto >= 8) continue;
-    const pool = via.poolMusculoPrim(m);
+    // Casa+Ginásio (parte 3): o que conta é o equipamento dos dias que TREINAM
+    // este músculo — não o da semana inteira. Um músculo cujo único dia é em
+    // casa não pode ser julgado pelo que só é possível no ginásio.
+    const viaM = viabilidadeComEquipamento(perfil, equipamentoDoMusculo(dias, m));
+    const pool = viaM.poolMusculoPrim(m);
     // no split muscular o músculo só tem UM dia — só cabe 1 exercício por
     // família nesse dia, por isso o que importa é quantas famílias distintas
     // (não quantos exercícios) as lesões/equipamento deixam viáveis.
@@ -216,7 +246,7 @@ export function validarSemana(semana: SemanaSelecionada): ResultadoValidacao {
       !!diaDoMusculo &&
       avisos.some((a) => a.startsWith(diaDoMusculo.nome) && /não cabem|cortar abaixo do ideal/.test(a));
     const limitado =
-      (perfil.splitFormato === "muscular" ? via.poolMusculoFamilias(m) * 4 < 8 : pool < 3) || limitadoPorTempo;
+      (perfil.splitFormato === "muscular" ? viaM.poolMusculoFamilias(m) * 4 < 8 : pool < 3) || limitadoPorTempo;
     if (limitado)
       avisos.push(
         `${m}: ${v.direto} séries/semana (abaixo de 8) — as lesões/equipamento limitam o que cabe num só dia.`,
@@ -390,9 +420,13 @@ export function validarSemana(semana: SemanaSelecionada): ResultadoValidacao {
     let slotsComposto = 0;
     let slotsCompostoTotal = 0;
     for (const d of dias) {
+      // Casa+Ginásio (parte 3): a âncora só é exigível se o EQUIPAMENTO DESTE
+      // DIA a permite — não o da semana inteira (um dia de casa não é julgado
+      // pelo agachamento com barra que só existe no dia de ginásio).
+      const viaDia = viabilidadeComEquipamento(perfil, new Set(d.equipamento));
       for (const m of gruposGrandesDoDia(d)) {
-        // só se espera âncora composta se ela é sequer viável
-        if (via.poolMusculoPesado(m) === 0) continue;
+        // só se espera âncora composta se ela é sequer viável NESTE dia
+        if (viaDia.poolMusculoPesado(m) === 0) continue;
         ancoraTotal++;
         if (d.exercicios.some((e) => e.exercicio.tier <= 2 && e.exercicio.primarios.some((p) => p.musculo === m)))
           ancoraOK++;

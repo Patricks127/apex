@@ -4,6 +4,8 @@ import {
   selecionarSemana,
   avaliarHistorico,
   gerarPlanoComHistorico,
+  equipamentoDaSemana,
+  equipamentoPorDiaDe,
   EXERCICIOS,
   EQUIP_DISPONIVEL,
   type HistoricoTreino,
@@ -266,6 +268,72 @@ test("o substituto respeita família, nível e equipamento; nunca troca por vari
   assert.equal(sub.nivelMinimo, "iniciante");
   assert.ok(sub.equipamento.some((q) => (EQUIP_DISPONIVEL.casa as string[]).includes(q)));
   assert.ok(todos(semana).length - new Set(todos(semana)).size <= dupsAntes, "a troca criou um duplicado novo");
+});
+
+// ===========================================================================
+// Casa+Ginásio (parte 3): o substituto respeita o equipamento do PRÓPRIO dia
+// ===========================================================================
+test("Casa+Ginásio: substituição por estagnação num dia de casa devolve variante disponível em casa", () => {
+  const equipamentoPorDia = equipamentoPorDiaDe({ location: "hibrido", dias: 5, diasGinasio: 2 });
+  const perfil = base({ dias: 5, equipamento: equipamentoDaSemana(equipamentoPorDia), equipamentoPorDia });
+  const s = selecionarSemana(perfil);
+
+  const diasDoExercicio = (id: string) => s.dias.filter((d) => d.exercicios.some((e) => e.exercicio.id === id));
+  // um exercício cujos slots estão TODOS num dia de casa (sem barra — ver
+  // `ehDiaDeGinasio` em equipamento.test.ts para o mesmo critério)
+  const alvoId = todos(s).find((id) => {
+    const dias = diasDoExercicio(id);
+    return dias.length > 0 && dias.every((d) => !d.equipamento.includes("barra"));
+  });
+  assert.ok(alvoId, "não achei nenhum exercício só em dia(s) de casa neste plano de teste");
+
+  const diaCasa = diasDoExercicio(alvoId!)[0];
+  const hist: HistoricoTreino = { logs: logsEstaveis(alvoId!, 40, 8), checkins: [] };
+  // passa a união RICA da semana (como `gerarPlanoComHistorico` sempre fez) —
+  // de propósito, para provar que já não é isso que decide o substituto.
+  const { semana, decisoes } = avaliarHistorico(s, hist, { equipamento: perfil.equipamento });
+
+  const d = decisoes.find((x) => x.exercicioId === alvoId)!;
+  assert.equal(d.accao, "substituir", d.motivo);
+  const sub = porId.get(d.substitutoId!)!;
+  assert.ok(
+    sub.equipamento.some((q) => diaCasa.equipamento.includes(q)),
+    `substituto ${sub.id} (${sub.equipamento.join(",")}) não é executável no dia de casa (${diaCasa.equipamento.join(",")})`,
+  );
+  assert.ok(todos(semana).includes(d.substitutoId!));
+});
+
+test("Casa+Ginásio: o melhor candidato por tier/perfil (hip_thrust_maquina, gym) é preterido pela variante de casa (hip_thrust_1_perna)", () => {
+  // hip_thrust_barra (T2, encurtado) estagna. Por tier+perfil, o melhor
+  // candidato da família é hip_thrust_maquina (T2, encurtado, máquina) — só
+  // perde para hip_thrust_1_perna (T3, encurtado, peso_corporal/halteres) se
+  // o equipamento considerado for o do PRÓPRIO dia (sem máquina), não a
+  // união rica da semana. Prova determinística do mecanismo corrigido.
+  const perfil = base({ dias: 1, equipamento: EQUIP_DISPONIVEL.ginasio }); // união rica de propósito
+  const s: SemanaSelecionada = {
+    perfil,
+    split: "x",
+    alvoVolume: {},
+    dias: [
+      {
+        indice: 0,
+        nome: "Pernas (casa)",
+        tipo: "legs",
+        musculosAlvo: ["gluteo"],
+        equipamento: ["halteres", "banda", "peso_corporal", "barra_fixa", "banco"],
+        exercicios: [{ exercicio: porId.get("hip_thrust_barra")!, series: 3, ordem: 1, foco: false }],
+      },
+    ],
+    volume: { nivel: "intermedio", porMusculo: [], racioEmpurrarPuxar: { empurrar: 0, puxar: 0, racio: 1, equilibrado: true }, avisos: [] },
+    avisos: [],
+  };
+  const hist: HistoricoTreino = { logs: logsEstaveis("hip_thrust_barra", 40, 8), checkins: [] };
+  // passa a união rica explicitamente — como `gerarPlanoComHistorico` sempre
+  // fez — para confirmar que já não é ela a decidir o substituto.
+  const { decisoes } = avaliarHistorico(s, hist, { equipamento: perfil.equipamento });
+  const d = decisoes.find((x) => x.exercicioId === "hip_thrust_barra")!;
+  assert.equal(d.accao, "substituir", d.motivo);
+  assert.equal(d.substitutoId, "hip_thrust_1_perna", `esperava a variante de casa, veio ${d.substitutoId}`);
 });
 
 test("gerarPlanoComHistorico revalida o plano depois das trocas", () => {

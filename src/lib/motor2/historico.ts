@@ -118,6 +118,14 @@ export type OpcoesHistorico = {
   objetivo?: ObjetivoV2;
   nivel?: Nivel;
   lesoes?: Zona[];
+  /**
+   * Restringe AINDA MAIS o equipamento considerado (ex.: o atleta perdeu
+   * acesso a algo entretanto). Casa+Ginásio (parte 3): por omissão já não se
+   * usa o equipamento da semana inteira — usa-se o do(s) PRÓPRIO(S) dia(s)
+   * onde o exercício está (`dia.equipamento`, populado pelo seletor). Um
+   * exercício de casa nunca é trocado por uma variante de barra que só serve
+   * no dia de ginásio.
+   */
   equipamento?: Equipamento[];
 };
 
@@ -190,7 +198,8 @@ export function avaliarHistorico(
 ): { semana: SemanaSelecionada; decisoes: DecisaoHistorico[] } {
   const nivel = opcoes.nivel ?? semana.perfil.nivel;
   const lesoes = opcoes.lesoes ?? semana.perfil.lesoes ?? [];
-  const equip = new Set<Equipamento>(opcoes.equipamento ?? semana.perfil.equipamento ?? []);
+  // restrição adicional explícita (rara); ver doc de `OpcoesHistorico.equipamento`.
+  const restricao = opcoes.equipamento ? new Set(opcoes.equipamento) : null;
   const alvo = rpeAlvo(opcoes.objetivo ?? semana.perfil.objetivo);
 
   const logsDe = (id: string) =>
@@ -215,8 +224,21 @@ export function avaliarHistorico(
   const usados = new Set(slotsPorId.keys());
   const decisoes: DecisaoHistorico[] = [];
 
+  // Casa+Ginásio (parte 3): o substituto tem de servir em TODOS os dias onde
+  // o exercício está — interseção do equipamento desses dias, não a união da
+  // semana. Um exercício com slots só num dia de casa nunca vê equipamento de
+  // ginásio aqui, mesmo que a semana tenha dias de ginásio noutro sítio.
+  const equipDoExercicio = (slots: Slot[]): Set<Equipamento> => {
+    const base = slots.reduce<Set<Equipamento> | undefined>(
+      (inter, { dia }) => (inter ? new Set([...inter].filter((q) => dia.equipamento.includes(q))) : new Set(dia.equipamento)),
+      undefined,
+    ) ?? new Set<Equipamento>();
+    return restricao ? new Set([...base].filter((q) => restricao.has(q))) : base;
+  };
+
   /** Decide para um exercício (sem aplicar). */
-  const decidir = (ex: Exercicio): DecisaoHistorico => {
+  const decidir = (ex: Exercicio, slots: Slot[]): DecisaoHistorico => {
+    const equip = equipDoExercicio(slots);
     const logs = logsDe(ex.id);
     const recentes = logs.slice(-JANELA);
     const sub = (evitar: Zona[], seguranca = false) =>
@@ -317,13 +339,17 @@ export function avaliarHistorico(
   for (const [id, slots] of slotsPorId) {
     const ex = porId.get(id);
     if (!ex) continue;
-    const dec = decidir(ex);
+    const dec = decidir(ex, slots);
     if (dec.accao === "substituir" && dec.substitutoId) {
       const s = porId.get(dec.substitutoId)!;
       let aplicado = false;
       for (const { pres, dia } of slots) {
         // não criar um segundo exercício da mesma família no mesmo dia
         if (dia.exercicios.some((x) => x.exercicio !== pres.exercicio && x.exercicio.familia === s.familia)) continue;
+        // defesa extra (a escolha já respeita a interseção dos dias, mas um
+        // slot individual não fica dependente disso): nunca aplicar um
+        // substituto que este dia em concreto não consiga executar.
+        if (!s.equipamento.some((q) => dia.equipamento.includes(q))) continue;
         pres.exercicio = s;
         aplicado = true;
       }

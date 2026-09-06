@@ -6,6 +6,8 @@ import {
   validarSemana,
   estimarMinutosDia,
   EQUIP_DISPONIVEL,
+  equipamentoDaSemana,
+  equipamentoPorDiaDe,
   type PerfilSelecao,
   type SemanaSelecionada,
 } from "./index.ts";
@@ -137,6 +139,88 @@ test("§4.1 — abaixo de 8 séries: falha se há pool, aviso se a lesão limita
     v1.falhasDuras.some((f) => /peito/.test(f) && /abaixo do mínimo de 8/.test(f)) ||
       v1.avisos.some((a) => /peito/.test(a) && /abaixo de 8/.test(a)),
   );
+});
+
+// ===========================================================================
+// 2b. Casa+Ginásio (parte 3): o validador julga cada dia pelo SEU equipamento
+// ===========================================================================
+test("Casa+Ginásio: dia de casa sem âncora viável não é penalizado em qualidade_selecao", () => {
+  // perfil com equipamento (união da semana) RICO — era isto que o bug usava
+  // para decidir se uma âncora era "exigível" num dia que não a podia dar.
+  const s: SemanaSelecionada = {
+    perfil: base({ dias: 1, equipamento: EQUIP_DISPONIVEL.ginasio }),
+    split: "x",
+    alvoVolume: {},
+    dias: [
+      {
+        indice: 0,
+        nome: "Pernas (casa)",
+        tipo: "legs",
+        musculosAlvo: ["quadriceps"],
+        equipamento: ["peso_corporal", "banda"], // sem barra/halteres/máquina: agachamento_goblet fica inviável
+        exercicios: [{ exercicio: pick("pistol_squat"), series: 3, ordem: 1, foco: false }],
+      },
+    ],
+    volume: { nivel: "intermedio", porMusculo: [], racioEmpurrarPuxar: { empurrar: 0, puxar: 0, racio: 1, equilibrado: true }, avisos: [] },
+    avisos: [],
+  };
+  const v = validarSemana(s);
+  const qs = v.criterios.find((c) => c.nome === "qualidade_selecao")!;
+  assert.equal(qs.notas[0], "âncora composta para 0/0 estímulos de grupo grande viáveis");
+});
+
+test("Casa+Ginásio: §4.1 abaixo de 8 séries julga pelo equipamento do(s) dia(s) do músculo, não da semana inteira", () => {
+  // quadriceps tem pool rico (17 exercícios primários) com o equipamento da
+  // semana (ginásio) mas ZERO com o equipamento do ÚNICO dia que o treina
+  // (peso_corporal + banda) — o critério tinha de usar o segundo, não o
+  // primeiro, senão "não está limitado" (pool rico) e falha em vez de avisar.
+  const s: SemanaSelecionada = {
+    perfil: base({ dias: 1, equipamento: EQUIP_DISPONIVEL.ginasio }),
+    split: "x",
+    alvoVolume: {},
+    dias: [
+      {
+        indice: 0,
+        nome: "Pernas (casa)",
+        tipo: "legs",
+        musculosAlvo: ["quadriceps"],
+        equipamento: ["peso_corporal", "banda"],
+        exercicios: [{ exercicio: pick("agachamento_goblet"), series: 3, ordem: 1, foco: false }],
+      },
+    ],
+    volume: { nivel: "intermedio", porMusculo: [], racioEmpurrarPuxar: { empurrar: 0, puxar: 0, racio: 1, equilibrado: true }, avisos: [] },
+    avisos: [],
+  };
+  const v = validarSemana(s);
+  assert.ok(
+    !v.falhasDuras.some((f) => /quadriceps/.test(f)),
+    `não devia falhar por quadriceps — ${v.falhasDuras.join(" | ")}`,
+  );
+  assert.ok(
+    v.avisos.some((a) => /quadriceps/.test(a) && /abaixo de 8/.test(a)),
+    `esperava aviso de quadriceps abaixo de 8 — ${v.avisos.join(" | ")}`,
+  );
+});
+
+test("Casa+Ginásio: híbrido com equipamento de casa por omissão não fica atrás do puro ginásio", () => {
+  const puro = gerarPlanoValidado(base({ dias: 5, equipamento: EQUIP_DISPONIVEL.ginasio }));
+  for (const ginasio of [1, 2, 3, 4]) {
+    const equipamentoPorDia = equipamentoPorDiaDe({ location: "hibrido", dias: 5, diasGinasio: ginasio });
+    const perfil = base({
+      dias: 5,
+      equipamento: equipamentoDaSemana(equipamentoPorDia),
+      equipamentoPorDia,
+    });
+    const { validacao } = gerarPlanoValidado(perfil);
+    assert.ok(
+      validacao.aprovado,
+      `${ginasio} dias de ginásio: não aprovado (${validacao.pontuacao}) — ${validacao.falhasDuras.join(" | ")}`,
+    );
+    assert.ok(
+      validacao.pontuacao >= puro.validacao.pontuacao - 8,
+      `${ginasio} dias de ginásio: ${validacao.pontuacao} muito abaixo do puro ginásio (${puro.validacao.pontuacao})`,
+    );
+  }
 });
 
 // ===========================================================================
