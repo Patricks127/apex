@@ -117,10 +117,10 @@ export async function guardarOnboarding(
       injury_note: injuries.length ? injuryNote || null : null,
       focus_muscles: goal === "hipertrofia" ? focus : [],
       split_format: goal === "hipertrofia" ? splitFormat : "auto",
-      // As duas colunas do local vão sempre juntas (o CHECK da 010 compara
-      // gym_days_per_week com days_per_week).
+      // gym_days_per_week só faz sentido em "hibrido" (o CHECK da 010 compara
+      // com days_per_week). home_equipment também serve "casa" sozinho.
       gym_days_per_week: location === "hibrido" ? gymDays : null,
-      home_equipment: location === "hibrido" ? homeEquipment : [],
+      home_equipment: location === "hibrido" || location === "casa" ? homeEquipment : [],
     })
     .eq("id", user.id);
 

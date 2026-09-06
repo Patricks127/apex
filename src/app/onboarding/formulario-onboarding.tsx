@@ -142,58 +142,62 @@ export function FormularioOnboarding({
       </Seccao>
 
       {location === "hibrido" ? (
-        <>
-          <Seccao
-            titulo="Quantos dias treinas no ginásio?"
-            nota="Os restantes são em casa. O motor põe os levantamentos pesados nos dias de ginásio."
-            erro={estado.erros?.gym_days_per_week}
-          >
-            {opcoesGinasio.length > 0 ? (
-              <>
-                <div className="grid grid-cols-5 gap-2">
-                  {opcoesGinasio.map((n) => (
-                    <Opcao
-                      key={n}
-                      name="gym_days_per_week"
-                      value={String(n)}
-                      titulo={String(n)}
-                      centro
-                      checkedPorDefeito={inicial.gym_days_per_week === n}
-                    />
-                  ))}
-                </div>
-                <p className="text-xs text-zinc-500">
-                  {inicial.gym_days_per_week && inicial.gym_days_per_week < dias
-                    ? `${inicial.gym_days_per_week} no ginásio · ${dias - inicial.gym_days_per_week} em casa`
-                    : `De ${dias} dias de treino.`}
-                </p>
-              </>
-            ) : (
-              <p className="text-xs text-zinc-500">Escolhe primeiro os dias por semana.</p>
-            )}
-          </Seccao>
+        <Seccao
+          titulo="Quantos dias treinas no ginásio?"
+          nota="Os restantes são em casa. O motor põe os levantamentos pesados nos dias de ginásio."
+          erro={estado.erros?.gym_days_per_week}
+        >
+          {opcoesGinasio.length > 0 ? (
+            <>
+              <div className="grid grid-cols-5 gap-2">
+                {opcoesGinasio.map((n) => (
+                  <Opcao
+                    key={n}
+                    name="gym_days_per_week"
+                    value={String(n)}
+                    titulo={String(n)}
+                    centro
+                    checkedPorDefeito={inicial.gym_days_per_week === n}
+                  />
+                ))}
+              </div>
+              <p className="text-xs text-zinc-500">
+                {inicial.gym_days_per_week && inicial.gym_days_per_week < dias
+                  ? `${inicial.gym_days_per_week} no ginásio · ${dias - inicial.gym_days_per_week} em casa`
+                  : `De ${dias} dias de treino.`}
+              </p>
+            </>
+          ) : (
+            <p className="text-xs text-zinc-500">Escolhe primeiro os dias por semana.</p>
+          )}
+        </Seccao>
+      ) : null}
 
-          <Seccao
-            titulo="O que tens em casa?"
-            nota="Nos dias de casa o motor troca as âncoras de barra pela variante mais próxima do que tens."
-          >
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {EQUIP_CASA_OPCOES.map((e) => (
-                <Check
-                  key={e.id}
-                  name="home_equipment"
-                  value={e.id}
-                  titulo={e.label}
-                  defaultChecked={
-                    inicial.home_equipment.length > 0
-                      ? inicial.home_equipment.includes(e.id)
-                      : (EQUIP_CASA_OMISSAO as string[]).includes(e.id)
-                  }
-                />
-              ))}
-            </div>
-          </Seccao>
-        </>
+      {location === "hibrido" || location === "casa" ? (
+        <Seccao
+          titulo="O que tens em casa?"
+          nota={
+            location === "hibrido"
+              ? "Nos dias de casa o motor troca as âncoras de barra pela variante mais próxima do que tens."
+              : "O motor escolhe as variantes de halteres/peso corporal mais próximas do que tens."
+          }
+        >
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {EQUIP_CASA_OPCOES.map((e) => (
+              <Check
+                key={e.id}
+                name="home_equipment"
+                value={e.id}
+                titulo={e.label}
+                defaultChecked={
+                  inicial.home_equipment.length > 0
+                    ? inicial.home_equipment.includes(e.id)
+                    : (EQUIP_CASA_OMISSAO as string[]).includes(e.id)
+                }
+              />
+            ))}
+          </div>
+        </Seccao>
       ) : null}
 
       <Seccao
