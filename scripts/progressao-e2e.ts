@@ -17,6 +17,7 @@ import {
   initProgression,
   referenceLoads,
   type Injury,
+  type MetaMotor,
   type MotorProfile,
   type Progression,
 } from "../src/lib/motor/index.ts";
@@ -94,7 +95,7 @@ async function main() {
     owner_id: uid,
     student_id: uid,
     name: "Hipertrofia · 4 dias/semana",
-    split_style: plano0.meta.splitStyle,
+    split_style: (plano0.meta as MetaMotor).splitStyle,
     days: plano0,
     progression: prog0,
     is_active: true,

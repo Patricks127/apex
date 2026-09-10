@@ -19,33 +19,35 @@ export function VistaPlano({
   plano: PlanoGerado;
   nome: string;
 }) {
+  const meta = plano.meta;
+  const dePt = meta.origem === "pt";
   const primeiroTreino = plano.days.findIndex((d) => !d.rest);
   const [sel, setSel] = useState(primeiroTreino < 0 ? 0 : primeiroTreino);
   const dia = plano.days[sel];
 
-  const cargas = (Object.keys(plano.meta.maxes.used) as Lift[])
-    .map(
-      (k) =>
-        `${LIFT_LABEL[k]} ${plano.meta.maxes.used[k]} kg${
-          plano.meta.maxes.real.includes(k) ? "" : "*"
-        }`,
-    )
-    .join(" · ");
+  const cargas =
+    meta.origem === "pt"
+      ? null
+      : (Object.keys(meta.maxes.used) as Lift[])
+          .map((k) => `${LIFT_LABEL[k]} ${meta.maxes.used[k]} kg${meta.maxes.real.includes(k) ? "" : "*"}`)
+          .join(" · ");
 
   return (
     <div className="flex flex-col gap-5">
       <header className="flex flex-col gap-1">
         <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-zinc-600">
-          <span>O teu plano</span>
-          <span>· semana {plano.meta.week ?? 1}</span>
-          {plano.meta.deloadWeek ? (
+          <span>{dePt ? "Plano do teu PT" : "O teu plano"}</span>
+          <span>· semana {meta.week ?? 1}</span>
+          {meta.deloadWeek ? (
             <span className="rounded bg-amber-500/15 px-1.5 py-0.5 font-medium text-amber-300">
               descarga
             </span>
           ) : null}
         </div>
         <h1 className="text-2xl font-semibold text-zinc-100">{nome}</h1>
-        <p className="text-sm text-zinc-400">{plano.meta.science}</p>
+        <p className="text-sm text-zinc-400">
+          {meta.origem === "pt" ? `Atribuído por ${meta.ptNome}.` : meta.science}
+        </p>
       </header>
 
       {/* Tira da semana */}
@@ -75,21 +77,25 @@ export function VistaPlano({
 
       <DiaDetalhe dia={dia} />
 
-      <p className="text-xs text-zinc-600">
-        Cargas de referência: {cargas}{" "}
-        <span className="text-zinc-500">(* = estimado do nível/sexo; sem * = recorde teu)</span>
-      </p>
+      {cargas ? (
+        <p className="text-xs text-zinc-600">
+          Cargas de referência: {cargas}{" "}
+          <span className="text-zinc-500">(* = estimado do nível/sexo; sem * = recorde teu)</span>
+        </p>
+      ) : null}
 
       <AvancarSemana />
 
-      <form action={regenerarPlano}>
-        <button
-          type="submit"
-          className="w-full rounded-lg border border-zinc-700 px-4 py-2.5 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800"
-        >
-          Regenerar plano (reinicia a progressão)
-        </button>
-      </form>
+      {dePt ? null : (
+        <form action={regenerarPlano}>
+          <button
+            type="submit"
+            className="w-full rounded-lg border border-zinc-700 px-4 py-2.5 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800"
+          >
+            Regenerar plano (reinicia a progressão)
+          </button>
+        </form>
+      )}
     </div>
   );
 }
@@ -246,6 +252,9 @@ function DiaDetalhe({ dia }: { dia: DiaGerado }) {
                 ) : null}
                 {e.detail ? (
                   <p className="mt-1 text-xs text-zinc-500">{e.detail}</p>
+                ) : null}
+                {e.nota ? (
+                  <p className="mt-1 text-xs text-sky-300/90">Nota do PT: {e.nota}</p>
                 ) : null}
               </li>
             );

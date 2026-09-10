@@ -21,6 +21,7 @@ import {
   type Injury,
   type Level,
   type Lift,
+  type MetaMotor,
   type MotorProfile,
   type PlanoGerado,
   type Progression,
@@ -37,7 +38,7 @@ import {
 import { gerarPlanoValidado } from "./validador.ts";
 import type { Musculo } from "./tipos.ts";
 
-const MUSCULO_LABEL: Record<Musculo, string> = {
+export const MUSCULO_LABEL: Record<Musculo, string> = {
   peito: "Peito",
   dorsais: "Costas",
   trapezio_medio: "Trapézio médio",
@@ -102,7 +103,13 @@ export function perfilV2De(mp: MotorProfile): PerfilSelecao {
 // posições dos dias de treino na semana de 7 dias (descanso pelo meio)
 // ---------------------------------------------------------------------------
 
-const CALENDARIO: Record<number, number[]> = {
+// Exportado: um plano de PT (src/app/actions/treino.ts::atribuirPlanoPt) usa
+// o mesmo mapeamento para espalhar os dias de treino que o PT escreveu pela
+// semana de 7 — 1/2 dias não acontecem num plano do motor (clampado a 3–6),
+// mas um PT pode legitimamente atribuir um plano de 1 ou 2 dias.
+export const CALENDARIO: Record<number, number[]> = {
+  1: [0],
+  2: [0, 3],
   3: [0, 2, 4],
   4: [0, 1, 3, 4],
   5: [0, 1, 2, 4, 5],
@@ -226,7 +233,7 @@ export function gerarPlanoV2(
   mp: MotorProfile,
   maxes?: Partial<Record<Lift, number>> | null,
   opts?: OpcoesPlanoV2,
-): PlanoGerado {
+): PlanoGerado & { meta: MetaMotor } {
   const perfil = perfilV2De(mp);
   const { semana } = gerarPlanoValidado(perfil);
   return montarPlano(semana, mp, maxes, opts);
@@ -238,7 +245,7 @@ export function montarPlano(
   mp: MotorProfile,
   maxes?: Partial<Record<Lift, number>> | null,
   opts?: OpcoesPlanoV2,
-): PlanoGerado {
+): PlanoGerado & { meta: MetaMotor } {
   const prog = opts?.progression ?? null;
   const { lvl, usedReal } = baseLifts({ sex: mp.sex, level: mp.level }, maxes);
   const { mult, repAdd } = progressionFactor(prog);

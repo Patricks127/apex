@@ -17,6 +17,7 @@ import {
   buildWeek,
   checkHypertrophyFrequency,
   maxesFromPRs,
+  type MetaMotor,
   type MotorProfile,
 } from "../src/lib/motor/index.ts";
 
@@ -98,7 +99,7 @@ async function main() {
       owner_id: uid,
       student_id: uid,
       name: `Hipertrofia · 4 dias/semana`,
-      split_style: plano.meta.splitStyle,
+      split_style: (plano.meta as MetaMotor).splitStyle,
       days: plano,
       is_active: true,
     }),

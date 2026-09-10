@@ -21,6 +21,7 @@ import {
   type Injury,
   type Level,
   type Location,
+  type MetaMotor,
   type MotorProfile,
   type Sex,
 } from "../src/lib/motor/index.ts";
@@ -154,7 +155,7 @@ async function main() {
       owner_id: uid,
       student_id: uid,
       name: nome,
-      split_style: plano.meta.splitStyle,
+      split_style: (plano.meta as MetaMotor).splitStyle,
       days: plano,
       is_active: true,
     }),

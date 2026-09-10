@@ -94,6 +94,10 @@ export interface ExercicioGerado {
   caution?: boolean; // carga reduzida por desconforto reportado no check-in
   focusTag?: string; // marcado como trabalho de foco
   detail?: string;
+  /** Observação do PT para este exercício, num plano atribuído (não usado nos gerados pelo motor). */
+  nota?: string;
+  /** Id do exercício na base do motor2 — só presente num plano de PT (liga de volta a EXERCICIOS). */
+  exercicioId?: string;
 }
 
 export interface DiaGerado {
@@ -112,28 +116,41 @@ export interface DiaGerado {
   adjustments?: string[];
 }
 
+/** Plano gerado pelo motor a partir do perfil de onboarding. */
+export interface MetaMotor {
+  origem?: undefined;
+  goal: Goal;
+  sex: Sex;
+  level: Level;
+  daysPerWeek: number;
+  location: Location;
+  locationNote: string | null;
+  splitStyle: SplitStyle;
+  injuries: Injury[];
+  focus: FocusMuscle[];
+  science: string;
+  maxes: {
+    used: Record<Lift, number>;
+    real: Lift[];
+    estimated: Lift[];
+  };
+  week: number; // semana de progressão que este plano reflete
+  deloadWeek: boolean; // a semana é de descarga (−10% carga)
+  generatedAt: string;
+}
+
+/** Plano escrito à mão por um PT e atribuído a um aluno. */
+export interface MetaPt {
+  origem: "pt";
+  ptNome: string;
+  week: number;
+  deloadWeek: boolean;
+  generatedAt: string;
+}
+
 export interface PlanoGerado {
   version: 1;
-  meta: {
-    goal: Goal;
-    sex: Sex;
-    level: Level;
-    daysPerWeek: number;
-    location: Location;
-    locationNote: string | null;
-    splitStyle: SplitStyle;
-    injuries: Injury[];
-    focus: FocusMuscle[];
-    science: string;
-    maxes: {
-      used: Record<Lift, number>;
-      real: Lift[];
-      estimated: Lift[];
-    };
-    week: number; // semana de progressão que este plano reflete
-    deloadWeek: boolean; // a semana é de descarga (−10% carga)
-    generatedAt: string;
-  };
+  meta: MetaMotor | MetaPt;
   days: DiaGerado[]; // sempre 7
 }
 
@@ -1942,7 +1959,7 @@ export function buildWeek(
   profile: MotorProfile,
   maxes?: Partial<Record<Lift, number>> | null,
   opts?: OpcoesGeracao,
-): PlanoGerado {
+): PlanoGerado & { meta: MetaMotor } {
   const prog = opts?.progression ?? null;
   const { lvl, usedReal } = baseLifts(profile, maxes);
   const allLifts: Lift[] = ["agachamento", "terra", "supino", "press"];

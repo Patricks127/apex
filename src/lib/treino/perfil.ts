@@ -13,9 +13,11 @@ import {
   type Lift,
   type Location,
   type MotorProfile,
+  type PlanoGerado,
+  type Progression,
   type Sex,
 } from "@/lib/motor";
-import { equipamentoPorDiaDe } from "@/lib/motor2";
+import { equipamentoPorDiaDe, planoParaExibir } from "@/lib/motor2";
 import type { Equipamento } from "@/lib/motor2";
 
 /**
@@ -78,4 +80,81 @@ export async function carregarPerfilMotor(
     },
     maxes: maxesFromPRs(prs ?? []),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Plano ativo — porta única para "qual é o plano deste aluno agora"
+// ---------------------------------------------------------------------------
+
+export type PlanoAtivo = {
+  id: string;
+  name: string;
+  days: PlanoGerado;
+  progression: Progression | null;
+  /** true = o próprio utilizador é o dono (plano gerado pelo motor);
+   *  false = o dono é um PT (plano atribuído). */
+  souDono: boolean;
+};
+
+/**
+ * O plano que este utilizador está a seguir agora, seja ele próprio (gerado
+ * pelo motor) ou atribuído por um PT. Lê primeiro `active_plans` (o
+ * ponteiro que o aluno controla, migração 012); se não houver linha aí,
+ * cai para a query antiga (`training_plans` por `owner_id` + `is_active`)
+ * — compatibilidade com quem já tinha plano antes desta tabela existir.
+ */
+type LinhaPlano = {
+  id: string;
+  name: string;
+  days: PlanoGerado;
+  progression: Progression | null;
+  owner_id: string;
+  student_id: string;
+};
+
+function paraPlanoAtivo(plano: LinhaPlano): PlanoAtivo {
+  const souDono = plano.owner_id === plano.student_id;
+  return {
+    id: plano.id,
+    name: plano.name,
+    // planos do motor já vêm com a progressão aplicada na própria geração —
+    // `planoParaExibir` só transforma planos de PT (meta.origem === "pt").
+    days: planoParaExibir(plano.days, plano.progression),
+    progression: plano.progression,
+    souDono,
+  };
+}
+
+export async function carregarPlanoAtivo(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<PlanoAtivo | null> {
+  const { data: ponteiro } = await supabase
+    .from("active_plans")
+    .select("plan_id")
+    .eq("student_id", userId)
+    .maybeSingle();
+
+  if (ponteiro?.plan_id) {
+    const { data: plano } = await supabase
+      .from("training_plans")
+      .select("id, name, days, progression, owner_id, student_id")
+      .eq("id", ponteiro.plan_id)
+      .maybeSingle();
+    if (plano) return paraPlanoAtivo(plano as LinhaPlano);
+    // ponteiro órfão (não devia acontecer — active_plans tem FK a
+    // training_plans com on delete cascade) — cai para o fallback abaixo.
+  }
+
+  const { data: plano } = await supabase
+    .from("training_plans")
+    .select("id, name, days, progression, owner_id, student_id")
+    .eq("owner_id", userId)
+    .eq("is_active", true)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!plano) return null;
+  return paraPlanoAtivo(plano as LinhaPlano);
 }

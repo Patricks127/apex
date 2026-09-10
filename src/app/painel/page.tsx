@@ -214,14 +214,26 @@ async function SeccaoPt({ userId, ptCode }: { userId: string; ptCode: string | n
             {alunos.map((a) => (
               <li
                 key={a.id}
-                className="rounded-xl border border-zinc-800 bg-zinc-900 p-4"
+                className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-900 p-4"
               >
-                <p className="text-sm font-semibold text-zinc-100">
-                  {a.aluno?.name ?? "Atleta"}
-                </p>
-                <p className="mt-1 text-xs text-zinc-500">
-                  Autorizou: <Scopes l={a} />
-                </p>
+                <div>
+                  <p className="text-sm font-semibold text-zinc-100">
+                    {a.aluno?.name ?? "Atleta"}
+                  </p>
+                  <p className="mt-1 text-xs text-zinc-500">
+                    Autorizou: <Scopes l={a} />
+                  </p>
+                </div>
+                {a.aluno?.id ? (
+                  // scope_treinos é sempre true numa ligação ativa (ver
+                  // ligacoes.ts) — não precisa de verificação aqui.
+                  <Link
+                    href={`/pt/aluno/${a.aluno.id}`}
+                    className="shrink-0 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-200 transition hover:bg-zinc-800"
+                  >
+                    Plano
+                  </Link>
+                ) : null}
               </li>
             ))}
           </ul>

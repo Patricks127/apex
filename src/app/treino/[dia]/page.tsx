@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { carregarPerfilMotor, janelaRecente } from "@/lib/treino/perfil";
-import { type Injury, type Progression } from "@/lib/motor";
-import { gerarPlanoV2 } from "@/lib/motor2";
+import { carregarPerfilMotor, carregarPlanoAtivo, janelaRecente } from "@/lib/treino/perfil";
+import { type DiaGerado, type Injury } from "@/lib/motor";
+import { gerarPlanoV2, aplicarCautelaLeitura } from "@/lib/motor2";
 import { RegistoTreino } from "./registo-treino";
 
 export const metadata: Metadata = {
@@ -26,20 +26,8 @@ export default async function TreinoDiaPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/entrar");
 
-  const ctx = await carregarPerfilMotor(supabase, user.id);
-  if (!ctx) redirect("/onboarding");
-
-  const { data: plano } = await supabase
-    .from("training_plans")
-    .select("progression")
-    .eq("owner_id", user.id)
-    .eq("is_active", true)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (!plano) redirect("/plano");
-  const prog = (plano.progression ?? null) as Progression | null;
+  const planoAtivo = await carregarPlanoAtivo(supabase, user.id);
+  if (!planoAtivo) redirect("/plano");
 
   // Check-in mais recente (últimos 5 dias) → zonas de desconforto → carga cautelar
   const desde = janelaRecente(5);
@@ -52,11 +40,31 @@ export default async function TreinoDiaPage({
     .limit(1);
   const checkinZones = (checkins?.[0]?.discomfort_zones ?? []) as Injury[];
 
-  const planoV2 = gerarPlanoV2(ctx.motorProfile, ctx.maxes, {
-    progression: prog,
-    checkinZones,
-  });
-  const diaBruto = planoV2.days[dayIndex];
+  let diaBruto: DiaGerado | undefined;
+  let weekNumber: number;
+  let deload: boolean;
+
+  if (planoAtivo.souDono) {
+    // Plano gerado pelo motor: regenera ao vivo (comportamento de sempre) —
+    // é assim que a cautela do check-in e a progressão se aplicam.
+    const ctx = await carregarPerfilMotor(supabase, user.id);
+    if (!ctx) redirect("/onboarding");
+    const prog = planoAtivo.progression;
+    const planoV2 = gerarPlanoV2(ctx.motorProfile, ctx.maxes, { progression: prog, checkinZones });
+    diaBruto = planoV2.days[dayIndex];
+    weekNumber = prog?.week ?? 1;
+    deload = !!prog?.deloadWeek;
+  } else {
+    // Plano de PT: `planoAtivo.days` já vem com a progressão aplicada em
+    // leitura (carregarPlanoAtivo → planoParaExibir) — os exercícios em si
+    // (days) nunca se regeneram, são os que o PT escreveu. Só falta a
+    // cautela do check-in, aplicada ao vivo tal como no motor.
+    const diasComCautela = aplicarCautelaLeitura(planoAtivo.days.days, checkinZones);
+    diaBruto = diasComCautela[dayIndex];
+    weekNumber = planoAtivo.days.meta.week ?? 1;
+    deload = !!planoAtivo.days.meta.deloadWeek;
+  }
+
   const diaGerado = diaBruto && !diaBruto.rest ? diaBruto : null;
 
   return (
@@ -75,8 +83,8 @@ export default async function TreinoDiaPage({
       ) : (
         <RegistoTreino
           dia={diaGerado}
-          weekNumber={prog?.week ?? 1}
-          deload={!!prog?.deloadWeek}
+          weekNumber={weekNumber}
+          deload={deload}
           checkinAtivo={checkinZones.length > 0}
         />
       )}

@@ -3,23 +3,37 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { carregarPerfilMotor } from "@/lib/treino/perfil";
+import { carregarPerfilMotor, carregarPlanoAtivo } from "@/lib/treino/perfil";
 import {
   advanceWeek,
   initProgression,
   referenceLoads,
   LIFT_LABEL,
+  DAY_NAMES,
+  DAY_SHORT,
   GOALS,
+  type DiaGerado,
+  type ExercicioGerado,
   type FocusMuscle,
   type Goal,
   type Injury,
   type Level,
   type Lift,
   type Location,
-  type Progression,
+  type PlanoGerado,
   type Sex,
 } from "@/lib/motor";
-import { gerarPlanoV2, EQUIP_CASA_IDS, type Equipamento } from "@/lib/motor2";
+import {
+  gerarPlanoV2,
+  EQUIP_CASA_IDS,
+  EXERCICIOS,
+  MUSCULO_LABEL,
+  CALENDARIO,
+  decidirProgressaoManual,
+  type Equipamento,
+} from "@/lib/motor2";
+
+const EXERCICIO_POR_ID = new Map(EXERCICIOS.map((e) => [e.id, e]));
 
 const GOAL_IDS = GOALS.map((g) => g.id) as Goal[];
 const SEXES: Sex[] = ["homem", "mulher"];
@@ -162,18 +176,63 @@ async function criarPlano(userId: string): Promise<{ erro?: string }> {
     .eq("owner_id", userId)
     .eq("is_active", true);
 
-  const { error } = await supabase.from("training_plans").insert({
-    owner_id: userId,
-    student_id: userId,
-    name: `${nomeObjetivo} · ${ctx.motorProfile.daysPerWeek} dias/semana`,
-    split_style: plano.meta.splitStyle,
-    days: plano,
-    progression,
-    is_active: true,
-  });
+  const { data: novo, error } = await supabase
+    .from("training_plans")
+    .insert({
+      owner_id: userId,
+      student_id: userId,
+      name: `${nomeObjetivo} · ${ctx.motorProfile.daysPerWeek} dias/semana`,
+      split_style: plano.meta.splitStyle,
+      days: plano,
+      progression,
+      is_active: true,
+    })
+    .select("id")
+    .single();
 
-  if (error) return { erro: BLOQUEIO_RLS };
+  if (error || !novo) return { erro: BLOQUEIO_RLS };
+
+  // Gerar um plano = ficar a segui-lo na hora (comportamento de sempre) — o
+  // ponteiro (migração 012) é quem agora decide "qual é o plano ativo".
+  await supabase.from("active_plans").upsert(
+    { student_id: userId, plan_id: novo.id },
+    { onConflict: "student_id" },
+  );
+
   return {};
+}
+
+// ---------------------------------------------------------------------------
+// Escolher qual plano seguir (o próprio, ou um que o PT atribuiu)
+// ---------------------------------------------------------------------------
+
+export async function escolherPlano(formData: FormData): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/entrar");
+
+  const planId = String(formData.get("plan_id") ?? "");
+  if (!planId) redirect("/plano");
+
+  // A RLS (migração 011) já só deixa o aluno LER planos que são para ele —
+  // confirmar aqui dá uma falha silenciosa em vez de um upsert a apontar
+  // para lado nenhum se o id vier adulterado.
+  const { data: plano } = await supabase
+    .from("training_plans")
+    .select("id, student_id")
+    .eq("id", planId)
+    .maybeSingle();
+
+  if (!plano || plano.student_id !== user.id) redirect("/plano");
+
+  const { error } = await supabase
+    .from("active_plans")
+    .upsert({ student_id: user.id, plan_id: planId }, { onConflict: "student_id" });
+
+  if (!error) revalidatePath("/plano");
+  redirect("/plano");
 }
 
 // ---------------------------------------------------------------------------
@@ -274,20 +333,9 @@ export async function avancarSemana(
   } = await supabase.auth.getUser();
   if (!user) return { erro: "Sessão inválida." };
 
-  const ctx = await carregarPerfilMotor(supabase, user.id);
-  if (!ctx) return { erro: "Completa o onboarding primeiro." };
-
-  const { data: plano } = await supabase
-    .from("training_plans")
-    .select("id, progression")
-    .eq("owner_id", user.id)
-    .eq("is_active", true)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (!plano) return { erro: "Não há plano ativo." };
-  const prog = (plano.progression ?? initProgression()) as Progression;
+  const planoAtivo = await carregarPlanoAtivo(supabase, user.id);
+  if (!planoAtivo) return { erro: "Não há plano ativo." };
+  const prog = planoAtivo.progression ?? initProgression();
 
   const { data: sessoes } = await supabase
     .from("workout_sessions")
@@ -304,16 +352,49 @@ export async function avancarSemana(
   const meanRpe = rpes.length ? rpes.reduce((a, b) => a + b, 0) / rpes.length : 8;
   const meanComp = comps.length ? comps.reduce((a, b) => a + b, 0) / comps.length : 1;
 
-  const antesLoads = referenceLoads(ctx.motorProfile, ctx.maxes, prog);
-  const novoProg = advanceWeek(prog, ctx.motorProfile, meanRpe, meanComp);
-  const depoisLoads = referenceLoads(ctx.motorProfile, ctx.maxes, novoProg);
-  const novoPlano = gerarPlanoV2(ctx.motorProfile, ctx.maxes, { progression: novoProg });
+  // Plano gerado pelo motor: regenera tudo (comportamento de sempre).
+  if (planoAtivo.souDono) {
+    const ctx = await carregarPerfilMotor(supabase, user.id);
+    if (!ctx) return { erro: "Completa o onboarding primeiro." };
+
+    const antesLoads = referenceLoads(ctx.motorProfile, ctx.maxes, prog);
+    const novoProg = advanceWeek(prog, ctx.motorProfile, meanRpe, meanComp);
+    const depoisLoads = referenceLoads(ctx.motorProfile, ctx.maxes, novoProg);
+    const novoPlano = gerarPlanoV2(ctx.motorProfile, ctx.maxes, { progression: novoProg });
+
+    const { error } = await supabase
+      .from("training_plans")
+      .update({ progression: novoProg, days: novoPlano })
+      .eq("id", planoAtivo.id)
+      .eq("owner_id", user.id);
+
+    if (error) return { erro: BLOQUEIO_RLS };
+
+    revalidatePath("/plano");
+    return {
+      ok: true,
+      semana: novoProg.week,
+      deload: novoProg.deloadWeek,
+      reason: novoProg.reason,
+      cargas: (["agachamento", "terra", "supino", "press"] as Lift[]).map((k) => ({
+        lift: LIFT_LABEL[k],
+        antes: antesLoads[k],
+        depois: depoisLoads[k],
+      })),
+    };
+  }
+
+  // Plano atribuído por um PT: os exercícios (`days`) são do PT — nunca se
+  // escrevem daqui (migrações 013/014, só o dono os muda). A progressão só
+  // grava `progression`; as cargas/reps "de agora" calculam-se em leitura
+  // (ver src/lib/motor2/progressao-manual.ts) quando o plano é mostrado.
+  const novoProg = decidirProgressaoManual(prog, meanRpe, meanComp);
 
   const { error } = await supabase
     .from("training_plans")
-    .update({ progression: novoProg, days: novoPlano })
-    .eq("id", plano.id)
-    .eq("owner_id", user.id);
+    .update({ progression: novoProg })
+    .eq("id", planoAtivo.id)
+    .eq("student_id", user.id);
 
   if (error) return { erro: BLOQUEIO_RLS };
 
@@ -323,10 +404,187 @@ export async function avancarSemana(
     semana: novoProg.week,
     deload: novoProg.deloadWeek,
     reason: novoProg.reason,
-    cargas: (["agachamento", "terra", "supino", "press"] as Lift[]).map((k) => ({
-      lift: LIFT_LABEL[k],
-      antes: antesLoads[k],
-      depois: depoisLoads[k],
-    })),
   };
+}
+
+// ---------------------------------------------------------------------------
+// PT: criar/editar um plano e atribuí-lo a um aluno
+// ---------------------------------------------------------------------------
+
+/** O formato que o editor (client) manda no campo escondido `plano_json`. */
+type ExercicioEditorJSON = {
+  exercicioId: string;
+  series: number;
+  reps: number;
+  carga: number | null;
+  nota: string;
+};
+type DiaEditorJSON = { nome: string; exercicios: ExercicioEditorJSON[] };
+
+const MAX_DIAS_PT = 6;
+const MAX_EXERCICIOS_DIA_PT = 12;
+
+export type EstadoAtribuirPlano = {
+  erro?: string;
+  ok?: boolean;
+};
+
+/** Valida e normaliza o JSON do editor. Nunca confia em nome/músculo vindos
+ *  do cliente — só no `exercicioId` (resolvido contra a base do motor2) e
+ *  nos números que o PT escreveu (séries/reps/carga/nota). */
+function validarPlanoPt(bruto: unknown): { dias: DiaEditorJSON[] } | { erro: string } {
+  if (!Array.isArray(bruto) || bruto.length === 0) return { erro: "O plano precisa de pelo menos um dia." };
+  if (bruto.length > MAX_DIAS_PT) return { erro: `Máximo ${MAX_DIAS_PT} dias de treino.` };
+
+  const dias: DiaEditorJSON[] = [];
+  for (const diaBruto of bruto) {
+    if (typeof diaBruto !== "object" || diaBruto === null) return { erro: "Dia inválido." };
+    const d = diaBruto as Record<string, unknown>;
+    const nome = typeof d.nome === "string" ? d.nome.trim().slice(0, 60) : "";
+    if (!nome) return { erro: "Cada dia precisa de um nome (ex.: Peito e Tríceps)." };
+    if (!Array.isArray(d.exercicios) || d.exercicios.length === 0) {
+      return { erro: `"${nome}": adiciona pelo menos um exercício.` };
+    }
+    if (d.exercicios.length > MAX_EXERCICIOS_DIA_PT) {
+      return { erro: `"${nome}": máximo ${MAX_EXERCICIOS_DIA_PT} exercícios por dia.` };
+    }
+
+    const exercicios: ExercicioEditorJSON[] = [];
+    for (const exBruto of d.exercicios) {
+      if (typeof exBruto !== "object" || exBruto === null) return { erro: `"${nome}": exercício inválido.` };
+      const e = exBruto as Record<string, unknown>;
+      const exercicioId = typeof e.exercicioId === "string" ? e.exercicioId : "";
+      const exercicio = EXERCICIO_POR_ID.get(exercicioId);
+      if (!exercicio) return { erro: `"${nome}": exercício desconhecido.` };
+
+      const series = Number(e.series);
+      if (!Number.isInteger(series) || series < 1 || series > 10) {
+        return { erro: `${exercicio.nome}: séries tem de ser um número entre 1 e 10.` };
+      }
+      const reps = Number(e.reps);
+      if (!Number.isInteger(reps) || reps < 1 || reps > 50) {
+        return { erro: `${exercicio.nome}: reps tem de ser um número entre 1 e 50.` };
+      }
+      let carga: number | null = null;
+      if (e.carga !== null && e.carga !== undefined && e.carga !== "") {
+        const n = Number(e.carga);
+        if (!Number.isFinite(n) || n < 0 || n > 500) {
+          return { erro: `${exercicio.nome}: carga inválida.` };
+        }
+        carga = Math.round(n * 4) / 4; // 0.25 kg
+      }
+      const nota = typeof e.nota === "string" ? e.nota.trim().slice(0, 200) : "";
+
+      exercicios.push({ exercicioId, series, reps, carga, nota });
+    }
+    dias.push({ nome, exercicios });
+  }
+  return { dias };
+}
+
+function planoPtParaGerado(dias: DiaEditorJSON[], ptNome: string): PlanoGerado {
+  const posicoes = CALENDARIO[dias.length] ?? CALENDARIO[Math.min(6, Math.max(1, dias.length))];
+  const porPosicao = new Map(dias.map((d, i) => [posicoes[i], d]));
+
+  const diasGerados: DiaGerado[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = porPosicao.get(i);
+    if (!d) {
+      diasGerados.push({ dayIndex: i, dayName: DAY_NAMES[i], dayShort: DAY_SHORT[i], rest: true, title: "Descanso" });
+      continue;
+    }
+    const exercises: ExercicioGerado[] = d.exercicios.map((e) => {
+      const ex = EXERCICIO_POR_ID.get(e.exercicioId)!;
+      return {
+        name: ex.nome,
+        swap: null,
+        sets: Array.from({ length: e.series }, () => ({ w: e.carga, reps: e.reps, rpe: "—" })),
+        rest: "90 s",
+        muscle: ex.primarios[0] ? MUSCULO_LABEL[ex.primarios[0].musculo] : null,
+        bw: e.carga == null,
+        substituted: false,
+        nota: e.nota || undefined,
+        exercicioId: e.exercicioId,
+      };
+    });
+    diasGerados.push({ dayIndex: i, dayName: DAY_NAMES[i], dayShort: DAY_SHORT[i], rest: false, title: d.nome, exercises });
+  }
+
+  return {
+    version: 1,
+    meta: { origem: "pt", ptNome, week: 1, deloadWeek: false, generatedAt: new Date().toISOString() },
+    days: diasGerados,
+  };
+}
+
+export async function atribuirPlanoPt(
+  _anterior: EstadoAtribuirPlano,
+  formData: FormData,
+): Promise<EstadoAtribuirPlano> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { erro: "Sessão inválida." };
+
+  const alunoId = String(formData.get("aluno_id") ?? "");
+  const nome = String(formData.get("nome") ?? "").trim().slice(0, 80);
+  if (!alunoId) return { erro: "Aluno inválido." };
+  if (!nome) return { erro: "Dá um nome ao plano." };
+
+  let planoJson: unknown;
+  try {
+    planoJson = JSON.parse(String(formData.get("plano_json") ?? "[]"));
+  } catch {
+    return { erro: "Plano inválido — tenta novamente." };
+  }
+  const validado = validarPlanoPt(planoJson);
+  if ("erro" in validado) return { erro: validado.erro };
+
+  // Confirma a ligação aqui para dar um erro claro — a RLS (011) já
+  // impediria o INSERT/UPDATE de qualquer forma se isto não se verificar.
+  const { data: link } = await supabase
+    .from("pt_links")
+    .select("id")
+    .eq("pt_id", user.id)
+    .eq("student_id", alunoId)
+    .eq("status", "ativo")
+    .eq("scope_treinos", true)
+    .maybeSingle();
+  if (!link) return { erro: "Não tens ligação ativa (com permissão de treinos) a este aluno." };
+
+  const { data: perfilPt } = await supabase.from("profiles").select("name").eq("id", user.id).single();
+  const plano = planoPtParaGerado(validado.dias, perfilPt?.name ?? "O teu PT");
+
+  // Um plano por (PT, aluno) — editar é sempre a linha mais recente.
+  const { data: existente } = await supabase
+    .from("training_plans")
+    .select("id")
+    .eq("owner_id", user.id)
+    .eq("student_id", alunoId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existente) {
+    const { error } = await supabase
+      .from("training_plans")
+      .update({ name: nome, days: plano })
+      .eq("id", existente.id)
+      .eq("owner_id", user.id);
+    if (error) return { erro: BLOQUEIO_RLS };
+  } else {
+    const { error } = await supabase.from("training_plans").insert({
+      owner_id: user.id,
+      student_id: alunoId,
+      name: nome,
+      days: plano,
+      progression: initProgression(),
+      is_active: false, // o aluno é quem escolhe seguir este plano
+    });
+    if (error) return { erro: BLOQUEIO_RLS };
+  }
+
+  revalidatePath(`/pt/aluno/${alunoId}`);
+  return { ok: true };
 }
