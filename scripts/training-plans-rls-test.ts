@@ -140,11 +140,18 @@ async function main() {
   if (Array.isArray(r9) && r9.length === 1) ok("aluno lê o plano que o PT lhe atribuiu");
   else ko("aluno não conseguiu ler o plano do PT", r9);
 
-  // 10. aluno NÃO edita o plano do PT
+  // 10. aluno NÃO edita o plano do PT (colunas fora de `progression`)
+  //     Antes da 013: 0 linhas (RLS nem via a linha). Desde a 013/014: o
+  //     aluno já pode fazer UPDATE nesta linha (para avançar a progressão),
+  //     mas o trigger rejeita explicitamente qualquer coluna que não seja
+  //     `progression` — por isso aceita as duas formas de bloqueio.
   const r10 = await patch(A, `training_plans?id=eq.${planoB}`, { name: "Hackeado pelo aluno" });
   const b10 = await r10.json();
-  if (Array.isArray(b10) && b10.length === 0) ok("aluno NÃO edita o plano atribuído pelo PT (0 linhas)");
-  else ko("aluno conseguiu editar o plano do PT", b10);
+  if (r10.status >= 400 || (Array.isArray(b10) && b10.length === 0)) {
+    ok("aluno NÃO edita o plano atribuído pelo PT (bloqueado)");
+  } else {
+    ko("aluno conseguiu editar o plano do PT", b10);
+  }
 
   // 11. FALHA 1b (corrigida): PT não redireciona o plano do aluno para uma vítima sem ligação
   const r11 = await patch(B, `training_plans?id=eq.${planoB}`, { student_id: C.id });
