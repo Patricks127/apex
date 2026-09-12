@@ -77,7 +77,10 @@
   line-height: 1.05;
 }
 
+/* Título de secção carrega a sua própria margem superior — a app é um
+   documento estruturado, os blocos não vêm colados uns aos outros. */
 .apex-tipo-titulo-seccao {
+  margin-top: var(--apex-space-8);
   font-family: var(--apex-sans);
   font-size: 24px;
   font-weight: 800;
@@ -170,6 +173,7 @@
 .apex-botao--treino {
   min-height: 64px;
   padding: 24px;
+  border: 1px solid transparent;
   border-radius: 16px;
   background: var(--apex-branco);
   color: var(--apex-fundo-treino);
@@ -177,6 +181,17 @@
   font-size: 26px;
   font-weight: 700;
   letter-spacing: -0.02em;
+}
+
+/* Desativado no modo treino: um botão branco a 45% de opacidade sobre
+   fundo escuro fica cinzento-sólido e chama MAIS atenção que o ativo —
+   o oposto do que "desativado" devia comunicar. Recua em vez de escurecer:
+   sem preenchimento, borda fina, texto fraco. */
+.apex-botao--treino:disabled {
+  opacity: 1;
+  background: transparent;
+  border-color: var(--apex-linha-treino);
+  color: var(--apex-texto-fraco);
 }
 
 /* ============================================================
@@ -214,9 +229,26 @@
   color: var(--apex-cinza-texto);
 }
 
-.apex-linha-exercicio__valor {
+/* Carga e séries são dois NÍVEIS, não dois iguais — a carga é o que se
+   procura de relance, as séries são contexto. Empilhados como o nome/
+   etiqueta à esquerda, sem "·" a separar: a posição já os liga. */
+.apex-linha-exercicio__valores {
+  display: flex;
   flex-shrink: 0;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.apex-linha-exercicio__carga {
+  font-family: var(--apex-sans);
+  font-size: 17px;
+  font-weight: 800;
   color: var(--apex-tinta);
+}
+
+.apex-linha-exercicio__series {
+  color: var(--apex-cinza-texto);
 }
 
 /* ============================================================

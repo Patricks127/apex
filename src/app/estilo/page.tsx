@@ -54,7 +54,7 @@ const TIPOGRAFIA = [
 
 export default function EstiloPage() {
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-col gap-12 px-5 py-12">
+    <main className="mx-auto flex w-full max-w-2xl flex-col px-5 py-12">
       <header className="flex flex-col gap-3">
         <p className="apex-tipo-etiqueta" style={{ color: "var(--apex-cinza-texto)" }}>
           Sistema de design — fase 1
@@ -157,9 +157,9 @@ export default function EstiloPage() {
 
       <Seccao titulo="Linha de exercício">
         <div>
-          <LinhaExercicio nome="Supino com barra" etiqueta="peito · 90s" valor="52,5 kg · 4 × 6" />
-          <LinhaExercicio nome="Remada curvada" etiqueta="dorsal · 90s" valor="60 kg · 4 × 8" />
-          <LinhaExercicio nome="Elevação lateral" etiqueta="deltoide · 60s" valor="12 kg · 3 × 12" />
+          <LinhaExercicio nome="Supino com barra" etiqueta="peito · 90s" carga="52,5 kg" series="4 × 6" />
+          <LinhaExercicio nome="Remada curvada" etiqueta="dorsal · 90s" carga="60 kg" series="4 × 8" />
+          <LinhaExercicio nome="Elevação lateral" etiqueta="deltoide · 60s" carga="12 kg" series="3 × 12" />
         </div>
       </Seccao>
 
@@ -171,11 +171,13 @@ export default function EstiloPage() {
       </Seccao>
 
       <Seccao titulo="Botão — claro">
-        <div className="max-w-xs">
-          <Botao variante="claro" type="button">
-            Continuar
-          </Botao>
-        </div>
+        <Botao variante="claro" type="button">
+          Continuar
+        </Botao>
+        <p className="apex-tipo-secundario" style={{ color: "var(--apex-cinza-texto)" }}>
+          Largura total do ecrã — o botão não tem largura própria, ocupa a do
+          contentor.
+        </p>
       </Seccao>
 
       <Seccao titulo="Botão — treino">
@@ -190,9 +192,16 @@ export default function EstiloPage() {
             Série feita
           </Botao>
         </div>
+        <p className="apex-tipo-secundario" style={{ color: "var(--apex-cinza-texto)" }}>
+          Desativado recua (sem preenchimento, borda fina, texto fraco) — não
+          escurece um botão que já é sólido.
+        </p>
       </Seccao>
 
-      <footer className="apex-tipo-secundario pb-8" style={{ color: "var(--apex-cinza-texto)" }}>
+      <footer
+        className="apex-tipo-secundario mt-12 pb-8"
+        style={{ color: "var(--apex-cinza-texto)" }}
+      >
         Alvos de toque ≥44px (claro) e ≥64px (treino). Movimento respeita
         prefers-reduced-motion via <code>--apex-mov-duracao</code>.
       </footer>

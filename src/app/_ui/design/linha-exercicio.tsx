@@ -1,17 +1,19 @@
-// Linha de exercício (ecrã do dia, modo claro). Nome + etiqueta por baixo,
-// valor à direita alinhado por tabular, separador de 1px em baixo.
-// Fase 1: só o componente, não ligado a nenhum ecrã ainda.
-
-import type { ReactNode } from "react";
+// Linha de exercício (ecrã do dia, modo claro). Nome + etiqueta por baixo à
+// esquerda; carga + séries por baixo à direita — dois níveis, não dois
+// iguais: a carga é o que se procura de relance, as séries são contexto.
+// Separador de 1px em baixo. Fase 1: só o componente, não ligado a nenhum
+// ecrã ainda.
 
 export function LinhaExercicio({
   nome,
   etiqueta,
-  valor,
+  carga,
+  series,
 }: {
   nome: string;
   etiqueta?: string;
-  valor?: ReactNode;
+  carga?: string;
+  series?: string;
 }) {
   return (
     <div className="apex-linha-exercicio">
@@ -21,10 +23,17 @@ export function LinhaExercicio({
           <span className="apex-tipo-etiqueta apex-linha-exercicio__etiqueta">{etiqueta}</span>
         ) : null}
       </div>
-      {valor !== undefined ? (
-        <span className="apex-tipo-nome-exercicio apex-tabular apex-linha-exercicio__valor">
-          {valor}
-        </span>
+      {carga || series ? (
+        <div className="apex-linha-exercicio__valores">
+          {carga ? (
+            <span className="apex-tabular apex-linha-exercicio__carga">{carga}</span>
+          ) : null}
+          {series ? (
+            <span className="apex-tipo-secundario apex-tabular apex-linha-exercicio__series">
+              {series}
+            </span>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );
