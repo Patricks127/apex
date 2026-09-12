@@ -1,0 +1,294 @@
+/* ============================================================
+   APEX — Sistema de design, fundação (fase 1: frontend)
+
+   Fonte: referencia/SISTEMA-DESIGN.md. Dois modos deliberados —
+   claro e rigoroso (navegar, ler, gerir) / escuro (treino ao vivo).
+   A mudança de modo é um sinal: quando o ecrã escurece, está-se a
+   treinar.
+
+   Este ficheiro só define tokens + os componentes base da fase 1
+   (botão, linha de exercício, aviso da app, cabeçalho de ecrã,
+   bloco de dados). Todas as classes usam o prefixo "apex-" e não
+   são usadas por nenhum ecrã existente ainda — só por /estilo.
+   Nenhum ecrã atual referencia estas classes, por isso importar
+   este ficheiro globalmente não muda nada do que já existe.
+   ============================================================ */
+
+:root {
+  /* --- Cor — modo claro (base da app) --- */
+  --apex-branco: #ffffff;
+  --apex-tinta: #0a0a0b;
+  --apex-cinza-texto: #6b6b70;
+  --apex-cinza-linha: #e2e2e4;
+  --apex-cinza-fundo: #f6f6f7;
+  --apex-azul: #0047ff;
+  --apex-azul-fundo: #edf1ff;
+
+  /* --- Cor — modo treino (escuro) --- */
+  --apex-fundo-treino: #0d0f13;
+  --apex-superficie: #171a20;
+  --apex-linha-treino: #262a31;
+  --apex-texto-treino: #ffffff;
+  --apex-texto-fraco: #8a9098;
+  --apex-verde: #5ac8a0;
+
+  /* --- Estados (comuns aos dois modos) --- */
+  --apex-alerta: #c8761a;
+  --apex-erro: #c0392b;
+
+  /* --- Tipografia --- */
+  /* var(--font-archivo)/var(--font-barlow-condensed): expostas pelo
+     next/font/google em src/app/layout.tsx. */
+  --apex-sans: var(--font-archivo), system-ui, sans-serif;
+  --apex-cond: var(--font-barlow-condensed), var(--apex-sans);
+
+  /* --- Espaçamento — escala de 4. Nada fora disto. --- */
+  --apex-space-1: 4px;
+  --apex-space-2: 8px;
+  --apex-space-3: 12px;
+  --apex-space-4: 16px;
+  --apex-space-5: 20px;
+  --apex-space-6: 24px;
+  --apex-space-7: 32px;
+  --apex-space-8: 48px;
+
+  /* --- Movimento — quase nenhum. Componentes animados (anel de
+     descanso, painel de RPE, ainda por construir) usam esta
+     variável em vez de uma duração fixa, para respeitar
+     prefers-reduced-motion automaticamente. --- */
+  --apex-mov-duracao: 280ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --apex-mov-duracao: 0ms;
+  }
+}
+
+/* ============================================================
+   Tipografia — escala (ver tabela "Tipografia" do documento)
+   ============================================================ */
+
+.apex-tipo-titulo-ecra {
+  font-family: var(--apex-sans);
+  font-size: 44px;
+  font-weight: 900;
+  letter-spacing: -0.045em;
+  line-height: 1.05;
+}
+
+.apex-tipo-titulo-seccao {
+  font-family: var(--apex-sans);
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.apex-tipo-nome-exercicio {
+  font-family: var(--apex-sans);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.apex-tipo-corpo {
+  font-family: var(--apex-sans);
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.apex-tipo-secundario {
+  font-family: var(--apex-sans);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.apex-tipo-etiqueta {
+  font-family: var(--apex-sans);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Único caso com maiúsculas: números condensados do modo treino. */
+.apex-tipo-carga-treino {
+  font-family: var(--apex-cond);
+  font-size: 120px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.apex-tipo-numero-dados {
+  font-family: var(--apex-sans);
+  font-size: 25px;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+
+.apex-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================
+   Botão — claro e treino
+   ============================================================ */
+
+.apex-botao {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  border: none;
+  cursor: pointer;
+  font-family: var(--apex-sans);
+  text-align: center;
+}
+
+.apex-botao:focus-visible {
+  outline: 2px solid var(--apex-azul);
+  outline-offset: 2px;
+}
+
+.apex-botao:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+/* Alvo de toque ≥44px (§Acessibilidade) */
+.apex-botao--claro {
+  min-height: 44px;
+  padding: 20px 24px;
+  border-radius: 2px;
+  background: var(--apex-tinta);
+  color: var(--apex-branco);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+/* Alvo de toque ≥64px no modo treino (mãos molhadas) */
+.apex-botao--treino {
+  min-height: 64px;
+  padding: 24px;
+  border-radius: 16px;
+  background: var(--apex-branco);
+  color: var(--apex-fundo-treino);
+  font-family: var(--apex-cond);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* ============================================================
+   Linha de exercício
+   ============================================================ */
+
+.apex-linha-exercicio {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--apex-space-4);
+  min-height: 44px;
+  padding: var(--apex-space-4) 0;
+  border-bottom: 1px solid var(--apex-cinza-linha);
+}
+
+.apex-linha-exercicio__principal {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Nota: cada classe abaixo junta-se em JSX à respetiva
+   .apex-tipo-* (a tipografia não se repete aqui — só cor/layout). */
+
+.apex-linha-exercicio__nome {
+  overflow: hidden;
+  color: var(--apex-tinta);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.apex-linha-exercicio__etiqueta {
+  color: var(--apex-cinza-texto);
+}
+
+.apex-linha-exercicio__valor {
+  flex-shrink: 0;
+  color: var(--apex-tinta);
+}
+
+/* ============================================================
+   Aviso da app — sempre com explicação, nunca só um ícone.
+   ============================================================ */
+
+.apex-aviso {
+  display: flex;
+  flex-direction: column;
+  gap: var(--apex-space-1);
+  padding: var(--apex-space-4);
+  background: var(--apex-azul-fundo);
+  border-left: 3px solid var(--apex-azul);
+}
+
+.apex-aviso__titulo {
+  color: var(--apex-azul);
+}
+
+.apex-aviso__texto {
+  color: var(--apex-tinta);
+}
+
+/* ============================================================
+   Cabeçalho de ecrã
+   ============================================================ */
+
+.apex-cabecalho {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: var(--apex-space-4) 0;
+  border-bottom: 3px solid var(--apex-tinta);
+}
+
+.apex-cabecalho__marca {
+  color: var(--apex-tinta);
+}
+
+.apex-cabecalho__direita {
+  color: var(--apex-cinza-texto);
+}
+
+/* ============================================================
+   Bloco de dados em colunas
+   ============================================================ */
+
+.apex-dados {
+  display: flex;
+  border-top: 1px solid var(--apex-cinza-linha);
+  border-bottom: 1px solid var(--apex-cinza-linha);
+}
+
+.apex-dados__coluna {
+  flex: 1;
+  min-width: 0;
+  padding: var(--apex-space-3) var(--apex-space-2);
+  border-left: 1px solid var(--apex-cinza-linha);
+  text-align: center;
+}
+
+.apex-dados__coluna:first-child {
+  border-left: none;
+}
+
+.apex-dados__valor {
+  display: block;
+  color: var(--apex-tinta);
+}
+
+.apex-dados__etiqueta {
+  display: block;
+  margin-top: 2px;
+  color: var(--apex-cinza-texto);
+}

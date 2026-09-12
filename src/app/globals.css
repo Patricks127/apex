@@ -1,4 +1,8 @@
 @import "tailwindcss";
+/* Sistema de design (fase 1: fundação) — tokens + componentes base.
+   Classes com prefixo "apex-", só usadas em /estilo por agora; ver
+   referencia/SISTEMA-DESIGN.md e o próprio ficheiro para o porquê. */
+@import "./_ui/design/design.css";
 
 :root {
   --background: #ffffff;
