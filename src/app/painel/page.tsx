@@ -75,6 +75,18 @@ export default async function PainelPage() {
           O teu perfil ainda não está completo. Contacta o suporte.
         </p>
       )}
+
+      <section className="mt-auto flex flex-col gap-1.5 border-t border-zinc-800 pt-4">
+        <h2 className="text-xs font-medium uppercase tracking-wider text-zinc-600">Definições</h2>
+        <div className="flex gap-4 text-xs">
+          <Link href="/termos" className="text-zinc-400 underline underline-offset-4 hover:text-zinc-200">
+            Termos de Utilização
+          </Link>
+          <Link href="/privacidade" className="text-zinc-400 underline underline-offset-4 hover:text-zinc-200">
+            Política de Privacidade
+          </Link>
+        </div>
+      </section>
     </main>
   );
 }

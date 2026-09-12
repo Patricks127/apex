@@ -80,6 +80,36 @@ export function FormularioRegisto() {
       />
 
       <fieldset className="flex flex-col gap-2">
+        <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-200 has-[:checked]:border-zinc-300">
+          <input type="checkbox" name="aceita_termos" className="mt-0.5 size-4 shrink-0 accent-zinc-100" />
+          <span>
+            Li e aceito os{" "}
+            <Link href="/termos" target="_blank" className="underline underline-offset-2 hover:text-white">
+              Termos
+            </Link>{" "}
+            e a{" "}
+            <Link href="/privacidade" target="_blank" className="underline underline-offset-2 hover:text-white">
+              Política de Privacidade
+            </Link>
+            .
+          </span>
+        </label>
+        {estado.erros?.termos ? <span className="text-xs text-red-400">{estado.erros.termos}</span> : null}
+
+        <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-200 has-[:checked]:border-zinc-300">
+          <input type="checkbox" name="aceita_saude" className="mt-0.5 size-4 shrink-0 accent-zinc-100" />
+          <span>
+            Compreendo que a APEX não substitui aconselhamento médico e que o exercício tem riscos (ver o{" "}
+            <Link href="/termos" target="_blank" className="underline underline-offset-2 hover:text-white">
+              aviso de saúde
+            </Link>
+            ).
+          </span>
+        </label>
+        {estado.erros?.saude ? <span className="text-xs text-red-400">{estado.erros.saude}</span> : null}
+      </fieldset>
+
+      <fieldset className="flex flex-col gap-2">
         <legend className="text-sm font-medium text-zinc-300">Sou…</legend>
         <div className="mt-1 grid grid-cols-2 gap-2">
           <OpcaoPapel

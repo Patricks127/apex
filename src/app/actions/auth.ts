@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { VERSAO_TERMOS_PRIVACIDADE, VERSAO_AVISO_SAUDE } from "@/lib/legal";
 
 // Papéis aceites — têm de coincidir com o enum user_role da base de dados.
 const PAPEIS = ["atleta", "pt"] as const;
@@ -19,6 +20,8 @@ export type EstadoRegisto = {
     telemovel?: string;
     password?: string;
     papel?: string;
+    termos?: string;
+    saude?: string;
   };
   mensagem?: string;
   // Registo concluído mas falta confirmar o email (sem sessão iniciada).
@@ -45,6 +48,8 @@ export async function registar(
   const telemovel = telemovelBruto.replace(/[\s-]/g, "");
   const password = String(formData.get("password") ?? "");
   const papel = String(formData.get("papel") ?? "");
+  const aceitaTermos = formData.get("aceita_termos") === "on";
+  const aceitaSaude = formData.get("aceita_saude") === "on";
 
   const valores = { nome, email, telemovel: telemovelBruto, papel };
   const erros: NonNullable<EstadoRegisto["erros"]> = {};
@@ -64,6 +69,14 @@ export async function registar(
   if (!PAPEIS.includes(papel as Papel)) {
     erros.papel = "Escolhe se és atleta ou personal trainer.";
   }
+  // Duas aceitações SEPARADAS, de propósito: os Termos+Privacidade não
+  // substituem o aviso de saúde ter a sua própria aceitação explícita.
+  if (!aceitaTermos) {
+    erros.termos = "Tens de ler e aceitar os Termos e a Política de Privacidade.";
+  }
+  if (!aceitaSaude) {
+    erros.saude = "Tens de confirmar que compreendes o aviso de saúde.";
+  }
 
   if (Object.keys(erros).length > 0) {
     return { erros, valores };
@@ -76,11 +89,17 @@ export async function registar(
     email,
     password,
     options: {
-      // Lido pelo trigger handle_new_user para criar a linha em profiles.
+      // Lido pelos triggers de auth.users: handle_new_user (perfil) e
+      // handle_new_user_legal_acceptance (migração 015 — regista data/hora/
+      // versão das duas aceitações, já validadas como obrigatórias acima).
       data: {
         name: nome,
         role: papel,
         phone: telemovel || null,
+        terms_accepted: "true",
+        terms_version: VERSAO_TERMOS_PRIVACIDADE,
+        health_accepted: "true",
+        health_version: VERSAO_AVISO_SAUDE,
       },
       emailRedirectTo: `${origem}/painel`,
     },

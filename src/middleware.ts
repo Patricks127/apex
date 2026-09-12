@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 // Rotas que não exigem sessão iniciada
-const PUBLIC_ROUTES = ["/", "/entrar", "/registar", "/auth"];
+const PUBLIC_ROUTES = ["/", "/entrar", "/registar", "/auth", "/termos", "/privacidade"];
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
