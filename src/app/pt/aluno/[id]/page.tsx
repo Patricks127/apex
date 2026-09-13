@@ -136,17 +136,19 @@ export default async function FichaAlunoPage({
         ) : null}
       </header>
 
-      {/* Limitação conhecida, não deste ecrã: /chat e /videos resolvem "a"
-          ligação ativa do PT (src/lib/chat/link.ts::linkAtivo), não uma
-          ligação por aluno — com mais do que um aluno ligado, isto pode
-          abrir a conversa/galeria de OUTRO aluno. Fica assim por agora;
-          corrigir exigiria /chat e /videos aceitarem qual aluno (fora do
-          âmbito desta ficha). */}
       <nav className="flex flex-wrap gap-4">
-        <Link href="/chat" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.tinta }}>
+        <Link
+          href={`/pt/aluno/${alunoId}/chat`}
+          className="apex-tipo-secundario underline underline-offset-4"
+          style={{ color: COR.tinta }}
+        >
           Chat
         </Link>
-        <Link href="/videos" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.tinta }}>
+        <Link
+          href={`/pt/aluno/${alunoId}/videos`}
+          className="apex-tipo-secundario underline underline-offset-4"
+          style={{ color: COR.tinta }}
+        >
           Vídeos
         </Link>
       </nav>

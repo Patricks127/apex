@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { linkAtivo } from "@/lib/chat/link";
+import { linkAtivo, alunosLigados } from "@/lib/chat/link";
+import { EscolherAluno } from "@/app/_ui/escolher-aluno";
 import { VideosView, type VideoRow, type FeedbackRow } from "./videos-view";
 
 export const metadata: Metadata = {
@@ -22,31 +23,38 @@ export default async function VideosPage() {
     .eq("id", user.id)
     .single();
 
-  const link = await linkAtivo(supabase, user.id);
-  const souPt = link?.perspetiva === "pt";
-
-  // Um PT sem aluno ligado não tem galeria para ver.
-  if (perfil?.role === "pt" && !souPt) {
-    return (
-      <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col gap-3 px-4 py-10">
-        <h1 className="text-2xl font-semibold text-zinc-100">Vídeos</h1>
-        <p className="text-sm text-zinc-400">
-          Vais ver aqui os vídeos dos alunos que te derem permissão de vídeos.
-        </p>
-        <Link href="/painel" className="text-sm text-zinc-300 underline underline-offset-4">
-          Voltar ao painel
-        </Link>
-      </main>
-    );
+  // Um PT pode ter vários alunos ligados — "a ligação mais recente"
+  // (linkAtivo) não sabe escolher qual, e sem isto a galeria abria sempre
+  // a do mesmo aluno a um PT com dois. Um atleta só tem um PT, o caminho
+  // dele (abaixo) não muda.
+  if (perfil?.role === "pt") {
+    const alunos = await alunosLigados(supabase, user.id);
+    if (alunos.length === 0) {
+      return (
+        <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col gap-3 px-4 py-10">
+          <h1 className="text-2xl font-semibold text-zinc-100">Vídeos</h1>
+          <p className="text-sm text-zinc-400">
+            Vais ver aqui os vídeos dos alunos que te derem permissão de vídeos.
+          </p>
+          <Link href="/painel" className="text-sm text-zinc-300 underline underline-offset-4">
+            Voltar ao painel
+          </Link>
+        </main>
+      );
+    }
+    if (alunos.length === 1) {
+      redirect(`/pt/aluno/${alunos[0].id}/videos`);
+    }
+    return <EscolherAluno alunos={alunos} destino="videos" titulo="Vídeos" />;
   }
 
-  // O atleta vê a própria galeria; o PT vê a do aluno ligado.
-  const alunoId = link && souPt ? link.student_id : user.id;
+  // Atleta: vê sempre a própria galeria.
+  const link = await linkAtivo(supabase, user.id);
 
   const { data: videos } = await supabase
     .from("training_videos")
     .select("id, user_id, storage_path, exercise, created_at")
-    .eq("user_id", alunoId)
+    .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(100);
 
@@ -59,22 +67,12 @@ export default async function VideosPage() {
         .order("created_at", { ascending: true })
     : { data: [] as FeedbackRow[] };
 
-  let alunoNome = "";
-  if (souPt) {
-    const { data: p } = await supabase
-      .from("profiles")
-      .select("name")
-      .eq("id", alunoId)
-      .single();
-    alunoNome = p?.name ?? "Atleta";
-  }
-
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col px-4 py-8">
       <VideosView
-        perspetiva={souPt ? "pt" : "aluno"}
+        perspetiva="aluno"
         scopeVideos={link ? link.scope_videos : true}
-        alunoNome={alunoNome}
+        alunoNome=""
         videos={(videos ?? []) as VideoRow[]}
         feedback={(feedback ?? []) as FeedbackRow[]}
         meId={user.id}

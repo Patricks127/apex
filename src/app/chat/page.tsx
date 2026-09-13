@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { linkAtivo } from "@/lib/chat/link";
+import { linkAtivo, alunosLigados } from "@/lib/chat/link";
+import { EscolherAluno } from "@/app/_ui/escolher-aluno";
 import { ChatView, type Mensagem } from "./chat-view";
 
 export const metadata: Metadata = {
@@ -16,23 +17,26 @@ export default async function ChatPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/entrar");
 
-  const link = await linkAtivo(supabase, user.id);
+  // Um PT pode ter vários alunos ligados — "a ligação mais recente"
+  // (linkAtivo) não sabe escolher qual, e sem isto o chat abria sempre a
+  // mesma conversa a um PT com dois alunos, fosse ela de quem fosse. Um
+  // atleta só tem um PT, por isso o caminho dele (abaixo) não muda.
+  const { data: perfil } = await supabase.from("profiles").select("role").eq("id", user.id).single();
 
+  if (perfil?.role === "pt") {
+    const alunos = await alunosLigados(supabase, user.id);
+    if (alunos.length === 0) {
+      return <SemConversa />;
+    }
+    if (alunos.length === 1) {
+      redirect(`/pt/aluno/${alunos[0].id}/chat`);
+    }
+    return <EscolherAluno alunos={alunos} destino="chat" titulo="Conversas" />;
+  }
+
+  const link = await linkAtivo(supabase, user.id);
   if (!link) {
-    return (
-      <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col gap-3 px-4 py-10">
-        <h1 className="text-2xl font-semibold text-zinc-100">Sem conversa</h1>
-        <p className="text-sm text-zinc-400">
-          O chat abre quando tens uma ligação PT↔aluno ativa.
-        </p>
-        <Link
-          href="/painel"
-          className="mt-2 self-start text-sm font-medium text-zinc-300 underline underline-offset-4 hover:text-zinc-100"
-        >
-          Ir para o painel
-        </Link>
-      </main>
-    );
+    return <SemConversa />;
   }
 
   const { data: outro } = await supabase
@@ -62,6 +66,23 @@ export default async function ChatPage() {
         supabaseUrl={process.env.NEXT_PUBLIC_SUPABASE_URL!}
         anonKey={process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}
       />
+    </main>
+  );
+}
+
+function SemConversa() {
+  return (
+    <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col gap-3 px-4 py-10">
+      <h1 className="text-2xl font-semibold text-zinc-100">Sem conversa</h1>
+      <p className="text-sm text-zinc-400">
+        O chat abre quando tens uma ligação PT↔aluno ativa.
+      </p>
+      <Link
+        href="/painel"
+        className="mt-2 self-start text-sm font-medium text-zinc-300 underline underline-offset-4 hover:text-zinc-100"
+      >
+        Ir para o painel
+      </Link>
     </main>
   );
 }
