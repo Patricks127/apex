@@ -36,6 +36,15 @@
 
 export type MotivoAtencao = "dor_recorrente" | "adesao_baixa" | "esforco_alto" | "inativo";
 
+/** Texto em português de cada motivo — fonte única, para /painel,
+ *  /pt/alunos e a ficha do aluno nunca divergirem na palavra usada. */
+export const MOTIVO_LABEL: Record<MotivoAtencao, string> = {
+  dor_recorrente: "dor recorrente",
+  adesao_baixa: "adesão baixa",
+  esforco_alto: "esforço muito alto",
+  inativo: "inativo",
+};
+
 /** Dias — adesão, esforço e dor recorrente olham todos para a mesma
  *  janela (3 semanas). Inatividade tem o seu próprio limiar, mais curto. */
 export const JANELA_ATENCAO_DIAS = 21;

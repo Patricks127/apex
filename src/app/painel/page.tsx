@@ -4,12 +4,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { carregarPlanoAtivo, treinoDeHojeFeito, janelaRecente } from "@/lib/treino/perfil";
 import { indiceDiaSemanaHoje, proximoDiaDeTreino, construirLinhaTempo } from "@/lib/treino/linha-tempo";
-import {
-  avaliarAtencao,
-  JANELA_ATENCAO_DIAS,
-  MIN_SESSOES_PARA_RPE,
-  type MotivoAtencao,
-} from "@/lib/treino/atencao";
+import { MOTIVO_LABEL, type MotivoAtencao } from "@/lib/treino/atencao";
+import { atencaoDosAlunos } from "@/lib/treino/atencao-dados";
 import type { DiaGerado } from "@/lib/motor";
 import { sair } from "@/app/actions/auth";
 import { responderPedido, revogarAcesso } from "@/app/actions/ligacoes";
@@ -270,13 +266,6 @@ function DescansoHoje({ dias, indiceHoje }: { dias: DiaGerado[]; indiceHoje: num
   );
 }
 
-/** Dias inteiros desde um timestamp ISO até agora — extraído à parte
- *  (como janelaRecente) para o acesso ao relógio não ficar dentro do corpo
- *  de um componente. */
-function diasDesde(iso: string): number {
-  return Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
-}
-
 function rotuloOffset(offset: number): string {
   if (offset === 1) return "amanhã";
   if (offset === 2) return "depois de amanhã";
@@ -381,12 +370,6 @@ async function contarFeedbackRecente(
 // PT
 // ---------------------------------------------------------------------------
 
-const MOTIVO_LABEL: Record<MotivoAtencao, string> = {
-  dor_recorrente: "dor recorrente",
-  adesao_baixa: "adesão baixa",
-  esforco_alto: "esforço muito alto",
-  inativo: "inativo",
-};
 
 async function SeccaoPt({ userId, ptCode }: { userId: string; ptCode: string | null }) {
   const supabase = await createClient();
@@ -416,18 +399,10 @@ async function SeccaoPt({ userId, ptCode }: { userId: string; ptCode: string | n
 
   let videosPorVer = 0;
   let mensagensPorLer = 0;
-  const atencaoPorAluno = new Map<string, MotivoAtencao[]>();
+  let atencaoPorAluno = new Map<string, MotivoAtencao[]>();
 
   if (alunoIds.length) {
-    // Dor recorrente, adesão e esforço olham todos para a mesma janela
-    // (3 semanas) — um sinal de atenção tem de expirar, senão um PT com
-    // muitos alunos passa a ignorar alertas que nunca desaparecem. A
-    // sessão mais recente de sempre (para "inativo") não tem esse corte —
-    // precisamos de saber SE há muito que o aluno não treina, mesmo que
-    // "muito" seja mais do que 3 semanas.
-    const corteAtencao = janelaRecente(JANELA_ATENCAO_DIAS);
-
-    const [{ data: vids }, { count: msgsCount }, { data: checkins }, { data: sessoes }] = await Promise.all([
+    const [{ data: vids }, { count: msgsCount }, atencao] = await Promise.all([
       supabase.from("training_videos").select("id").in("user_id", alunoIds),
       supabase
         .from("messages")
@@ -435,62 +410,17 @@ async function SeccaoPt({ userId, ptCode }: { userId: string; ptCode: string | n
         .in("link_id", linkIds)
         .neq("sender_id", userId)
         .is("read_at", null),
-      supabase
-        .from("workout_checkins")
-        .select("user_id, discomfort_zones")
-        .in("user_id", alunoIds)
-        .gte("created_at", corteAtencao),
-      // Sem filtro de data aqui — precisamos da sessão mais recente de
-      // sempre para "inativo" (a janela de atenção filtra-se abaixo, em
-      // memória, para adesão/esforço). Limite defensivo (não é paginação
-      // a sério, só um travão a crescimento patológico) — nenhum PT real
-      // tem isto hoje.
-      supabase
-        .from("workout_sessions")
-        .select("user_id, completion, avg_rpe, created_at")
-        .in("user_id", alunoIds)
-        .order("created_at", { ascending: false })
-        .limit(1000),
+      atencaoDosAlunos(supabase, alunoIds),
     ]);
 
     mensagensPorLer = msgsCount ?? 0;
+    atencaoPorAluno = atencao;
 
     const vidIds = (vids ?? []).map((v) => v.id);
     if (vidIds.length) {
       const { data: fbs } = await supabase.from("video_feedback").select("video_id").in("video_id", vidIds);
       const comFeedback = new Set((fbs ?? []).map((f) => f.video_id));
       videosPorVer = vidIds.filter((id) => !comFeedback.has(id)).length;
-    }
-
-    for (const alunoId of alunoIds) {
-      const checkinsComDor = (checkins ?? []).filter(
-        (c) => c.user_id === alunoId && (c.discomfort_zones ?? []).length > 0,
-      ).length;
-      // `sessoes` já vem ordenado desc — o filter preserva a ordem.
-      const sessoesDoAluno = (sessoes ?? []).filter((s) => s.user_id === alunoId);
-      const ultima = sessoesDoAluno[0];
-      const diasDesdeUltimaSessao = ultima ? diasDesde(ultima.created_at) : null;
-
-      // Só sessões DENTRO da janela de atenção — uma sessão incompleta de
-      // há dois meses não pode continuar a pesar na média de hoje.
-      const naJanela = sessoesDoAluno.filter((s) => s.created_at >= corteAtencao);
-
-      const completions = naJanela.map((s) => s.completion).filter((c): c is number => c != null);
-      const completionMediaNaJanela = completions.length
-        ? completions.reduce((a, b) => a + b, 0) / completions.length
-        : null;
-
-      const rpes = naJanela.map((s) => s.avg_rpe).filter((r): r is number => r != null);
-      const rpeMedioNaJanela =
-        rpes.length >= MIN_SESSOES_PARA_RPE ? rpes.reduce((a, b) => a + b, 0) / rpes.length : null;
-
-      const motivos = avaliarAtencao({
-        diasDesdeUltimaSessao,
-        checkinsComDesconfortoNaJanela: checkinsComDor,
-        completionMediaNaJanela,
-        rpeMedioNaJanela,
-      });
-      if (motivos.length) atencaoPorAluno.set(alunoId, motivos);
     }
   }
 
@@ -532,7 +462,7 @@ async function SeccaoPt({ userId, ptCode }: { userId: string; ptCode: string | n
         Editar o meu perfil público
       </Link>
 
-      <ListaAlunos alunos={alunos ?? []} atencaoPorAluno={atencaoPorAluno} />
+      <ListaAlunos alunos={alunos ?? []} />
     </div>
   );
 }
@@ -634,56 +564,20 @@ function BlocoPrincipalPt({
   );
 }
 
-function ListaAlunos({
-  alunos,
-  atencaoPorAluno,
-}: {
-  alunos: Ligacao[];
-  atencaoPorAluno: Map<string, MotivoAtencao[]>;
-}) {
+function ListaAlunos({ alunos }: { alunos: Ligacao[] }) {
   return (
-    <section className="flex flex-col gap-2">
-      <h2 className="apex-tipo-titulo-seccao" style={{ marginTop: 0, color: COR.tinta }}>
-        Alunos{alunos.length > 0 ? ` (${alunos.length})` : ""}
-      </h2>
-      {alunos.length === 0 ? (
-        <p className="apex-tipo-corpo" style={{ color: COR.fraco }}>
-          Ainda não tens alunos ligados.
-        </p>
-      ) : (
-        <div className="flex flex-col">
-          {alunos.map((a) => (
-            <div key={a.id} className="apex-linha-exercicio">
-              <div className="apex-linha-exercicio__principal">
-                <span className="apex-tipo-nome-exercicio" style={{ color: COR.tinta }}>
-                  {a.aluno?.name ?? "Atleta"}
-                </span>
-                <span className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
-                  {a.aluno?.id && atencaoPorAluno.has(a.aluno.id) ? (
-                    <span className="apex-chip-alerta" style={{ marginRight: 6 }}>
-                      {atencaoPorAluno
-                        .get(a.aluno.id)!
-                        .map((m) => MOTIVO_LABEL[m])
-                        .join(" · ")}
-                    </span>
-                  ) : null}
-                  Autorizou: <Scopes l={a} />
-                </span>
-              </div>
-              {a.aluno?.id ? (
-                <Link
-                  href={`/pt/aluno/${a.aluno.id}`}
-                  className="apex-tipo-etiqueta shrink-0 border px-3 py-1.5"
-                  style={{ borderColor: COR.linha, color: COR.tinta }}
-                >
-                  Plano
-                </Link>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      )}
-    </section>
+    <div className="flex items-baseline justify-between border-t pt-4" style={{ borderColor: COR.linha }}>
+      <span className="apex-tipo-secundario" style={{ color: COR.fraco }}>
+        {alunos.length === 0
+          ? "Ainda não tens alunos ligados."
+          : `${alunos.length} aluno${alunos.length > 1 ? "s" : ""} ligado${alunos.length > 1 ? "s" : ""}`}
+      </span>
+      {alunos.length > 0 ? (
+        <Link href="/pt/alunos" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.tinta }}>
+          Ver todos
+        </Link>
+      ) : null}
+    </div>
   );
 }
 

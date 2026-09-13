@@ -2,7 +2,6 @@
 
 import { useActionState, useMemo, useState } from "react";
 import { atribuirPlanoPt, type EstadoAtribuirPlano } from "@/app/actions/treino";
-import { AvisoErro } from "@/app/_ui/campos";
 
 export type ExercicioPicker = { id: string; nome: string; familia: string; musculo: string; equipamento: string[] };
 export type ExercicioEditorInicial = {
@@ -17,6 +16,14 @@ export type DiaEditorInicial = { nome: string; exercicios: ExercicioEditorInicia
 
 type ExercicioState = { chave: string; exercicioId: string; nome: string; series: string; reps: string; carga: string; nota: string };
 type DiaState = { chave: string; nome: string; exercicios: ExercicioState[] };
+
+const COR = {
+  tinta: "var(--apex-tinta)",
+  fraco: "var(--apex-cinza-texto)",
+  linha: "var(--apex-cinza-linha)",
+  fundo: "var(--apex-cinza-fundo)",
+  erro: "var(--apex-erro)",
+} as const;
 
 let seq = 0;
 const novaChave = () => `k${++seq}`;
@@ -112,15 +119,21 @@ export function EditorPlanoPt({
       <input type="hidden" name="aluno_id" value={alunoId} />
       <input type="hidden" name="plano_json" value={planoJson} />
 
-      {estado.erro ? <AvisoErro>{estado.erro}</AvisoErro> : null}
+      {estado.erro ? (
+        <p className="apex-tipo-secundario" style={{ color: COR.erro }} role="alert">
+          {estado.erro}
+        </p>
+      ) : null}
       {estado.ok ? (
-        <p className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">
+        <p className="apex-tipo-secundario" style={{ color: COR.tinta }}>
           Plano gravado. O aluno já pode escolhê-lo em &ldquo;Trocar de plano&rdquo;.
         </p>
       ) : null}
 
       <label className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium text-zinc-300">Nome do plano</span>
+        <span className="apex-tipo-secundario" style={{ color: COR.fraco }}>
+          Nome do plano
+        </span>
         <input
           name="nome"
           value={nome}
@@ -128,7 +141,8 @@ export function EditorPlanoPt({
           placeholder="ex.: Hipertrofia · 4 dias"
           maxLength={80}
           required
-          className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-zinc-400"
+          className="apex-tipo-corpo border px-3 py-2.5 outline-none"
+          style={{ borderColor: COR.linha, borderRadius: 2, background: "transparent", color: COR.tinta }}
         />
       </label>
 
@@ -152,16 +166,13 @@ export function EditorPlanoPt({
         type="button"
         onClick={adicionarDia}
         disabled={dias.length >= MAX_DIAS}
-        className="rounded-lg border border-dashed border-zinc-700 px-4 py-2.5 text-sm font-medium text-zinc-300 transition hover:bg-zinc-900 disabled:opacity-40"
+        className="apex-tipo-secundario border px-4 py-2.5 disabled:opacity-40"
+        style={{ borderColor: COR.linha, borderStyle: "dashed", color: COR.fraco }}
       >
         + Adicionar dia de treino
       </button>
 
-      <button
-        type="submit"
-        disabled={pendente}
-        className="rounded-lg bg-zinc-100 px-4 py-3 font-semibold text-zinc-900 transition hover:bg-white disabled:opacity-60"
-      >
+      <button type="submit" disabled={pendente} className="apex-botao apex-botao--claro">
         {pendente ? "A gravar…" : "Gravar plano"}
       </button>
     </form>
@@ -192,20 +203,24 @@ function DiaCard({
   const [aPesquisar, setAPesquisar] = useState(false);
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+    <div className="flex flex-col gap-3 border p-4" style={{ borderColor: COR.linha, background: COR.fundo }}>
       <div className="flex items-center gap-2">
-        <span className="shrink-0 text-xs font-semibold text-zinc-600">Dia {indice + 1}</span>
+        <span className="apex-tipo-etiqueta shrink-0" style={{ color: COR.fraco }}>
+          Dia {indice + 1}
+        </span>
         <input
           value={dia.nome}
           onChange={(e) => onNome(e.currentTarget.value)}
           placeholder="ex.: Peito e Tríceps"
           maxLength={60}
-          className="flex-1 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-400"
+          className="apex-tipo-corpo flex-1 border px-3 py-2 outline-none"
+          style={{ borderColor: COR.linha, borderRadius: 2, background: "var(--apex-branco)", color: COR.tinta }}
         />
         <button
           type="button"
           onClick={onRemover}
-          className="shrink-0 rounded-lg border border-zinc-700 px-2 py-1.5 text-xs text-zinc-400 hover:border-red-500/50 hover:text-red-400"
+          className="apex-tipo-etiqueta shrink-0 border px-2 py-1.5"
+          style={{ borderColor: COR.linha, color: COR.fraco }}
         >
           Remover dia
         </button>
@@ -213,13 +228,16 @@ function DiaCard({
 
       <ul className="flex flex-col gap-2">
         {dia.exercicios.map((e) => (
-          <li key={e.chave} className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+          <li key={e.chave} className="border p-3" style={{ borderColor: COR.linha, background: "var(--apex-branco)" }}>
             <div className="flex items-baseline justify-between gap-2">
-              <span className="text-sm font-medium text-zinc-100">{e.nome}</span>
+              <span className="apex-tipo-nome-exercicio" style={{ color: COR.tinta }}>
+                {e.nome}
+              </span>
               <button
                 type="button"
                 onClick={() => onRemoverExercicio(e.chave)}
-                className="shrink-0 text-xs text-zinc-500 hover:text-red-400"
+                className="apex-tipo-etiqueta shrink-0"
+                style={{ color: COR.fraco }}
               >
                 remover
               </button>
@@ -239,12 +257,13 @@ function DiaCard({
               onChange={(ev) => onAtualizarExercicio(e.chave, { nota: ev.currentTarget.value })}
               placeholder="Observação (opcional) — ex.: cadência lenta na descida"
               maxLength={200}
-              className="mt-2 w-full rounded-md border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 text-xs text-zinc-200 outline-none focus:border-zinc-500"
+              className="apex-tipo-secundario mt-2 w-full border px-2.5 py-1.5 outline-none"
+              style={{ borderColor: COR.linha, borderRadius: 2, background: "transparent", color: COR.tinta }}
             />
           </li>
         ))}
         {dia.exercicios.length === 0 ? (
-          <li className="rounded-lg border border-dashed border-zinc-800 px-3 py-2 text-xs text-zinc-600">
+          <li className="apex-tipo-etiqueta border px-3 py-2" style={{ borderColor: COR.linha, borderStyle: "dashed", color: COR.fraco }}>
             Ainda sem exercícios.
           </li>
         ) : null}
@@ -263,7 +282,8 @@ function DiaCard({
         <button
           type="button"
           onClick={() => setAPesquisar(true)}
-          className="self-start rounded-lg border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:bg-zinc-800"
+          className="apex-tipo-etiqueta self-start border px-3 py-1.5"
+          style={{ borderColor: COR.linha, color: COR.tinta, background: "var(--apex-branco)" }}
         >
           + Adicionar exercício
         </button>
@@ -285,7 +305,7 @@ function NumField({
 }) {
   return (
     <label className="flex flex-col gap-0.5">
-      <span className="text-[10px] uppercase tracking-wide text-zinc-500">
+      <span className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
         {label}
         {opcional ? " (opc.)" : ""}
       </span>
@@ -295,7 +315,8 @@ function NumField({
         min={0}
         value={value}
         onChange={(e) => onChange(e.currentTarget.value)}
-        className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100 outline-none focus:border-zinc-400"
+        className="apex-tipo-secundario apex-tabular border px-2 py-1.5 outline-none"
+        style={{ borderColor: COR.linha, borderRadius: 2, background: "transparent", color: COR.tinta }}
       />
     </label>
   );
@@ -324,33 +345,41 @@ function SeletorExercicio({
     : exercicios.slice(0, 12);
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-zinc-700 bg-zinc-950 p-3">
+    <div className="flex flex-col gap-2 border p-3" style={{ borderColor: COR.linha, background: "var(--apex-branco)" }}>
       <div className="flex items-center gap-2">
         <input
           autoFocus
           value={q}
           onChange={(e) => setQ(e.currentTarget.value)}
           placeholder="Pesquisar por nome ou músculo (ex.: supino, dorsais)"
-          className="flex-1 rounded-md border border-zinc-700 bg-zinc-900 px-2.5 py-1.5 text-sm text-zinc-100 outline-none focus:border-zinc-400"
+          className="apex-tipo-corpo flex-1 border px-2.5 py-1.5 outline-none"
+          style={{ borderColor: COR.linha, borderRadius: 2, background: "transparent", color: COR.tinta }}
         />
-        <button type="button" onClick={onFechar} className="shrink-0 text-xs text-zinc-500 hover:text-zinc-300">
+        <button type="button" onClick={onFechar} className="apex-tipo-etiqueta shrink-0" style={{ color: COR.fraco }}>
           fechar
         </button>
       </div>
-      <ul className="flex max-h-64 flex-col gap-1 overflow-y-auto">
+      <ul className="flex max-h-64 flex-col overflow-y-auto">
         {resultados.map((ex) => (
           <li key={ex.id}>
             <button
               type="button"
               onClick={() => onEscolher(ex)}
-              className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm text-zinc-200 hover:bg-zinc-800"
+              className="apex-tipo-corpo flex w-full items-center justify-between gap-2 border-b py-2 text-left"
+              style={{ borderColor: COR.linha, color: COR.tinta }}
             >
               <span>{ex.nome}</span>
-              <span className="shrink-0 text-xs text-zinc-500">{ex.musculo}</span>
+              <span className="apex-tipo-etiqueta shrink-0" style={{ color: COR.fraco }}>
+                {ex.musculo}
+              </span>
             </button>
           </li>
         ))}
-        {resultados.length === 0 ? <li className="px-2 py-1.5 text-xs text-zinc-600">Sem resultados.</li> : null}
+        {resultados.length === 0 ? (
+          <li className="apex-tipo-etiqueta px-2 py-1.5" style={{ color: COR.fraco }}>
+            Sem resultados.
+          </li>
+        ) : null}
       </ul>
     </div>
   );
