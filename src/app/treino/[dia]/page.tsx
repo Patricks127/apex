@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { carregarPerfilMotor, carregarPlanoAtivo, janelaRecente } from "@/lib/treino/perfil";
-import { type DiaGerado, type Injury } from "@/lib/motor";
-import { gerarPlanoV2, aplicarCautelaLeitura } from "@/lib/motor2";
+import { carregarPlanoAtivo, janelaRecente } from "@/lib/treino/perfil";
+import { type Injury } from "@/lib/motor";
+import { aplicarCautelaLeitura } from "@/lib/motor2";
 import { RegistoTreino } from "./registo-treino";
 
 export const metadata: Metadata = {
@@ -40,30 +40,22 @@ export default async function TreinoDiaPage({
     .limit(1);
   const checkinZones = (checkins?.[0]?.discomfort_zones ?? []) as Injury[];
 
-  let diaBruto: DiaGerado | undefined;
-  let weekNumber: number;
-  let deload: boolean;
-
-  if (planoAtivo.souDono) {
-    // Plano gerado pelo motor: regenera ao vivo (comportamento de sempre) —
-    // é assim que a cautela do check-in e a progressão se aplicam.
-    const ctx = await carregarPerfilMotor(supabase, user.id);
-    if (!ctx) redirect("/onboarding");
-    const prog = planoAtivo.progression;
-    const planoV2 = gerarPlanoV2(ctx.motorProfile, ctx.maxes, { progression: prog, checkinZones });
-    diaBruto = planoV2.days[dayIndex];
-    weekNumber = prog?.week ?? 1;
-    deload = !!prog?.deloadWeek;
-  } else {
-    // Plano de PT: `planoAtivo.days` já vem com a progressão aplicada em
-    // leitura (carregarPlanoAtivo → planoParaExibir) — os exercícios em si
-    // (days) nunca se regeneram, são os que o PT escreveu. Só falta a
-    // cautela do check-in, aplicada ao vivo tal como no motor.
-    const diasComCautela = aplicarCautelaLeitura(planoAtivo.days.days, checkinZones);
-    diaBruto = diasComCautela[dayIndex];
-    weekNumber = planoAtivo.days.meta.week ?? 1;
-    deload = !!planoAtivo.days.meta.deloadWeek;
-  }
+  // O snapshot em training_plans.days É o plano — nunca se regenera aqui.
+  // Regenerar só acontece em três momentos explícitos (ver
+  // src/app/actions/treino.ts): criar/regenerar plano, avançar a semana, ou
+  // completar o onboarding de novo. Se este ecrã regenerasse ao vivo a cada
+  // entrada, o que o aluno vê aqui podia deixar de bater certo com o que
+  // /plano mostrou — e a progressão semanal (que compara executado com
+  // planeado) perderia sentido, porque o planeado teria mudado sozinho.
+  // `carregarPlanoAtivo` já devolve `days` com a progressão aplicada (em
+  // leitura, para um plano de PT; já embutida no snapshot, para um plano do
+  // motor — ver planoParaExibir). Só falta a cautela do check-in, também em
+  // leitura, igual para os dois casos (ambos ligam exercicioId à mesma base
+  // EXERCICIOS — ver aplicarCautelaLeitura).
+  const diasComCautela = aplicarCautelaLeitura(planoAtivo.days.days, checkinZones);
+  const diaBruto = diasComCautela[dayIndex];
+  const weekNumber = planoAtivo.days.meta.week ?? 1;
+  const deload = !!planoAtivo.days.meta.deloadWeek;
 
   const diaGerado = diaBruto && !diaBruto.rest ? diaBruto : null;
 

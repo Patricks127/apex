@@ -1,7 +1,25 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { decidirProgressaoManual, progressaoManualFactor, aplicarProgressaoLeitura } from "./progressao-manual.ts";
+import {
+  decidirProgressaoManual,
+  progressaoManualFactor,
+  aplicarProgressaoLeitura,
+  aplicarCautelaLeitura,
+} from "./progressao-manual.ts";
 import { initProgression, type DiaGerado, type Progression } from "../motor/index.ts";
+
+// supino_barra: contraindicacoes: ["ombro"] (ver exercicios.ts) — usado nos
+// testes de aplicarCautelaLeitura abaixo, tal como um exercício real.
+const diaComExercicioId = (exercicioId: string, w: number): DiaGerado => ({
+  dayIndex: 0,
+  dayName: "Segunda",
+  dayShort: "Seg",
+  rest: false,
+  title: "Peito",
+  exercises: [
+    { name: "Supino com barra", swap: null, sets: [{ w, reps: 6, rpe: "RIR 1-3" }], rest: "90 s", muscle: "peito", bw: false, substituted: false, exercicioId },
+  ],
+});
 
 const dia = (w: number | null, reps: number): DiaGerado => ({
   dayIndex: 0,
@@ -120,5 +138,55 @@ test("aplicarProgressaoLeitura: descarga reduz carga em 10% e não mexe em reps"
 test("aplicarProgressaoLeitura: dia de descanso passa intocado", () => {
   const descanso: DiaGerado = { dayIndex: 1, dayName: "Terça", dayShort: "Ter", rest: true };
   const out = aplicarProgressaoLeitura([descanso], { ...initProgression(), loadBonus: 0.5 });
+  assert.deepEqual(out[0], descanso);
+});
+
+// ---------------------------------------------------------------------------
+// aplicarCautelaLeitura — ajuste de carga por check-in, EM LEITURA, sobre o
+// snapshot gravado. Cobre tanto um plano de PT como um gerado pelo motor v2
+// (gerarPlanoV2 também liga exercicioId a EXERCICIOS desde a correção do
+// bug "/plano vs /treino/[dia] mostravam exercícios diferentes" — antes
+// disto, um exercício do motor não tinha exercicioId e a cautela nunca lhe
+// pegava em leitura, só regenerando tudo).
+// ---------------------------------------------------------------------------
+
+test("aplicarCautelaLeitura: zona sem check-ins → devolve o MESMO array (sem cópia desnecessária)", () => {
+  const dias = [diaComExercicioId("supino_barra", 100)];
+  const out = aplicarCautelaLeitura(dias, []);
+  assert.equal(out, dias);
+});
+
+test("aplicarCautelaLeitura: exercício do MOTOR (exercicioId vindo de gerarPlanoV2) com contraindicação → -8%", () => {
+  const dias = [diaComExercicioId("supino_barra", 100)];
+  const out = aplicarCautelaLeitura(dias, ["ombro"]);
+  assert.equal(out[0].exercises![0].sets[0].w, 92.5); // round25(100 * 0.92)
+  assert.equal(out[0].exercises![0].caution, true);
+  // nunca muta o array base
+  assert.equal(dias[0].exercises![0].sets[0].w, 100);
+  assert.equal(dias[0].exercises![0].caution, undefined);
+});
+
+test("aplicarCautelaLeitura: zona reportada não toca as contraindicações do exercício → intocado", () => {
+  const dias = [diaComExercicioId("supino_barra", 100)];
+  const out = aplicarCautelaLeitura(dias, ["joelho"]);
+  assert.equal(out[0].exercises![0].sets[0].w, 100);
+  assert.equal(out[0].exercises![0].caution, undefined);
+});
+
+test("aplicarCautelaLeitura: exercício sem exercicioId (defensivo) não rebenta, fica intocado", () => {
+  const dias: DiaGerado[] = [dia(100, 8)]; // helper `dia()` acima não põe exercicioId
+  const out = aplicarCautelaLeitura(dias, ["ombro"]);
+  assert.equal(out[0].exercises![0].sets[0].w, 100);
+});
+
+test("aplicarCautelaLeitura: exercicioId desconhecido na base não rebenta", () => {
+  const dias = [diaComExercicioId("nao_existe_na_base", 100)];
+  const out = aplicarCautelaLeitura(dias, ["ombro"]);
+  assert.equal(out[0].exercises![0].sets[0].w, 100);
+});
+
+test("aplicarCautelaLeitura: dia de descanso passa intocado", () => {
+  const descanso: DiaGerado = { dayIndex: 1, dayName: "Terça", dayShort: "Ter", rest: true };
+  const out = aplicarCautelaLeitura([descanso], ["ombro"]);
   assert.deepEqual(out[0], descanso);
 });

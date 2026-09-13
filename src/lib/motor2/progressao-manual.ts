@@ -132,12 +132,12 @@ export function planoParaExibir(plano: PlanoGerado, prog: Progression | null): P
 }
 
 /**
- * "Carga cautelar" (−8%) para um plano de PT — o mesmo ajuste que o motor
- * v1 já aplica ao vivo em `/treino/[dia]` quando o check-in mais recente
- * reportou desconforto numa zona. Só se aplica a exercícios com
- * `exercicioId` (ligados à base do motor2 — sempre o caso num plano de PT)
- * cuja `contraindicacoes` toque numa das zonas reportadas. Só usada na vista
- * de um dia específico (como no motor) — `/plano` mostra a semana sem isto.
+ * "Carga cautelar" (−8%) em LEITURA, sobre o snapshot gravado — nunca
+ * regenera nada. Usada tanto para um plano de PT como para um gerado pelo
+ * motor v2 (ambos ligam os exercícios a `exercicioId`, a mesma base
+ * EXERCICIOS). Só se aplica a exercícios cuja `contraindicacoes` toque numa
+ * das zonas reportadas no check-in mais recente. Só usada na vista de um
+ * dia específico (`/treino/[dia]`) — `/plano` mostra a semana sem isto.
  */
 export function aplicarCautelaLeitura(dias: DiaGerado[], checkinZones: Injury[]): DiaGerado[] {
   if (!checkinZones.length) return dias;

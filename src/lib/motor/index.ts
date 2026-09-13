@@ -96,7 +96,11 @@ export interface ExercicioGerado {
   detail?: string;
   /** Observação do PT para este exercício, num plano atribuído (não usado nos gerados pelo motor). */
   nota?: string;
-  /** Id do exercício na base do motor2 — só presente num plano de PT (liga de volta a EXERCICIOS). */
+  /** Id do exercício na base do motor2 (liga de volta a EXERCICIOS) — presente
+   *  tanto num plano de PT como num gerado pelo motor v2 (gerarPlanoV2), que
+   *  também escolhe os exercícios a partir dessa base. Usado por
+   *  aplicarCautelaLeitura para ajustar a carga por check-in EM LEITURA,
+   *  sem regenerar o plano (ver src/app/treino/[dia]/page.tsx). */
   exercicioId?: string;
 }
 

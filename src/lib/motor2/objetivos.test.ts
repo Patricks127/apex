@@ -8,6 +8,7 @@ import {
   CARDIO_DURO,
   PARAMS,
   EQUIP_DISPONIVEL,
+  EXERCICIOS,
   type ObjetivoV2,
   type PerfilSelecao,
   type SemanaSelecionada,
@@ -209,6 +210,23 @@ test("gerarPlanoV2 devolve um PlanoGerado válido para cada objetivo", () => {
   const cal = gerarPlanoV2({ goal: "calistenia", sex: "homem", level: "intermedio", daysPerWeek: 4, location: "ginasio", injuries: [], focus: [] } as never, {});
   for (const d of cal.days.filter((x) => !x.rest))
     for (const e of d.exercises ?? []) assert.ok(e.bw || e.muscle === "Cardio", `${e.name} tem carga em calistenia`);
+});
+
+test("gerarPlanoV2 liga cada exercício a exercicioId válido em EXERCICIOS", () => {
+  // Sem isto, aplicarCautelaLeitura (motor2/progressao-manual.ts) nunca
+  // encontrava o exercício e a cautela do check-in só funcionava
+  // REGENERANDO o plano inteiro — exatamente o bug que fazia /plano (lê o
+  // snapshot) e /treino/[dia] (regenerava ao vivo) mostrarem exercícios
+  // diferentes para o mesmo dia. Ver src/app/treino/[dia]/page.tsx.
+  const idsValidos = new Set(EXERCICIOS.map((e) => e.id));
+  const mp = { goal: "hipertrofia" as const, sex: "homem" as const, level: "intermedio" as const, daysPerWeek: 4, location: "ginasio" as const, injuries: [], focus: [] };
+  const plano = gerarPlanoV2(mp as never, {});
+  for (const d of plano.days.filter((x) => !x.rest)) {
+    for (const e of d.exercises ?? []) {
+      assert.ok(e.exercicioId, `${e.name} (${d.title}) sem exercicioId`);
+      assert.ok(idsValidos.has(e.exercicioId!), `${e.name}: exercicioId "${e.exercicioId}" não existe em EXERCICIOS`);
+    }
+  }
 });
 
 test("gerarPlanoV2 aplica a progressão e o check-in", () => {

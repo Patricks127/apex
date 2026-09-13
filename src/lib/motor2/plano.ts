@@ -183,6 +183,7 @@ function prescrever(
       bw: false,
       substituted: false,
       detail: doseCardio(d, e),
+      exercicioId: ex.id,
     };
   }
 
@@ -219,6 +220,10 @@ function prescrever(
     muscle: ex.primarios[0].musculo,
     bw: !carregavel,
     substituted: false,
+    // liga de volta a EXERCICIOS — permite aplicarCautelaLeitura ajustar a
+    // carga por check-in em LEITURA (sem regenerar), tal como já faz para
+    // um plano de PT.
+    exercicioId: ex.id,
   };
   if (cautela) g.caution = true;
   if (e.foco) {
