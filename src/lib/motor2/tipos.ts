@@ -236,4 +236,12 @@ export type Exercicio = {
   nivelMinimo: Nivel;
   contraindicacoes: Zona[];
   progressao: Progressao;
+  /** Menor variação de carga que faz sentido neste exercício (kg) — o
+   *  incremento real do equipamento, não uma escala global. Omisso em
+   *  exercicios.ts, calculado por `ex()` a partir de equipamento/família
+   *  (barra 2,5 · halteres 2 · máquina/cabos 5 · isolamento leve 1,25),
+   *  mas guardado como atributo de cada exercício — não recalculado ao
+   *  vivo no ecrã de treino — e pode ser corrigido por exercício quando o
+   *  omisso não servir (ver EntradaExercicio). */
+  incrementoKg: number;
 };

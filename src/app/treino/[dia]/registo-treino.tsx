@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { autoregulate, type DiaGerado } from "@/lib/motor";
+import { decidirDescanso, type InfoMotorExercicio } from "@/lib/treino/descanso";
 import { SerieAtual, formatarNumero } from "./serie-atual";
 import { PainelRpe } from "./painel-rpe";
 import { EcraDescanso } from "./ecra-descanso";
@@ -17,12 +18,11 @@ type EstadoSerie = {
   rpeReportado: number | null;
   done: boolean;
 };
-type EstadoEx = {
+type EstadoEx = InfoMotorExercicio & {
   nome: string;
   muscle: string | null;
   bw: boolean;
   rest: string;
-  usaBarra: boolean;
   exercicioId?: string;
   caution?: boolean;
   substituted: boolean;
@@ -57,13 +57,13 @@ function proximoNaoFeito(exs: EstadoEx[], apartirEx: number, apartirSet: number)
 
 export function RegistoTreino({
   dia,
-  usaBarraPorExercicio,
+  infoMotorPorExercicio,
   weekNumber,
   deload,
   checkinAtivo,
 }: {
   dia: DiaGerado;
-  usaBarraPorExercicio: boolean[];
+  infoMotorPorExercicio: InfoMotorExercicio[];
   weekNumber: number;
   deload: boolean;
   checkinAtivo: boolean;
@@ -74,7 +74,7 @@ export function RegistoTreino({
       muscle: e.muscle,
       bw: e.bw,
       rest: e.rest,
-      usaBarra: usaBarraPorExercicio[i] ?? false,
+      ...(infoMotorPorExercicio[i] ?? { usaBarra: false, incrementoKg: 2.5, tipoDescanso: "normal" as const }),
       exercicioId: e.exercicioId,
       caution: e.caution,
       substituted: e.substituted,
@@ -86,7 +86,9 @@ export function RegistoTreino({
 
   const [cursor, setCursor] = useState<Cursor | null>(() => proximoNaoFeito(exs, 0, 0));
   const [fase, setFase] = useState<"serie" | "rpe" | "descanso" | "checkin">(cursor ? "serie" : "checkin");
-  const [descansoInfo, setDescansoInfo] = useState<{ duracaoSeg: number; proximo: Cursor } | null>(null);
+  const [descansoInfo, setDescansoInfo] = useState<{ duracaoSeg: number; motivo: string | null; proximo: Cursor } | null>(
+    null,
+  );
   const [listaAberta, setListaAberta] = useState(false);
 
   const agg = useMemo(() => {
@@ -137,9 +139,24 @@ export function RegistoTreino({
       const ex = next[cursor.ex];
       const s = ex.sets[cursor.set];
       if (!ex.bw && s.w != null) {
-        s.w = Math.max(0, s.w + delta);
+        s.w = Math.max(0, Math.round((s.w + delta) * 100) / 100);
       } else {
         s.reps = Math.max(1, s.reps + delta);
+      }
+      return next;
+    });
+  }
+
+  function definirCarga(valor: number) {
+    if (!cursor) return;
+    setExs((prev) => {
+      const next = prev.map((e) => ({ ...e, sets: e.sets.map((s) => ({ ...s })) }));
+      const ex = next[cursor.ex];
+      const s = ex.sets[cursor.set];
+      if (!ex.bw && s.w != null) {
+        s.w = Math.max(0, valor);
+      } else {
+        s.reps = Math.max(1, Math.round(valor));
       }
       return next;
     });
@@ -168,7 +185,11 @@ export function RegistoTreino({
       setFase("checkin");
       return;
     }
-    setDescansoInfo({ duracaoSeg: parseRest(next[cursor.ex].rest), proximo });
+    // descanso responde ao esforço: base do exercício + o RPE que acabou de
+    // ser reportado, com limites por tipo (ver src/lib/treino/descanso.ts —
+    // verificado contra a literatura antes de implementar).
+    const { seg, motivo } = decidirDescanso(parseRest(next[cursor.ex].rest), rpe, next[cursor.ex].tipoDescanso);
+    setDescansoInfo({ duracaoSeg: seg, motivo, proximo });
     setFase("descanso");
   }
 
@@ -241,11 +262,13 @@ export function RegistoTreino({
           repsAlvo={serieAtual.reps}
           rpeAlvoTexto={serieAtual.rpeAlvo}
           usaBarra={exAtual.usaBarra}
+          incrementoKg={exAtual.incrementoKg}
           caution={exAtual.caution}
           substituted={exAtual.substituted}
           focusTag={exAtual.focusTag}
           swap={exAtual.swap}
           onAjustar={ajustarCarga}
+          onDefinir={definirCarga}
           onFeito={() => setFase("rpe")}
         />
       ) : null}
@@ -255,6 +278,7 @@ export function RegistoTreino({
       {fase === "descanso" && descansoInfo ? (
         <EcraDescanso
           duracaoSeg={descansoInfo.duracaoSeg}
+          motivo={descansoInfo.motivo}
           proximoNome={exs[descansoInfo.proximo.ex].nome}
           proximoValor={valorAlvo(exs[descansoInfo.proximo.ex], exs[descansoInfo.proximo.ex].sets[descansoInfo.proximo.set])}
           onFim={avancarDoDescanso}

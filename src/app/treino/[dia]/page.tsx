@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { carregarPlanoAtivo, janelaRecente } from "@/lib/treino/perfil";
 import { type Injury } from "@/lib/motor";
 import { aplicarCautelaLeitura, exercicioPorId } from "@/lib/motor2";
+import type { InfoMotorExercicio } from "@/lib/treino/descanso";
 import { RegistoTreino } from "./registo-treino";
 
 export const metadata: Metadata = {
@@ -59,12 +60,20 @@ export default async function TreinoDiaPage({
 
   const diaGerado = diaBruto && !diaBruto.rest ? diaBruto : null;
 
-  // Quais exercícios usam barra (calculadora de discos) — resolvido aqui no
-  // servidor contra EXERCICIOS, para o cliente não precisar de importar a
-  // base inteira (128 exercícios) só para ler um booleano por exercício.
-  const usaBarraPorExercicio = (diaGerado?.exercises ?? []).map(
-    (e) => (e.exercicioId ? exercicioPorId(e.exercicioId)?.equipamento.includes("barra") : false) ?? false,
-  );
+  // Por exercício: usa barra (calculadora de discos), o incremento de carga
+  // certo (Exercicio.incrementoKg) e o tipo para o descanso responder ao
+  // RPE (tier 1 = composto pesado, tier 3 = isolamento — ver
+  // src/lib/treino/descanso.ts). Resolvido aqui no servidor contra
+  // EXERCICIOS, para o cliente não precisar de importar a base inteira
+  // (128 exercícios) só para ler três valores por exercício.
+  const infoMotorPorExercicio: InfoMotorExercicio[] = (diaGerado?.exercises ?? []).map((e) => {
+    const ex = e.exercicioId ? exercicioPorId(e.exercicioId) : undefined;
+    return {
+      usaBarra: ex?.equipamento.includes("barra") ?? false,
+      incrementoKg: ex?.incrementoKg ?? 2.5,
+      tipoDescanso: ex?.tier === 1 ? "composto_pesado" : ex?.tier === 3 ? "isolamento" : "normal",
+    };
+  });
 
   if (!diaGerado) {
     return (
@@ -89,7 +98,7 @@ export default async function TreinoDiaPage({
   return (
     <RegistoTreino
       dia={diaGerado}
-      usaBarraPorExercicio={usaBarraPorExercicio}
+      infoMotorPorExercicio={infoMotorPorExercicio}
       weekNumber={weekNumber}
       deload={deload}
       checkinAtivo={checkinZones.length > 0}

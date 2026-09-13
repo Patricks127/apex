@@ -1,7 +1,45 @@
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CalculadoraDiscos } from "./calculadora-discos";
 
 export function formatarNumero(n: number): string {
   return Number.isInteger(n) ? String(n) : String(n).replace(".", ",");
+}
+
+const ATRASO_INICIAL_MS = 400;
+const ATRASO_MIN_MS = 60;
+const FATOR_ACELERACAO = 0.8;
+
+/** Toque curto = um passo (chama uma vez e para, porque o solta antes do
+ *  primeiro atraso). Toque longo/segurar = repete, acelerando até um
+ *  mínimo — sem isto, trocar 57,5→70kg eram 5 toques. */
+function usePressaoRepetida(callback: () => void) {
+  const callbackRef = useRef(callback);
+  useEffect(() => {
+    callbackRef.current = callback;
+  }, [callback]);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const parar = useCallback(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = null;
+  }, []);
+
+  const iniciar = useCallback(() => {
+    callbackRef.current();
+    let atraso = ATRASO_INICIAL_MS;
+    const agendar = () => {
+      timeoutRef.current = setTimeout(() => {
+        callbackRef.current();
+        atraso = Math.max(ATRASO_MIN_MS, Math.round(atraso * FATOR_ACELERACAO));
+        agendar();
+      }, atraso);
+    };
+    agendar();
+  }, []);
+
+  useEffect(() => parar, [parar]);
+
+  return { onPointerDown: iniciar, onPointerUp: parar, onPointerLeave: parar, onPointerCancel: parar };
 }
 
 export function SerieAtual({
@@ -14,11 +52,13 @@ export function SerieAtual({
   repsAlvo,
   rpeAlvoTexto,
   usaBarra,
+  incrementoKg,
   caution,
   substituted,
   focusTag,
   swap,
   onAjustar,
+  onDefinir,
   onFeito,
 }: {
   nomeExercicio: string;
@@ -30,17 +70,35 @@ export function SerieAtual({
   repsAlvo: number;
   rpeAlvoTexto: string;
   usaBarra: boolean;
+  incrementoKg: number;
   caution?: boolean;
   substituted?: boolean;
   focusTag?: string;
   swap?: string | null;
   onAjustar: (delta: number) => void;
+  onDefinir: (valor: number) => void;
   onFeito: () => void;
 }) {
+  const [aEditar, setAEditar] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
   const ehCarga = !bw && w != null;
   const bigNumero = ehCarga ? w! : repsAlvo;
   const unidade = ehCarga ? "kg" : repsAlvo === 1 ? "rep" : "reps";
-  const passo = ehCarga ? 2.5 : 1;
+  const passo = ehCarga ? incrementoKg : 1;
+
+  const diminuir = usePressaoRepetida(() => onAjustar(-passo));
+  const aumentar = usePressaoRepetida(() => onAjustar(passo));
+
+  useEffect(() => {
+    if (aEditar) inputRef.current?.select();
+  }, [aEditar]);
+
+  function confirmarEdicao(valorTexto: string) {
+    const valor = Number.parseFloat(valorTexto.replace(",", "."));
+    if (Number.isFinite(valor)) onDefinir(valor);
+    setAEditar(false);
+  }
 
   return (
     <div className="apex-treino-serie">
@@ -53,7 +111,31 @@ export function SerieAtual({
       </span>
 
       <div className="apex-treino-carga-linha">
-        <span className="apex-tipo-carga-treino apex-tabular">{formatarNumero(bigNumero)}</span>
+        {aEditar ? (
+          <input
+            ref={inputRef}
+            type="number"
+            inputMode="decimal"
+            step={passo}
+            defaultValue={bigNumero}
+            autoFocus
+            className="apex-tipo-carga-treino apex-tabular apex-treino-input-carga"
+            onBlur={(e) => confirmarEdicao(e.currentTarget.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+              if (e.key === "Escape") setAEditar(false);
+            }}
+          />
+        ) : (
+          <button
+            type="button"
+            className="apex-tipo-carga-treino apex-tabular apex-treino-botao-carga"
+            onClick={() => setAEditar(true)}
+            aria-label="Escrever o valor diretamente"
+          >
+            {formatarNumero(bigNumero)}
+          </button>
+        )}
         <span className="apex-tipo-titulo-seccao apex-treino-unidade" style={{ marginTop: 0 }}>
           {unidade}
         </span>
@@ -67,16 +149,16 @@ export function SerieAtual({
         <button
           type="button"
           className="apex-stepper__botao"
-          onClick={() => onAjustar(-passo)}
-          aria-label={ehCarga ? "Menos 2,5 kg" : "Menos 1 rep"}
+          aria-label={ehCarga ? `Menos ${formatarNumero(passo)} kg` : "Menos 1 rep"}
+          {...diminuir}
         >
           −
         </button>
         <button
           type="button"
           className="apex-stepper__botao"
-          onClick={() => onAjustar(passo)}
-          aria-label={ehCarga ? "Mais 2,5 kg" : "Mais 1 rep"}
+          aria-label={ehCarga ? `Mais ${formatarNumero(passo)} kg` : "Mais 1 rep"}
+          {...aumentar}
         >
           +
         </button>

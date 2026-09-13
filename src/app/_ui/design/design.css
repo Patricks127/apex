@@ -512,8 +512,44 @@
   color: var(--apex-texto-fraco);
 }
 
-/* Ajuste da carga antes de registar — passo de 2,5 kg (a mesma escala que
-   o resto da app usa, round25). */
+/* O número grande é também um botão: toca para escrever o valor
+   diretamente (teclado), em vez de só subir/descer aos poucos. */
+.apex-treino-botao-carga {
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: var(--apex-texto-treino);
+  cursor: pointer;
+}
+
+.apex-treino-input-carga {
+  width: 4ch;
+  border: none;
+  border-bottom: 2px solid var(--apex-texto-fraco);
+  background: transparent;
+  color: var(--apex-texto-treino);
+  text-align: right;
+  outline: none;
+  -moz-appearance: textfield;
+}
+
+.apex-treino-input-carga::-webkit-outer-spin-button,
+.apex-treino-input-carga::-webkit-inner-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
+/* select() ao focar (para escrever por cima) usa o azul de seleção do
+   browser por omissão — colide com o azul reservado a decisões da app.
+   Aqui é só um estado de edição de texto, não uma decisão. */
+.apex-treino-input-carga::selection {
+  background: var(--apex-linha-treino);
+  color: var(--apex-texto-treino);
+}
+
+/* Ajuste da carga antes de registar — passo próprio do exercício
+   (Exercicio.incrementoKg: barra 2,5 · halteres 2 · máquina/cabos 5 ·
+   isolamento leve 1,25), nunca uma escala global adivinhada na hora. */
 .apex-stepper {
   display: flex;
   align-items: center;

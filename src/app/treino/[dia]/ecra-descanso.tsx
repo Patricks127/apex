@@ -17,12 +17,16 @@ function formatarTempo(seg: number): string {
  *  estático", desaparece de vez e mostra só o número. */
 export function EcraDescanso({
   duracaoSeg,
+  motivo,
   proximoNome,
   proximoValor,
   onFim,
   onSaltar,
 }: {
   duracaoSeg: number;
+  /** "Mais 30s — a última série custou-te 9." — null quando o descanso é
+   *  só a base do exercício, sem ajuste a explicar (ver decidirDescanso). */
+  motivo: string | null;
   proximoNome: string;
   proximoValor: string;
   onFim: () => void;
@@ -62,6 +66,11 @@ export function EcraDescanso({
       <span className="apex-tipo-etiqueta" style={{ color: "var(--apex-texto-fraco)" }}>
         Descanso
       </span>
+      {motivo ? (
+        <span className="apex-tipo-secundario" style={{ color: "var(--apex-texto-fraco)" }}>
+          {motivo}
+        </span>
+      ) : null}
 
       {reduzido ? (
         <span className="apex-tipo-carga-treino apex-tabular" style={{ color: "var(--apex-texto-treino)" }}>

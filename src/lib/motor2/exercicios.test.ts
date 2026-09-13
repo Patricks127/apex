@@ -32,6 +32,22 @@ test("dimensão da base: ~120 exercícios", () => {
   );
 });
 
+test("incrementoKg: barra manda mesmo em isolamento; senão família leve; senão equipamento", () => {
+  const por = (id: string) => exercicioPorId(id)!;
+  assert.equal(por("supino_barra").incrementoKg, 2.5); // barra
+  assert.equal(por("supino_halteres").incrementoKg, 2); // halteres, não é isolamento leve
+  assert.equal(por("press_inclinado_maquina").incrementoKg, 5); // máquina, não é isolamento leve
+  assert.equal(por("peck_deck").incrementoKg, 1.25); // chest_isolation (máquina, mas a família manda)
+  assert.equal(por("elevacao_lateral_halteres").incrementoKg, 1.25); // lateral_raise (halteres, mas a família manda)
+  assert.equal(por("elevacao_lateral_cabo").incrementoKg, 1.25); // lateral_raise (cabo, mas a família manda)
+});
+
+test("incrementoKg: todo exercício tem um valor positivo (nenhum ficou por definir)", () => {
+  for (const e of EXERCICIOS) {
+    assert.ok(e.incrementoKg > 0, `${e.id}: incrementoKg inválido (${e.incrementoKg})`);
+  }
+});
+
 test("ids únicos e em snake_case", () => {
   const vistos = new Set<string>();
   for (const e of EXERCICIOS) {

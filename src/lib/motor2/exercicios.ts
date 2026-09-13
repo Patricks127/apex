@@ -11,7 +11,9 @@ import {
   FAMILIA_PADRAO,
   type ContributoPrimario,
   type ContributoSecundario,
+  type Equipamento,
   type Exercicio,
+  type Familia,
   type Musculo,
   type Padrao,
 } from "./tipos.ts";
@@ -19,10 +21,39 @@ import {
 const P = (m: Musculo): ContributoPrimario => ({ musculo: m, contributo: 1.0 });
 const S = (m: Musculo): ContributoSecundario => ({ musculo: m, contributo: 0.5 });
 
-type EntradaExercicio = Omit<Exercicio, "padrao"> & { padrao?: Padrao };
+// Famílias de isolamento de músculo pequeno — ombro/braço, cargas leves,
+// onde 2,5 kg já é um salto grande (ex.: elevação lateral, rosca, extensão
+// de tríceps, peck deck, pulldown reto). "chest_isolation"/"lat_isolation"
+// já se chamam isolamento no próprio nome da família.
+const FAMILIAS_ISOLAMENTO_LEVE: Familia[] = [
+  "chest_isolation",
+  "lat_isolation",
+  "rear_delt_scap",
+  "lateral_raise",
+  "elbow_flexion",
+  "elbow_extension",
+];
+
+/** Incremento omisso (kg) a partir do equipamento/família — ver
+ *  Exercicio.incrementoKg. A barra manda mesmo num exercício de
+ *  isolamento (ex.: rosca direta com barra): discos entram aos pares,
+ *  2,5 kg é o salto físico mínimo real, menor que isso não é possível. */
+function incrementoOmissoDe(familia: Familia, equipamento: Equipamento[]): number {
+  if (equipamento.includes("barra")) return 2.5;
+  if (FAMILIAS_ISOLAMENTO_LEVE.includes(familia)) return 1.25;
+  if (equipamento.includes("halteres")) return 2;
+  if (equipamento.includes("maquina") || equipamento.includes("cabos")) return 5;
+  return 2.5; // omisso — kettlebell, banda, trx, sled, etc.
+}
+
+type EntradaExercicio = Omit<Exercicio, "padrao" | "incrementoKg"> & {
+  padrao?: Padrao;
+  incrementoKg?: number;
+};
 const ex = (e: EntradaExercicio): Exercicio => ({
   ...e,
   padrao: e.padrao ?? FAMILIA_PADRAO[e.familia],
+  incrementoKg: e.incrementoKg ?? incrementoOmissoDe(e.familia, e.equipamento),
 });
 
 export const EXERCICIOS: Exercicio[] = [
