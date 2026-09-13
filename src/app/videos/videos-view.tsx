@@ -31,6 +31,14 @@ export type FeedbackRow = {
   created_at: string;
 };
 
+const COR = {
+  tinta: "var(--apex-tinta)",
+  fraco: "var(--apex-cinza-texto)",
+  linha: "var(--apex-cinza-linha)",
+  fundo: "var(--apex-cinza-fundo)",
+  erro: "var(--apex-erro)",
+} as const;
+
 const data = (iso: string) =>
   new Date(iso).toLocaleDateString("pt-PT", { day: "numeric", month: "long", year: "numeric" });
 
@@ -87,22 +95,16 @@ export function VideosView({
     <div className="flex flex-col gap-5">
       <header className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-widest text-zinc-600">
+          <p className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
             {perspetiva === "pt" ? `Vídeos de ${alunoNome}` : "Os teus vídeos"}
           </p>
-          <h1 className="text-2xl font-semibold text-zinc-100">
+          <h1 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: COR.tinta }}>
             {videos.length} {videos.length === 1 ? "vídeo" : "vídeos"}
           </h1>
         </div>
         {perspetiva === "pt" ? (
-          <span
-            className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium ${
-              semFeedback > 0
-                ? "border-amber-500/40 bg-amber-500/10 text-amber-300"
-                : "border-zinc-700 text-zinc-500"
-            }`}
-          >
-            {semFeedback} por ver
+          <span className={semFeedback > 0 ? "apex-chip-alerta apex-tipo-etiqueta shrink-0" : "apex-tipo-etiqueta shrink-0"} style={semFeedback > 0 ? undefined : { color: COR.fraco }}>
+            {semFeedback} por rever
           </span>
         ) : null}
       </header>
@@ -117,18 +119,18 @@ export function VideosView({
       ) : null}
 
       {perspetiva === "pt" && !scopeVideos ? (
-        <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-          🔒 O atleta não te deu permissão de <span className="font-medium">vídeos</span> —
-          os vídeos de treino dele não são mostrados.
+        <p className="apex-tipo-secundario border-l-2 px-3 py-2" style={{ borderColor: COR.erro, color: COR.tinta }}>
+          O atleta não te deu permissão de <strong>vídeos</strong> — os vídeos de treino dele
+          não são mostrados.
         </p>
       ) : videos.length === 0 ? (
-        <p className="py-10 text-center text-sm text-zinc-600">
+        <p className="apex-tipo-corpo py-10 text-center" style={{ color: COR.fraco }}>
           {perspetiva === "aluno"
             ? "Ainda não enviaste nenhum vídeo."
             : "Este atleta ainda não enviou vídeos."}
         </p>
       ) : (
-        <ol className="flex flex-col gap-4">
+        <div className="flex flex-col">
           {videos.map((v) => (
             <VideoCard
               key={v.id}
@@ -139,7 +141,7 @@ export function VideosView({
               aoComentado={() => router.refresh()}
             />
           ))}
-        </ol>
+        </div>
       )}
     </div>
   );
@@ -161,52 +163,55 @@ function VideoCard({
   aoComentado: () => void;
 }) {
   return (
-    <li className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
-      <div className="flex items-baseline justify-between px-4 py-2.5">
-        <span className="text-sm font-semibold text-zinc-100">
+    <div className="apex-video-item">
+      <div className="flex items-baseline justify-between">
+        <span className="apex-tipo-nome-exercicio" style={{ color: COR.tinta }}>
           {video.exercise ?? "Exercício"}
         </span>
-        <span className="text-xs text-zinc-500">{data(video.created_at)}</span>
+        <span className="apex-tipo-etiqueta apex-tabular" style={{ color: COR.fraco }}>
+          {data(video.created_at)}
+        </span>
       </div>
 
       {url === undefined ? (
-        <div className="h-56 w-full animate-pulse bg-zinc-800" />
+        <div className="h-56 w-full" style={{ background: COR.fundo }} />
       ) : url === null ? (
-        <div className="flex h-56 w-full flex-col items-center justify-center gap-1 bg-zinc-950 text-xs text-zinc-500">
-          <span className="text-xl">🔒</span>
+        <div
+          className="apex-tipo-etiqueta flex h-56 w-full flex-col items-center justify-center gap-1"
+          style={{ background: COR.fundo, color: COR.fraco }}
+        >
           <span>Sem acesso a este ficheiro</span>
         </div>
       ) : (
-        <video src={url} controls className="max-h-[70vh] w-full bg-black" />
+        <video src={url} controls className="max-h-[70vh] w-full" style={{ background: "#000" }} />
       )}
 
-      <div className="flex flex-col gap-2 px-4 py-3">
-        <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">
-          Feedback ({feedback.length})
+      <div className="flex flex-col gap-2">
+        <p className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
+          Feedback do PT{feedback.length > 0 ? ` (${feedback.length})` : ""}
         </p>
         {feedback.length === 0 ? (
-          <p className="text-xs text-zinc-600">Ainda sem feedback do PT.</p>
+          <p className="apex-tipo-secundario" style={{ color: COR.fraco }}>
+            Ainda sem feedback do PT.
+          </p>
         ) : (
-          <ul className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2">
             {feedback.map((f) => (
-              <li
-                key={f.id}
-                className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2"
-              >
-                <p className="whitespace-pre-wrap break-words text-sm text-zinc-200">
+              <div key={f.id} className="apex-video-feedback-item">
+                <p className="apex-tipo-corpo whitespace-pre-wrap break-words" style={{ color: COR.tinta }}>
                   {f.body}
                 </p>
-                <p className="mt-1 text-[11px] text-zinc-600">PT · {data(f.created_at)}</p>
-              </li>
+                <p className="apex-tipo-etiqueta apex-tabular mt-1" style={{ color: COR.fraco }}>
+                  PT · {data(f.created_at)}
+                </p>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
 
-        {podeComentar ? (
-          <FormFeedback videoId={video.id} aoEnviado={aoComentado} />
-        ) : null}
+        {podeComentar ? <FormFeedback videoId={video.id} aoEnviado={aoComentado} /> : null}
       </div>
-    </li>
+    </div>
   );
 }
 
@@ -247,14 +252,20 @@ function FormFeedback({
         rows={2}
         maxLength={2000}
         placeholder="Ex.: joelho a colapsar na subida — pensa em empurrar o chão para fora"
-        className="resize-none rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-500"
+        className="apex-tipo-corpo resize-none border px-3 py-2 outline-none"
+        style={{ borderColor: COR.linha, borderRadius: 2, background: "transparent", color: COR.tinta }}
       />
-      {erro ? <p className="text-xs text-red-400">{erro}</p> : null}
+      {erro ? (
+        <p className="apex-tipo-secundario" style={{ color: COR.erro }}>
+          {erro}
+        </p>
+      ) : null}
       <button
         type="button"
         onClick={submeter}
         disabled={!texto.trim() || aEnviar}
-        className="self-start rounded-lg bg-zinc-100 px-4 py-1.5 text-sm font-semibold text-zinc-900 transition hover:bg-white disabled:opacity-50"
+        className="apex-botao apex-botao--claro self-start"
+        style={{ width: "auto", padding: "8px 16px" }}
       >
         {aEnviar ? "A enviar…" : "Enviar feedback"}
       </button>
@@ -339,25 +350,19 @@ function PainelUpload({
 
   if (!aberto) {
     return (
-      <button
-        type="button"
-        onClick={() => setAberto(true)}
-        className="rounded-lg bg-zinc-100 px-4 py-2.5 text-sm font-semibold text-zinc-900 transition hover:bg-white"
-      >
+      <button type="button" onClick={() => setAberto(true)} className="apex-botao apex-botao--claro">
         Enviar vídeo
       </button>
     );
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+    <div className="flex flex-col gap-3 border p-4" style={{ borderColor: COR.linha, background: COR.fundo }}>
       <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold text-zinc-100">Novo vídeo</p>
-        <button
-          type="button"
-          onClick={() => setAberto(false)}
-          className="text-xs text-zinc-500 hover:text-zinc-300"
-        >
+        <p className="apex-tipo-nome-exercicio" style={{ color: COR.tinta }}>
+          Novo vídeo
+        </p>
+        <button type="button" onClick={() => setAberto(false)} className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
           Cancelar
         </button>
       </div>
@@ -366,7 +371,8 @@ function PainelUpload({
         type="file"
         accept="video/*"
         onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-        className="text-sm text-zinc-300 file:mr-3 file:rounded-md file:border-0 file:bg-zinc-800 file:px-3 file:py-1.5 file:text-zinc-200"
+        className="apex-tipo-secundario"
+        style={{ color: COR.tinta }}
       />
       <input
         list="lista-exercicios"
@@ -374,7 +380,8 @@ function PainelUpload({
         onChange={(e) => setExercicio(e.target.value)}
         maxLength={80}
         placeholder="Que exercício é? (ex.: Agachamento)"
-        className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-zinc-500"
+        className="apex-tipo-corpo border px-3 py-2 outline-none"
+        style={{ borderColor: COR.linha, borderRadius: 2, background: "var(--apex-branco)", color: COR.tinta }}
       />
       <datalist id="lista-exercicios">
         {EXERCICIOS.map((e) => (
@@ -383,17 +390,22 @@ function PainelUpload({
       </datalist>
 
       {pct != null ? (
-        <div className="h-2 overflow-hidden rounded-full bg-zinc-800">
-          <div className="h-full bg-emerald-400 transition-all" style={{ width: `${pct}%` }} />
+        <div className="apex-progresso-claro">
+          <div className="apex-progresso-claro__preenchido" style={{ width: `${pct}%` }} />
         </div>
       ) : null}
-      {erro ? <p className="text-xs text-red-400">{erro}</p> : null}
+      {erro ? (
+        <p className="apex-tipo-secundario" style={{ color: COR.erro }}>
+          {erro}
+        </p>
+      ) : null}
 
       <button
         type="button"
         onClick={enviar}
         disabled={!file || !exercicio.trim() || pct != null}
-        className="self-start rounded-lg bg-zinc-100 px-4 py-2 text-sm font-semibold text-zinc-900 transition hover:bg-white disabled:opacity-50"
+        className="apex-botao apex-botao--claro self-start"
+        style={{ width: "auto", padding: "10px 20px" }}
       >
         {pct != null ? `A enviar… ${pct}%` : "Enviar"}
       </button>

@@ -717,3 +717,214 @@
   border-radius: 2px;
   color: var(--apex-alerta);
 }
+
+/* Etiqueta neutra — categoria de conteúdo (ex.: "Evolução" numa
+   mensagem), não um alerta nem uma decisão da app. `currentColor` para
+   funcionar tanto em texto escuro (fundo claro) como dentro de uma bolha
+   "minha" (fundo escuro, texto branco). */
+.apex-chip-neutro {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  padding: 1px 6px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+}
+
+/* ============================================================
+   Chat (modo claro) — bolhas com hierarquia clara entre quem envia e
+   quem recebe, separadores de dia como linha+etiqueta (não pílulas
+   cheias — a app não empilha cartões), estados de leitura discretos.
+   ============================================================ */
+
+.apex-chat {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  background: var(--apex-branco);
+}
+
+.apex-chat-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--apex-space-3);
+  padding: var(--apex-space-4) var(--apex-space-5);
+  border-bottom: 1px solid var(--apex-cinza-linha);
+}
+
+.apex-chat-abas {
+  display: flex;
+  border: 1px solid var(--apex-cinza-linha);
+}
+
+.apex-chat-aba {
+  border: none;
+  background: transparent;
+  padding: 6px 14px;
+  color: var(--apex-cinza-texto);
+}
+
+.apex-chat-aba[data-ativa="true"] {
+  background: var(--apex-tinta);
+  color: var(--apex-branco);
+}
+
+.apex-chat-corpo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--apex-space-4);
+  overflow-y: auto;
+  padding: var(--apex-space-4) var(--apex-space-5);
+}
+
+.apex-separador-dia {
+  display: flex;
+  align-items: center;
+  gap: var(--apex-space-3);
+}
+
+.apex-separador-dia__linha {
+  height: 1px;
+  flex: 1;
+  background: var(--apex-cinza-linha);
+}
+
+.apex-bolhas-dia {
+  display: flex;
+  flex-direction: column;
+  gap: var(--apex-space-2);
+}
+
+.apex-bolha-linha {
+  display: flex;
+}
+
+.apex-bolha-linha--minha {
+  justify-content: flex-end;
+}
+
+.apex-bolha-linha--outro {
+  justify-content: flex-start;
+}
+
+.apex-bolha {
+  display: flex;
+  max-width: 78%;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px;
+}
+
+/* Hierarquia entre quem envia e quem recebe — preto sólido para as
+   minhas, superfície clara para as do outro (nunca cor: a app é preta e
+   branca fora do treino). Cantos maioritariamente arredondados com UM
+   canto quase reto do lado de quem enviou — o "rabinho" da bolha, sem
+   desenhar uma seta. */
+.apex-bolha--minha {
+  border-radius: 10px 10px 2px 10px;
+  background: var(--apex-tinta);
+  color: var(--apex-branco);
+}
+
+.apex-bolha--outro {
+  border-radius: 10px 10px 10px 2px;
+  background: var(--apex-cinza-fundo);
+  color: var(--apex-tinta);
+}
+
+.apex-bolha__rodape {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.apex-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--apex-space-2);
+  padding: var(--apex-space-3) var(--apex-space-4);
+  border-top: 1px solid var(--apex-cinza-linha);
+}
+
+.apex-composer__anexar {
+  display: flex;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--apex-cinza-linha);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--apex-tinta);
+  font-size: 20px;
+}
+
+.apex-composer__menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 10;
+  width: 220px;
+  border: 1px solid var(--apex-cinza-linha);
+  background: var(--apex-branco);
+}
+
+.apex-composer__menu button {
+  display: block;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--apex-cinza-linha);
+  background: transparent;
+  padding: 10px 14px;
+  text-align: left;
+  color: var(--apex-tinta);
+}
+
+.apex-composer__menu button:last-child {
+  border-bottom: none;
+}
+
+.apex-composer__campo {
+  flex: 1;
+  max-height: 128px;
+  resize: none;
+  border: 1px solid var(--apex-cinza-linha);
+  border-radius: 2px;
+  background: transparent;
+  padding: 10px 14px;
+  font-family: var(--apex-sans);
+  font-size: 15px;
+  color: var(--apex-tinta);
+  outline: none;
+}
+
+/* ============================================================
+   Vídeos (modo claro) — galeria cronológica, reprodução inline,
+   feedback do PT por baixo de cada vídeo.
+   ============================================================ */
+
+.apex-video-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--apex-space-3);
+  padding: var(--apex-space-5) 0;
+  border-bottom: 1px solid var(--apex-cinza-linha);
+}
+
+/* fundo do leitor — preto é a convenção do próprio vídeo (letterboxing),
+   não uma superfície do sistema de design; por isso literal, não token. */
+.apex-video-item video {
+  width: 100%;
+  max-height: 70vh;
+  background: #000;
+}
+
+.apex-video-feedback-item {
+  border: 1px solid var(--apex-cinza-linha);
+  background: var(--apex-cinza-fundo);
+  padding: var(--apex-space-3);
+}

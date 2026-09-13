@@ -24,12 +24,17 @@ export default async function ChatComAlunoPage({
   const link = await linkComAluno(supabase, user.id, alunoId);
   if (!link) {
     return (
-      <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col gap-3 px-4 py-10">
-        <h1 className="text-2xl font-semibold text-zinc-100">Sem conversa</h1>
-        <p className="text-sm text-zinc-400">Não tens uma ligação ativa com este aluno.</p>
+      <main className="apex-ecra-claro mx-auto flex min-h-dvh w-full max-w-lg flex-col gap-3 px-5 py-10">
+        <h1 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: "var(--apex-tinta)" }}>
+          Sem conversa
+        </h1>
+        <p className="apex-tipo-corpo" style={{ color: "var(--apex-cinza-texto)" }}>
+          Não tens uma ligação ativa com este aluno.
+        </p>
         <Link
           href="/pt/alunos"
-          className="mt-2 self-start text-sm font-medium text-zinc-300 underline underline-offset-4 hover:text-zinc-100"
+          className="apex-tipo-secundario mt-2 self-start underline underline-offset-4"
+          style={{ color: "var(--apex-tinta)" }}
         >
           Voltar aos alunos
         </Link>
@@ -49,7 +54,7 @@ export default async function ChatComAlunoPage({
     .limit(500);
 
   return (
-    <main className="mx-auto flex h-dvh w-full max-w-lg flex-col px-0">
+    <main className="apex-ecra-claro mx-auto flex h-dvh w-full max-w-lg flex-col px-0">
       <ChatView
         linkId={link.id}
         meId={user.id}

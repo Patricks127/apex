@@ -24,10 +24,18 @@ export default async function VideosComAlunoPage({
   const link = await linkComAluno(supabase, user.id, alunoId);
   if (!link) {
     return (
-      <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col gap-3 px-4 py-10">
-        <h1 className="text-2xl font-semibold text-zinc-100">Vídeos</h1>
-        <p className="text-sm text-zinc-400">Não tens uma ligação ativa com este aluno.</p>
-        <Link href="/pt/alunos" className="text-sm text-zinc-300 underline underline-offset-4">
+      <main className="apex-ecra-claro mx-auto flex min-h-dvh w-full max-w-lg flex-col gap-3 px-5 py-10">
+        <h1 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: "var(--apex-tinta)" }}>
+          Vídeos
+        </h1>
+        <p className="apex-tipo-corpo" style={{ color: "var(--apex-cinza-texto)" }}>
+          Não tens uma ligação ativa com este aluno.
+        </p>
+        <Link
+          href="/pt/alunos"
+          className="apex-tipo-secundario mt-2 self-start underline underline-offset-4"
+          style={{ color: "var(--apex-tinta)" }}
+        >
           Voltar aos alunos
         </Link>
       </main>
@@ -53,7 +61,7 @@ export default async function VideosComAlunoPage({
   const { data: aluno } = await supabase.from("profiles").select("name").eq("id", alunoId).single();
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col px-4 py-8">
+    <main className="apex-ecra-claro mx-auto flex min-h-dvh w-full max-w-lg flex-col px-5 py-8">
       <VideosView
         perspetiva="pt"
         scopeVideos={link.scope_videos}

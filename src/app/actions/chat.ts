@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { linkAtivo } from "@/lib/chat/link";
+import { linkPertenceAoUtilizador } from "@/lib/chat/link";
 
 const BLOQUEIO_RLS =
   "Não foi possível enviar. As políticas de segurança da base de dados podem estar a bloquear esta operação.";
@@ -29,8 +29,8 @@ export async function enviarMensagem(
   } = await supabase.auth.getUser();
   if (!user) return { erro: "Sessão inválida." };
 
-  const link = await linkAtivo(supabase, user.id);
-  if (!link || link.id !== linkId) return { erro: "Não tens uma ligação ativa." };
+  const link = await linkPertenceAoUtilizador(supabase, linkId, user.id);
+  if (!link) return { erro: "Não tens uma ligação ativa." };
 
   const { error } = await supabase.from("messages").insert({
     link_id: link.id,
@@ -80,8 +80,8 @@ export async function registarMedia(
   } = await supabase.auth.getUser();
   if (!user) return { erro: "Sessão inválida." };
 
-  const link = await linkAtivo(supabase, user.id);
-  if (!link || link.id !== linkId) return { erro: "Não tens uma ligação ativa." };
+  const link = await linkPertenceAoUtilizador(supabase, linkId, user.id);
+  if (!link) return { erro: "Não tens uma ligação ativa." };
 
   // O caminho TEM de ser do próprio, na pasta certa.
   const prefixo = `${user.id}/${isEvolution ? "evolucao" : "chat"}/`;

@@ -55,7 +55,7 @@ export default async function ChatPage() {
     .limit(500);
 
   return (
-    <main className="mx-auto flex h-dvh w-full max-w-lg flex-col px-0">
+    <main className="apex-ecra-claro mx-auto flex h-dvh w-full max-w-lg flex-col px-0">
       <ChatView
         linkId={link.id}
         meId={user.id}
@@ -72,14 +72,17 @@ export default async function ChatPage() {
 
 function SemConversa() {
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col gap-3 px-4 py-10">
-      <h1 className="text-2xl font-semibold text-zinc-100">Sem conversa</h1>
-      <p className="text-sm text-zinc-400">
+    <main className="apex-ecra-claro mx-auto flex min-h-dvh w-full max-w-lg flex-col gap-3 px-5 py-10">
+      <h1 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: "var(--apex-tinta)" }}>
+        Sem conversa
+      </h1>
+      <p className="apex-tipo-corpo" style={{ color: "var(--apex-cinza-texto)" }}>
         O chat abre quando tens uma ligação PT↔aluno ativa.
       </p>
       <Link
         href="/painel"
-        className="mt-2 self-start text-sm font-medium text-zinc-300 underline underline-offset-4 hover:text-zinc-100"
+        className="apex-tipo-secundario mt-2 self-start underline underline-offset-4"
+        style={{ color: "var(--apex-tinta)" }}
       >
         Ir para o painel
       </Link>

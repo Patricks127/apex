@@ -31,12 +31,18 @@ export default async function VideosPage() {
     const alunos = await alunosLigados(supabase, user.id);
     if (alunos.length === 0) {
       return (
-        <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col gap-3 px-4 py-10">
-          <h1 className="text-2xl font-semibold text-zinc-100">Vídeos</h1>
-          <p className="text-sm text-zinc-400">
+        <main className="apex-ecra-claro mx-auto flex min-h-dvh w-full max-w-lg flex-col gap-3 px-5 py-10">
+          <h1 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: "var(--apex-tinta)" }}>
+            Vídeos
+          </h1>
+          <p className="apex-tipo-corpo" style={{ color: "var(--apex-cinza-texto)" }}>
             Vais ver aqui os vídeos dos alunos que te derem permissão de vídeos.
           </p>
-          <Link href="/painel" className="text-sm text-zinc-300 underline underline-offset-4">
+          <Link
+            href="/painel"
+            className="apex-tipo-secundario mt-2 self-start underline underline-offset-4"
+            style={{ color: "var(--apex-tinta)" }}
+          >
             Voltar ao painel
           </Link>
         </main>
@@ -68,7 +74,7 @@ export default async function VideosPage() {
     : { data: [] as FeedbackRow[] };
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col px-4 py-8">
+    <main className="apex-ecra-claro mx-auto flex min-h-dvh w-full max-w-lg flex-col px-5 py-8">
       <VideosView
         perspetiva="aluno"
         scopeVideos={link ? link.scope_videos : true}
