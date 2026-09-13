@@ -691,3 +691,29 @@
   padding: var(--apex-space-4) 0;
   border-bottom: 1px solid var(--apex-linha-treino);
 }
+
+/* ============================================================
+   Painel — barra de progresso em modo claro (semana em curso) e etiqueta
+   de atenção (PT: aluno precisa de atenção). Cantos angulares (2px), como
+   o resto do modo claro — nada de pílulas arredondadas.
+   ============================================================ */
+
+.apex-progresso-claro {
+  height: 3px;
+  width: 100%;
+  background: var(--apex-cinza-linha);
+}
+
+.apex-progresso-claro__preenchido {
+  height: 100%;
+  background: var(--apex-tinta);
+}
+
+.apex-chip-alerta {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border: 1px solid var(--apex-alerta);
+  border-radius: 2px;
+  color: var(--apex-alerta);
+}

@@ -141,3 +141,21 @@ export function construirLinhaTempo(dia: DiaGerado, opcoes: { estadoDia: EstadoD
 
   return { itens, duracaoTotalMin, duracaoRestanteMin };
 }
+
+/**
+ * O próximo dia de treino a partir de (sem contar) `indiceHoje` — para o
+ * painel dizer "hoje é descanso, o próximo treino é quarta" em vez de só
+ * "descanso". `offset` é 1 para amanhã, 2 para depois de amanhã, etc.
+ * `null` só quando NENHUM dia da semana tem treino (plano vazio) — nunca
+ * quando é só hoje que é descanso.
+ */
+export function proximoDiaDeTreino(
+  dias: DiaGerado[],
+  indiceHoje: number,
+): { offset: number; dia: DiaGerado } | null {
+  for (let offset = 1; offset <= 7; offset++) {
+    const dia = dias[(indiceHoje + offset) % 7];
+    if (dia && !dia.rest) return { offset, dia };
+  }
+  return null;
+}

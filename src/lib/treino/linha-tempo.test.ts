@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { construirLinhaTempo, indiceDiaSemanaHoje } from "./linha-tempo.ts";
+import { construirLinhaTempo, indiceDiaSemanaHoje, proximoDiaDeTreino } from "./linha-tempo.ts";
 import type { DiaGerado, ExercicioGerado, Movimento } from "@/lib/motor";
 
 function exercicio(nome: string, nSets: number, rest = "90 s"): ExercicioGerado {
@@ -113,4 +113,47 @@ test("dia de descanso (sem warmup/exercises/cooldown) → linha do tempo vazia",
   const { itens, duracaoTotalMin } = construirLinhaTempo(dia, { estadoDia: "hoje_por_comecar" });
   assert.deepEqual(itens, []);
   assert.equal(duracaoTotalMin, 0);
+});
+
+// ---------------------------------------------------------------------------
+// proximoDiaDeTreino — "hoje é descanso, o próximo treino é quarta" (painel)
+// ---------------------------------------------------------------------------
+
+function semana3x(diasTreino: number[]): DiaGerado[] {
+  return Array.from({ length: 7 }, (_, i) =>
+    diasTreino.includes(i) ? { ...DIA_BASE, dayIndex: i } : { dayIndex: i, dayName: "x", dayShort: "x", rest: true },
+  );
+}
+
+test("proximoDiaDeTreino: amanhã (offset 1) quando o dia seguinte é treino", () => {
+  const dias = semana3x([0, 2, 4]); // seg/qua/sex
+  const r = proximoDiaDeTreino(dias, 1); // hoje = terça
+  assert.equal(r?.offset, 1);
+  assert.equal(r?.dia.dayIndex, 2);
+});
+
+test("proximoDiaDeTreino: salta dias de descanso até encontrar treino", () => {
+  const dias = semana3x([0, 2, 4]);
+  const r = proximoDiaDeTreino(dias, 4); // hoje = sexta (treino) → próximo é segunda
+  assert.equal(r?.offset, 3);
+  assert.equal(r?.dia.dayIndex, 0);
+});
+
+test("proximoDiaDeTreino: dá a volta à semana (hoje = domingo, próximo = segunda)", () => {
+  const dias = semana3x([0, 2, 4]);
+  const r = proximoDiaDeTreino(dias, 6);
+  assert.equal(r?.offset, 1);
+  assert.equal(r?.dia.dayIndex, 0);
+});
+
+test("proximoDiaDeTreino: null só quando a semana inteira é descanso", () => {
+  const dias = semana3x([]);
+  assert.equal(proximoDiaDeTreino(dias, 0), null);
+});
+
+test("proximoDiaDeTreino: nunca devolve o próprio hoje, mesmo sendo treino", () => {
+  const dias = semana3x([0]); // só segunda tem treino
+  const r = proximoDiaDeTreino(dias, 0); // hoje já é o único dia de treino
+  assert.equal(r?.offset, 7); // só volta a acontecer daqui a 7 dias
+  assert.equal(r?.dia.dayIndex, 0);
 });

@@ -4,6 +4,27 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export function janelaRecente(dias: number): string {
   return new Date(Date.now() - dias * 86_400_000).toISOString();
 }
+
+/**
+ * Já foi registada uma sessão de treino hoje com este título? Casa por
+ * título (não só "algo recente") para não marcar "feito" se o treino
+ * registado foi de um dia diferente do agendado — usado em /plano (estado
+ * "a decorrer" só existe para o dia de hoje) e em /painel (bloco principal
+ * do atleta).
+ */
+export async function treinoDeHojeFeito(
+  supabase: SupabaseClient,
+  userId: string,
+  titulo: string,
+): Promise<boolean> {
+  const { count } = await supabase
+    .from("workout_sessions")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("title", titulo)
+    .gte("created_at", janelaRecente(1));
+  return (count ?? 0) > 0;
+}
 import {
   maxesFromPRs,
   type FocusMuscle,

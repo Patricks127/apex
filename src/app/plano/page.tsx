@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { carregarPlanoAtivo, janelaRecente } from "@/lib/treino/perfil";
+import { carregarPlanoAtivo, treinoDeHojeFeito } from "@/lib/treino/perfil";
 import { indiceDiaSemanaHoje } from "@/lib/treino/linha-tempo";
 import { regenerarPlano, escolherPlano } from "@/app/actions/treino";
 import { VistaPlano } from "./vista-plano";
@@ -48,16 +48,7 @@ export default async function PlanoPage({
   const indiceHoje = indiceDiaSemanaHoje();
   const diaHoje = planoAtivo?.days.days[indiceHoje];
   const tituloHoje = diaHoje && !diaHoje.rest ? diaHoje.title : null;
-  let hojeFeito = false;
-  if (tituloHoje) {
-    const { count } = await supabase
-      .from("workout_sessions")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .eq("title", tituloHoje)
-      .gte("created_at", janelaRecente(1));
-    hojeFeito = (count ?? 0) > 0;
-  }
+  const hojeFeito = tituloHoje ? await treinoDeHojeFeito(supabase, user.id, tituloHoje) : false;
 
   const outros: OutroPlano[] = (todos ?? [])
     .filter((p) => p.id !== planoAtivo?.id)

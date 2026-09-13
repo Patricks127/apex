@@ -1,13 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
-import {
-  atualizarScopes,
-  revogarAcesso,
-  type EstadoScopes,
-} from "@/app/actions/ligacoes";
-import { PainelPermissoes } from "@/app/_ui/permissoes";
+import { useState, useActionState } from "react";
+import { atualizarScopes, revogarAcesso, type EstadoScopes } from "@/app/actions/ligacoes";
+import { PermissoesClaro } from "./permissoes-claro";
 
 export function OMeuPt({
   linkId,
@@ -16,6 +12,8 @@ export function OMeuPt({
   evolucao,
   videos,
   metricas,
+  mensagensPorLer,
+  feedbackRecente,
 }: {
   linkId: string;
   ptNome: string;
@@ -23,86 +21,85 @@ export function OMeuPt({
   evolucao: boolean;
   videos: boolean;
   metricas: boolean;
+  mensagensPorLer: number;
+  feedbackRecente: number;
 }) {
-  const [estado, acao, pendente] = useActionState(
-    atualizarScopes,
-    {} as EstadoScopes,
-  );
+  const [estado, acao, pendente] = useActionState(atualizarScopes, {} as EstadoScopes);
+  const [permissoesAbertas, setPermissoesAbertas] = useState(false);
 
   return (
-    <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+    <div className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between">
-        <h2 className="text-sm font-medium text-zinc-400">O teu PT</h2>
-        <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-300">
-          Ligado
+        <span className="apex-tipo-titulo-seccao" style={{ marginTop: 0, color: "var(--apex-tinta)" }}>
+          {ptNome}
         </span>
-      </div>
-      <p className="mt-1 text-lg font-semibold text-zinc-100">{ptNome}</p>
-      {ptCode ? (
-        <p className="font-mono text-xs text-zinc-500">{ptCode}</p>
-      ) : null}
-
-      <div className="mt-3 flex gap-2">
-        <Link
-          href="/chat"
-          className="inline-block rounded-lg border border-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-200 transition hover:bg-zinc-800"
-        >
-          Abrir conversa
-        </Link>
-        <Link
-          href="/videos"
-          className="inline-block rounded-lg border border-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-200 transition hover:bg-zinc-800"
-        >
-          Os meus vídeos
-        </Link>
+        {ptCode ? (
+          <span className="apex-tipo-etiqueta apex-tabular" style={{ color: "var(--apex-cinza-texto)" }}>
+            {ptCode}
+          </span>
+        ) : null}
       </div>
 
-      <form action={acao} className="mt-4 flex flex-col gap-4">
-        <input type="hidden" name="link_id" value={linkId} />
-        <PainelPermissoes
-          evolucao={evolucao}
-          videos={videos}
-          metricas={metricas}
-        />
+      <Link href="/chat" className="apex-linha-exercicio" style={{ textDecoration: "none" }}>
+        <span className="apex-tipo-nome-exercicio" style={{ color: "var(--apex-tinta)" }}>Mensagens</span>
+        <span className="apex-tabular" style={{ color: mensagensPorLer > 0 ? "var(--apex-tinta)" : "var(--apex-cinza-texto)" }}>
+          {mensagensPorLer > 0 ? `${mensagensPorLer} por ler` : "Tudo lido"}
+        </span>
+      </Link>
 
-        <div className="flex items-center gap-3">
-          <button
-            type="submit"
-            disabled={pendente}
-            className="rounded-lg bg-zinc-100 px-4 py-2 text-sm font-semibold text-zinc-900 transition hover:bg-white disabled:opacity-60"
-          >
-            {pendente ? "A guardar…" : "Guardar permissões"}
-          </button>
-          {estado.ok ? (
-            <span className="text-sm text-emerald-400">Guardado</span>
-          ) : null}
-          {estado.erro ? (
-            <span className="text-sm text-red-400">{estado.erro}</span>
-          ) : null}
-        </div>
-      </form>
+      <Link href="/videos" className="apex-linha-exercicio" style={{ textDecoration: "none" }}>
+        <span className="apex-tipo-nome-exercicio" style={{ color: "var(--apex-tinta)" }}>Vídeos</span>
+        <span className="apex-tabular" style={{ color: feedbackRecente > 0 ? "var(--apex-tinta)" : "var(--apex-cinza-texto)" }}>
+          {feedbackRecente > 0 ? `${feedbackRecente} com feedback recente` : "Sem feedback recente"}
+        </span>
+      </Link>
 
-      <form
-        action={revogarAcesso}
-        className="mt-4 border-t border-zinc-800 pt-4"
+      <button
+        type="button"
+        onClick={() => setPermissoesAbertas((v) => !v)}
+        className="apex-tipo-secundario self-start"
+        style={{ color: "var(--apex-cinza-texto)" }}
       >
-        <input type="hidden" name="link_id" value={linkId} />
-        <button
-          type="submit"
-          onClick={(e) => {
-            if (
-              !window.confirm(
-                "Revogar o acesso deste PT? Ele deixa de ver os teus dados. O histórico não é apagado.",
-              )
-            ) {
-              e.preventDefault();
-            }
-          }}
-          className="rounded-lg border border-red-500/40 px-4 py-2 text-sm font-medium text-red-300 transition hover:bg-red-500/10"
-        >
-          Revogar acesso
-        </button>
-      </form>
-    </section>
+        {permissoesAbertas ? "Esconder permissões" : "Gerir permissões"}
+      </button>
+
+      {permissoesAbertas ? (
+        <div className="flex flex-col gap-4">
+          <form action={acao} className="flex flex-col gap-4">
+            <input type="hidden" name="link_id" value={linkId} />
+            <PermissoesClaro evolucao={evolucao} videos={videos} metricas={metricas} />
+
+            <div className="flex items-center gap-3">
+              <button
+                type="submit"
+                disabled={pendente}
+                className="apex-botao apex-botao--claro"
+                style={{ width: "auto", padding: "10px 20px" }}
+              >
+                {pendente ? "A guardar…" : "Guardar permissões"}
+              </button>
+              {estado.ok ? <span className="apex-tipo-secundario" style={{ color: "var(--apex-tinta)" }}>Guardado</span> : null}
+              {estado.erro ? <span className="apex-tipo-secundario" style={{ color: "var(--apex-erro)" }}>{estado.erro}</span> : null}
+            </div>
+          </form>
+
+          <form action={revogarAcesso} className="border-t pt-4" style={{ borderColor: "var(--apex-cinza-linha)" }}>
+            <input type="hidden" name="link_id" value={linkId} />
+            <button
+              type="submit"
+              onClick={(e) => {
+                if (!window.confirm("Revogar o acesso deste PT? Ele deixa de ver os teus dados. O histórico não é apagado.")) {
+                  e.preventDefault();
+                }
+              }}
+              className="apex-tipo-secundario"
+              style={{ color: "var(--apex-erro)" }}
+            >
+              Revogar acesso
+            </button>
+          </form>
+        </div>
+      ) : null}
+    </div>
   );
 }

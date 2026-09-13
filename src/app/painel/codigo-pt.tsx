@@ -31,44 +31,49 @@ export function CodigoPt({ codigoInicial }: { codigoInicial: string | null }) {
   }
 
   return (
-    <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-      <h2 className="text-sm font-medium text-zinc-400">O teu código de PT</h2>
-      <p className="mt-1 text-xs text-zinc-500">
-        Partilha-o com os teus atletas para eles te enviarem um pedido de ligação.
+    <div>
+      <p className="apex-tipo-etiqueta" style={{ color: "var(--apex-cinza-texto)" }}>
+        Partilha o teu código para os atletas te enviarem um pedido de ligação.
       </p>
 
       {erro ? (
-        <p className="mt-3 text-sm text-red-400">{erro}</p>
+        <p className="apex-tipo-secundario mt-2" style={{ color: "var(--apex-erro)" }}>
+          {erro}
+        </p>
       ) : codigo ? (
-        <div className="mt-3 flex flex-col gap-3">
+        <div className="mt-2 flex flex-col gap-2">
           <div className="flex items-center gap-3">
-            <span className="font-mono text-2xl font-semibold tracking-wider text-zinc-100">
+            <span className="apex-tipo-titulo-seccao apex-tabular" style={{ marginTop: 0, color: "var(--apex-tinta)" }}>
               {codigo}
             </span>
             <button
               type="button"
               onClick={() => copiar(codigo, "codigo")}
-              className="rounded-md border border-zinc-700 px-2.5 py-1 text-xs font-medium text-zinc-300 transition hover:bg-zinc-800"
+              className="apex-tipo-etiqueta border px-2.5 py-1"
+              style={{ borderColor: "var(--apex-cinza-linha)", color: "var(--apex-tinta)" }}
             >
               {copiado === "codigo" ? "Copiado" : "Copiar"}
             </button>
           </div>
-          <div className="flex items-center gap-2 text-xs text-zinc-500">
-            <span className="font-mono">apex.fit/pt/{codigo}</span>
+          <div className="flex items-center gap-2">
+            <span className="apex-tipo-secundario apex-tabular" style={{ color: "var(--apex-cinza-texto)" }}>
+              apex.fit/pt/{codigo}
+            </span>
             <button
               type="button"
               onClick={() => copiar(`apex.fit/pt/${codigo}`, "link")}
-              className="rounded-md border border-zinc-800 px-2 py-0.5 font-medium text-zinc-400 transition hover:bg-zinc-800"
+              className="apex-tipo-etiqueta border px-2 py-0.5"
+              style={{ borderColor: "var(--apex-cinza-linha)", color: "var(--apex-cinza-texto)" }}
             >
               {copiado === "link" ? "Copiado" : "Copiar link"}
             </button>
           </div>
         </div>
       ) : (
-        <p className="mt-3 text-sm text-zinc-500">
+        <p className="apex-tipo-secundario mt-2" style={{ color: "var(--apex-cinza-texto)" }}>
           {pendente ? "A gerar o teu código…" : "…"}
         </p>
       )}
-    </section>
+    </div>
   );
 }

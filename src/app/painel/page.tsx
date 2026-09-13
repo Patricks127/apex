@@ -2,8 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { carregarPlanoAtivo, treinoDeHojeFeito, janelaRecente } from "@/lib/treino/perfil";
+import { indiceDiaSemanaHoje, proximoDiaDeTreino, construirLinhaTempo } from "@/lib/treino/linha-tempo";
+import { avaliarAtencao, type MotivoAtencao } from "@/lib/treino/atencao";
+import type { DiaGerado } from "@/lib/motor";
 import { sair } from "@/app/actions/auth";
 import { responderPedido, revogarAcesso } from "@/app/actions/ligacoes";
+import { BlocoDados } from "../_ui/design/bloco-dados";
 import { CodigoPt } from "./codigo-pt";
 import { OMeuPt } from "./o-meu-pt";
 
@@ -15,6 +20,12 @@ const NOME_PAPEL: Record<string, string> = {
   atleta: "Atleta",
   pt: "Personal Trainer",
 };
+
+const COR = {
+  tinta: "var(--apex-tinta)",
+  fraco: "var(--apex-cinza-texto)",
+  linha: "var(--apex-cinza-linha)",
+} as const;
 
 type PerfilRef = { id: string; name: string | null } | null;
 
@@ -45,21 +56,24 @@ export default async function PainelPage() {
     .single();
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col gap-5 px-4 py-10">
+    <main className="apex-ecra-claro mx-auto flex w-full max-w-lg flex-col gap-8 px-5 py-8">
       <header className="flex items-start justify-between">
         <div>
-          <p className="text-xs uppercase tracking-widest text-zinc-600">APEX</p>
-          <h1 className="mt-1 text-2xl font-semibold text-zinc-100">
+          <p className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
+            APEX
+          </p>
+          <h1 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: COR.tinta }}>
             {perfil?.name ?? "—"}
           </h1>
-          <p className="text-sm text-zinc-400">
+          <p className="apex-tipo-secundario" style={{ color: COR.fraco }}>
             {perfil?.role ? (NOME_PAPEL[perfil.role] ?? perfil.role) : "Perfil incompleto"}
           </p>
         </div>
         <form action={sair}>
           <button
             type="submit"
-            className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:bg-zinc-800"
+            className="apex-tipo-etiqueta border px-3 py-1.5"
+            style={{ borderColor: COR.linha, color: COR.fraco }}
           >
             Terminar sessão
           </button>
@@ -71,18 +85,20 @@ export default async function PainelPage() {
       ) : perfil?.role === "atleta" ? (
         <SeccaoAtleta userId={user.id} />
       ) : (
-        <p className="text-sm text-zinc-500">
+        <p className="apex-tipo-corpo" style={{ color: COR.fraco }}>
           O teu perfil ainda não está completo. Contacta o suporte.
         </p>
       )}
 
-      <section className="mt-auto flex flex-col gap-1.5 border-t border-zinc-800 pt-4">
-        <h2 className="text-xs font-medium uppercase tracking-wider text-zinc-600">Definições</h2>
-        <div className="flex gap-4 text-xs">
-          <Link href="/termos" className="text-zinc-400 underline underline-offset-4 hover:text-zinc-200">
+      <section className="mt-auto flex flex-col gap-1.5 border-t pt-4" style={{ borderColor: COR.linha }}>
+        <h2 className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
+          Definições
+        </h2>
+        <div className="flex gap-4">
+          <Link href="/termos" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.fraco }}>
             Termos de Utilização
           </Link>
-          <Link href="/privacidade" className="text-zinc-400 underline underline-offset-4 hover:text-zinc-200">
+          <Link href="/privacidade" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.fraco }}>
             Política de Privacidade
           </Link>
         </div>
@@ -92,8 +108,279 @@ export default async function PainelPage() {
 }
 
 // ---------------------------------------------------------------------------
+// Atleta — "o que faço agora?" em dois segundos
+// ---------------------------------------------------------------------------
+
+async function SeccaoAtleta({ userId }: { userId: string }) {
+  return (
+    <div className="flex flex-col gap-8">
+      <BlocoTreinoHoje userId={userId} />
+      <BlocoPtDoAtleta userId={userId} />
+      <nav className="flex flex-wrap gap-4 border-t pt-4" style={{ borderColor: COR.linha }}>
+        <Link href="/plano" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.tinta }}>
+          Plano
+        </Link>
+        <Link href="/chat" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.tinta }}>
+          Chat
+        </Link>
+        <Link href="/videos" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.tinta }}>
+          Vídeos
+        </Link>
+      </nav>
+    </div>
+  );
+}
+
+async function BlocoTreinoHoje({ userId }: { userId: string }) {
+  const supabase = await createClient();
+  const planoAtivo = await carregarPlanoAtivo(supabase, userId);
+
+  if (!planoAtivo) {
+    return (
+      <section className="flex flex-col gap-2">
+        <h2 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: COR.tinta }}>
+          Ainda sem plano
+        </h2>
+        <p className="apex-tipo-corpo" style={{ color: COR.fraco }}>
+          Responde a seis perguntas rápidas e o motor gera a tua semana.
+        </p>
+        <Link href="/plano" className="apex-botao apex-botao--claro" style={{ marginTop: "var(--apex-space-2)" }}>
+          Começar
+        </Link>
+      </section>
+    );
+  }
+
+  const dias = planoAtivo.days.days;
+  const indiceHoje = indiceDiaSemanaHoje();
+  const diaHoje = dias[indiceHoje];
+
+  const semanaAtual = planoAtivo.progression?.week ?? 1;
+  const nPrevistos = dias.filter((d) => !d.rest).length;
+  const { count: nFeitosCru } = await supabase
+    .from("workout_sessions")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("week_number", semanaAtual);
+  const nFeitos = Math.min(nPrevistos, nFeitosCru ?? 0);
+  const percursoSemana = nPrevistos > 0 ? Math.round((nFeitos / nPrevistos) * 100) : 0;
+
+  return (
+    <section className="flex flex-col gap-5">
+      {diaHoje.rest ? (
+        <DescansoHoje dias={dias} indiceHoje={indiceHoje} />
+      ) : (
+        <TreinoHoje userId={userId} dia={diaHoje} indiceHoje={indiceHoje} />
+      )}
+
+      {nPrevistos > 0 ? (
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-baseline justify-between">
+            <span className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
+              Esta semana
+            </span>
+            <span className="apex-tipo-secundario apex-tabular" style={{ color: COR.fraco }}>
+              {nFeitos} de {nPrevistos}
+            </span>
+          </div>
+          <div className="apex-progresso-claro">
+            <div className="apex-progresso-claro__preenchido" style={{ width: `${percursoSemana}%` }} />
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+async function TreinoHoje({
+  userId,
+  dia,
+  indiceHoje,
+}: {
+  userId: string;
+  dia: DiaGerado;
+  indiceHoje: number;
+}) {
+  const supabase = await createClient();
+  const titulo = dia.title ?? "Treino";
+  const feito = await treinoDeHojeFeito(supabase, userId, titulo);
+  const { duracaoTotalMin } = construirLinhaTempo(dia, { estadoDia: "neutro" });
+  const nExercicios = dia.exercises?.length ?? 0;
+
+  if (feito) {
+    return (
+      <div className="flex flex-col gap-1">
+        <span className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
+          Hoje · {dia.dayName}
+        </span>
+        <h2 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: COR.tinta }}>
+          {titulo}
+        </h2>
+        <p className="apex-tipo-corpo" style={{ color: COR.fraco }}>
+          Já treinaste hoje. Bom trabalho.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div>
+        <span className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
+          Hoje · {dia.dayName}
+        </span>
+        <h2 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: COR.tinta }}>
+          {titulo}
+        </h2>
+      </div>
+      <BlocoDados
+        itens={[
+          { valor: String(nExercicios), etiqueta: "exercícios" },
+          { valor: `${duracaoTotalMin}′`, etiqueta: "estimado" },
+        ]}
+      />
+      <Link href={`/treino/${indiceHoje}`} className="apex-botao apex-botao--claro">
+        Começar treino
+      </Link>
+    </div>
+  );
+}
+
+function DescansoHoje({ dias, indiceHoje }: { dias: DiaGerado[]; indiceHoje: number }) {
+  const proximo = proximoDiaDeTreino(dias, indiceHoje);
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
+        Hoje
+      </span>
+      <h2 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: COR.tinta }}>
+        Descanso
+      </h2>
+      <p className="apex-tipo-corpo" style={{ color: COR.fraco }}>
+        {proximo
+          ? `Próximo treino ${rotuloOffset(proximo.offset)}: ${proximo.dia.title} (${proximo.dia.dayName}).`
+          : "Sem treinos marcados esta semana."}
+      </p>
+    </div>
+  );
+}
+
+/** Dias inteiros desde um timestamp ISO até agora — extraído à parte
+ *  (como janelaRecente) para o acesso ao relógio não ficar dentro do corpo
+ *  de um componente. */
+function diasDesde(iso: string): number {
+  return Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+}
+
+function rotuloOffset(offset: number): string {
+  if (offset === 1) return "amanhã";
+  if (offset === 2) return "depois de amanhã";
+  return `daqui a ${offset} dias`;
+}
+
+async function BlocoPtDoAtleta({ userId }: { userId: string }) {
+  const supabase = await createClient();
+
+  const { data: ligacao } = await supabase
+    .from("pt_links")
+    .select("id, status, scope_evolucao, scope_videos, scope_metricas, created_at, pt:profiles!pt_id(id, name, pt_code)")
+    .eq("student_id", userId)
+    .in("status", ["ativo", "pendente"])
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+    .overrideTypes<Ligacao & { pt: { id: string; name: string | null; pt_code: string | null } | null }>();
+
+  if (!ligacao) {
+    return (
+      <p className="apex-tipo-secundario" style={{ color: COR.fraco }}>
+        Ainda não tens um PT ligado.{" "}
+        <Link href="/ligar" className="underline underline-offset-4" style={{ color: COR.tinta }}>
+          Ligar a um PT
+        </Link>{" "}
+        ou{" "}
+        <Link href="/descobrir" className="underline underline-offset-4" style={{ color: COR.tinta }}>
+          descobrir
+        </Link>
+        .
+      </p>
+    );
+  }
+
+  if (ligacao.status === "pendente") {
+    return (
+      <div className="flex flex-col gap-2">
+        <span className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
+          Pedido enviado
+        </span>
+        <p className="apex-tipo-corpo" style={{ color: COR.tinta }}>
+          {ligacao.pt?.name ?? "PT"} — à espera de resposta.
+        </p>
+        <form action={revogarAcesso}>
+          <input type="hidden" name="link_id" value={ligacao.id} />
+          <button
+            type="submit"
+            className="apex-tipo-secundario underline underline-offset-4"
+            style={{ color: COR.fraco }}
+          >
+            Cancelar pedido
+          </button>
+        </form>
+      </div>
+    );
+  }
+
+  const [{ count: mensagensPorLer }, feedbackRecente] = await Promise.all([
+    supabase
+      .from("messages")
+      .select("id", { count: "exact", head: true })
+      .eq("link_id", ligacao.id)
+      .neq("sender_id", userId)
+      .is("read_at", null),
+    contarFeedbackRecente(supabase, userId),
+  ]);
+
+  return (
+    <OMeuPt
+      linkId={ligacao.id}
+      ptNome={ligacao.pt?.name ?? "PT"}
+      ptCode={ligacao.pt?.pt_code ?? null}
+      evolucao={ligacao.scope_evolucao}
+      videos={ligacao.scope_videos}
+      metricas={ligacao.scope_metricas}
+      mensagensPorLer={mensagensPorLer ?? 0}
+      feedbackRecente={feedbackRecente}
+    />
+  );
+}
+
+/** "Feedback recente" (últimos 7 dias) — não "não lido": video_feedback não
+ *  tem marca de leitura, por isso não afirmamos uma precisão que não
+ *  temos. */
+async function contarFeedbackRecente(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+): Promise<number> {
+  const { data: videos } = await supabase.from("training_videos").select("id").eq("user_id", userId);
+  const ids = (videos ?? []).map((v) => v.id);
+  if (!ids.length) return 0;
+  const { count } = await supabase
+    .from("video_feedback")
+    .select("id", { count: "exact", head: true })
+    .in("video_id", ids)
+    .gte("created_at", janelaRecente(7));
+  return count ?? 0;
+}
+
+// ---------------------------------------------------------------------------
 // PT
 // ---------------------------------------------------------------------------
+
+const MOTIVO_LABEL: Record<MotivoAtencao, string> = {
+  dor_recorrente: "dor recorrente",
+  adesao_baixa: "adesão baixa",
+  inativo: "inativo",
+};
 
 async function SeccaoPt({ userId, ptCode }: { userId: string; ptCode: string | null }) {
   const supabase = await createClient();
@@ -118,228 +405,257 @@ async function SeccaoPt({ userId, ptCode }: { userId: string; ptCode: string | n
     .order("updated_at", { ascending: false })
     .overrideTypes<Ligacao[]>();
 
-  // Vídeos dos alunos ainda sem feedback (a RLS já filtra por scope_videos).
-  let videosPorVer = 0;
+  const linkIds = (alunos ?? []).map((a) => a.id);
   const alunoIds = (alunos ?? []).map((a) => a.aluno?.id).filter((x): x is string => !!x);
+
+  let videosPorVer = 0;
+  let mensagensPorLer = 0;
+  const atencaoPorAluno = new Map<string, MotivoAtencao[]>();
+
   if (alunoIds.length) {
-    const { data: vids } = await supabase
-      .from("training_videos")
-      .select("id")
-      .in("user_id", alunoIds);
+    const [{ data: vids }, { count: msgsCount }, { data: checkins }, { data: sessoes }] = await Promise.all([
+      supabase.from("training_videos").select("id").in("user_id", alunoIds),
+      supabase
+        .from("messages")
+        .select("id", { count: "exact", head: true })
+        .in("link_id", linkIds)
+        .neq("sender_id", userId)
+        .is("read_at", null),
+      supabase
+        .from("workout_checkins")
+        .select("user_id, discomfort_zones")
+        .in("user_id", alunoIds)
+        .gte("created_at", janelaRecente(30)),
+      // Sem filtro de data — precisamos da sessão mais recente de sempre para
+      // saber se um aluno está inativo, não só das últimas semanas. Limite
+      // defensivo (não é paginação a sério, só um travão a crescimento
+      // patológico) — nenhum PT real tem isto hoje.
+      supabase
+        .from("workout_sessions")
+        .select("user_id, completion, created_at")
+        .in("user_id", alunoIds)
+        .order("created_at", { ascending: false })
+        .limit(1000),
+    ]);
+
+    mensagensPorLer = msgsCount ?? 0;
+
     const vidIds = (vids ?? []).map((v) => v.id);
     if (vidIds.length) {
-      const { data: fbs } = await supabase
-        .from("video_feedback")
-        .select("video_id")
-        .in("video_id", vidIds);
+      const { data: fbs } = await supabase.from("video_feedback").select("video_id").in("video_id", vidIds);
       const comFeedback = new Set((fbs ?? []).map((f) => f.video_id));
       videosPorVer = vidIds.filter((id) => !comFeedback.has(id)).length;
+    }
+
+    for (const alunoId of alunoIds) {
+      const checkinsComDor = (checkins ?? []).filter(
+        (c) => c.user_id === alunoId && (c.discomfort_zones ?? []).length > 0,
+      ).length;
+      // `sessoes` já vem ordenado desc — o filter preserva a ordem.
+      const sessoesDoAluno = (sessoes ?? []).filter((s) => s.user_id === alunoId);
+      const ultima = sessoesDoAluno[0];
+      const diasDesdeUltimaSessao = ultima ? diasDesde(ultima.created_at) : null;
+      const recentes = sessoesDoAluno
+        .slice(0, 3)
+        .map((s) => s.completion)
+        .filter((c): c is number => c != null);
+      const completionMedia = recentes.length ? recentes.reduce((a, b) => a + b, 0) / recentes.length : null;
+
+      const motivos = avaliarAtencao({ diasDesdeUltimaSessao, checkinsComDesconforto: checkinsComDor, completionMedia });
+      if (motivos.length) atencaoPorAluno.set(alunoId, motivos);
     }
   }
 
   return (
-    <>
-      <CodigoPt codigoInicial={ptCode} />
+    <div className="flex flex-col gap-8">
+      <BlocoPrincipalPt pedidos={pedidos ?? []} alunos={alunos ?? []} atencaoPorAluno={atencaoPorAluno} />
+
+      <div className="flex flex-col">
+        <Link href="/chat" className="apex-linha-exercicio" style={{ textDecoration: "none" }}>
+          <span className="apex-tipo-nome-exercicio" style={{ color: COR.tinta }}>
+            Mensagens
+          </span>
+          <span className="apex-tabular" style={{ color: mensagensPorLer > 0 ? COR.tinta : COR.fraco }}>
+            {mensagensPorLer > 0 ? `${mensagensPorLer} por ler` : "Tudo lido"}
+          </span>
+        </Link>
+        <Link href="/videos" className="apex-linha-exercicio" style={{ textDecoration: "none" }}>
+          <span className="apex-tipo-nome-exercicio" style={{ color: COR.tinta }}>
+            Vídeos
+          </span>
+          <span className="apex-tabular" style={{ color: videosPorVer > 0 ? COR.tinta : COR.fraco }}>
+            {videosPorVer > 0 ? `${videosPorVer} por rever` : "Tudo revisto"}
+          </span>
+        </Link>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <h2 className="apex-tipo-titulo-seccao" style={{ marginTop: 0, color: COR.tinta }}>
+          O teu código
+        </h2>
+        <CodigoPt codigoInicial={ptCode} />
+      </div>
 
       <Link
         href="/perfil/editar"
-        className="-mt-2 self-start text-xs font-medium text-zinc-300 underline underline-offset-4 hover:text-zinc-100"
+        className="apex-tipo-secundario self-start underline underline-offset-4"
+        style={{ color: COR.tinta }}
       >
         Editar o meu perfil público
       </Link>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-medium text-zinc-400">
-          Pedidos pendentes
-          {pedidos && pedidos.length > 0 ? ` (${pedidos.length})` : ""}
-        </h2>
-        {!pedidos || pedidos.length === 0 ? (
-          <p className="text-sm text-zinc-600">Sem pedidos por responder.</p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {pedidos.map((p) => (
-              <li
-                key={p.id}
-                className="rounded-xl border border-zinc-800 bg-zinc-900 p-4"
-              >
-                <p className="text-sm font-semibold text-zinc-100">
-                  {p.aluno?.name ?? "Atleta"}
-                </p>
-                <p className="mt-1 text-xs text-zinc-500">
-                  Quer autorizar: <Scopes l={p} />
-                </p>
-                <form action={responderPedido} className="mt-3 flex gap-2">
-                  <input type="hidden" name="link_id" value={p.id} />
-                  <button
-                    name="accao"
-                    value="aceitar"
-                    className="rounded-lg bg-zinc-100 px-3 py-1.5 text-sm font-semibold text-zinc-900 transition hover:bg-white"
-                  >
-                    Aceitar
-                  </button>
-                  <button
-                    name="accao"
-                    value="recusar"
-                    className="rounded-lg border border-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800"
-                  >
-                    Recusar
-                  </button>
-                </form>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-sm font-medium text-zinc-400">
-            Alunos ligados
-            {alunos && alunos.length > 0 ? ` (${alunos.length})` : ""}
-          </h2>
-          {alunos && alunos.length > 0 ? (
-            <div className="flex items-center gap-3 text-xs font-medium">
-              <Link
-                href="/chat"
-                className="text-zinc-300 underline underline-offset-4 hover:text-zinc-100"
-              >
-                Abrir conversa
-              </Link>
-              <Link
-                href="/videos"
-                className="text-zinc-300 underline underline-offset-4 hover:text-zinc-100"
-              >
-                Ver vídeos
-                {videosPorVer > 0 ? (
-                  <span className="ml-1 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-amber-300">
-                    {videosPorVer}
-                  </span>
-                ) : null}
-              </Link>
-            </div>
-          ) : null}
-        </div>
-        {!alunos || alunos.length === 0 ? (
-          <p className="text-sm text-zinc-600">Ainda não tens alunos ligados.</p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {alunos.map((a) => (
-              <li
-                key={a.id}
-                className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-900 p-4"
-              >
-                <div>
-                  <p className="text-sm font-semibold text-zinc-100">
-                    {a.aluno?.name ?? "Atleta"}
-                  </p>
-                  <p className="mt-1 text-xs text-zinc-500">
-                    Autorizou: <Scopes l={a} />
-                  </p>
-                </div>
-                {a.aluno?.id ? (
-                  // scope_treinos é sempre true numa ligação ativa (ver
-                  // ligacoes.ts) — não precisa de verificação aqui.
-                  <Link
-                    href={`/pt/aluno/${a.aluno.id}`}
-                    className="shrink-0 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-200 transition hover:bg-zinc-800"
-                  >
-                    Plano
-                  </Link>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-    </>
+      <ListaAlunos alunos={alunos ?? []} atencaoPorAluno={atencaoPorAluno} />
+    </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Atleta
-// ---------------------------------------------------------------------------
-
-async function SeccaoAtleta({ userId }: { userId: string }) {
-  const supabase = await createClient();
-
-  const { data: ligacao } = await supabase
-    .from("pt_links")
-    .select(
-      "id, status, scope_evolucao, scope_videos, scope_metricas, created_at, pt:profiles!pt_id(id, name, pt_code)",
-    )
-    .eq("student_id", userId)
-    .in("status", ["ativo", "pendente"])
-    .order("updated_at", { ascending: false })
-    .limit(1)
-    .maybeSingle()
-    .overrideTypes<Ligacao & { pt: { id: string; name: string | null; pt_code: string | null } | null }>();
-
-  if (!ligacao) {
+function BlocoPrincipalPt({
+  pedidos,
+  alunos,
+  atencaoPorAluno,
+}: {
+  pedidos: Ligacao[];
+  alunos: Ligacao[];
+  atencaoPorAluno: Map<string, MotivoAtencao[]>;
+}) {
+  if (pedidos.length > 0) {
     return (
-      <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-        <h2 className="text-sm font-medium text-zinc-400">O teu PT</h2>
-        <p className="mt-1 text-sm text-zinc-500">Ainda não estás ligado a nenhum PT.</p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Link
-            href="/ligar"
-            className="inline-block rounded-lg bg-zinc-100 px-4 py-2 text-sm font-semibold text-zinc-900 transition hover:bg-white"
-          >
-            Ligar a um PT
-          </Link>
-          <Link
-            href="/descobrir"
-            className="inline-block rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 transition hover:bg-zinc-800"
-          >
-            Descobrir PTs
-          </Link>
-          <Link
-            href="/videos"
-            className="inline-block rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 transition hover:bg-zinc-800"
-          >
-            Os meus vídeos
-          </Link>
+      <section className="flex flex-col gap-3">
+        <h2 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: COR.tinta }}>
+          {pedidos.length} pedido{pedidos.length > 1 ? "s" : ""} por responder
+        </h2>
+        <div className="flex flex-col">
+          {pedidos.map((p) => (
+            <div key={p.id} className="apex-linha-exercicio" style={{ alignItems: "flex-start" }}>
+              <div className="apex-linha-exercicio__principal">
+                <span className="apex-tipo-nome-exercicio" style={{ color: COR.tinta }}>
+                  {p.aluno?.name ?? "Atleta"}
+                </span>
+                <span className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
+                  Quer autorizar: <Scopes l={p} />
+                </span>
+              </div>
+              <form action={responderPedido} className="flex shrink-0 gap-2">
+                <input type="hidden" name="link_id" value={p.id} />
+                <button
+                  name="accao"
+                  value="aceitar"
+                  className="apex-tipo-etiqueta border px-2.5 py-1.5"
+                  style={{ borderColor: COR.tinta, color: COR.tinta }}
+                >
+                  Aceitar
+                </button>
+                <button
+                  name="accao"
+                  value="recusar"
+                  className="apex-tipo-etiqueta border px-2.5 py-1.5"
+                  style={{ borderColor: COR.linha, color: COR.fraco }}
+                >
+                  Recusar
+                </button>
+              </form>
+            </div>
+          ))}
         </div>
       </section>
     );
   }
 
-  if (ligacao.status === "pendente") {
+  const comAtencao = alunos.filter((a) => a.aluno?.id && atencaoPorAluno.has(a.aluno.id));
+
+  if (comAtencao.length > 0) {
     return (
-      <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-sm font-medium text-zinc-400">Pedido enviado</h2>
-          <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-300">
-            À espera
-          </span>
+      <section className="flex flex-col gap-3">
+        <h2 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: COR.tinta }}>
+          {comAtencao.length} aluno{comAtencao.length > 1 ? "s" : ""} a precisar de atenção
+        </h2>
+        <div className="flex flex-col">
+          {comAtencao.map((a) => (
+            <Link
+              key={a.id}
+              href={`/pt/aluno/${a.aluno!.id}`}
+              className="apex-linha-exercicio"
+              style={{ textDecoration: "none" }}
+            >
+              <span className="apex-tipo-nome-exercicio" style={{ color: COR.tinta }}>
+                {a.aluno?.name ?? "Atleta"}
+              </span>
+              <span className="flex gap-1.5">
+                {atencaoPorAluno.get(a.aluno!.id)!.map((m) => (
+                  <span key={m} className="apex-chip-alerta apex-tipo-etiqueta">
+                    {MOTIVO_LABEL[m]}
+                  </span>
+                ))}
+              </span>
+            </Link>
+          ))}
         </div>
-        <p className="mt-1 text-lg font-semibold text-zinc-100">
-          {ligacao.pt?.name ?? "PT"}
-        </p>
-        <p className="mt-1 text-xs text-zinc-500">
-          Pediste para autorizar: <Scopes l={ligacao} />
-        </p>
-        <form action={revogarAcesso} className="mt-3">
-          <input type="hidden" name="link_id" value={ligacao.id} />
-          <button
-            type="submit"
-            className="rounded-lg border border-zinc-700 px-3 py-1.5 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800"
-          >
-            Cancelar pedido
-          </button>
-        </form>
       </section>
     );
   }
 
   return (
-    <OMeuPt
-      linkId={ligacao.id}
-      ptNome={ligacao.pt?.name ?? "PT"}
-      ptCode={ligacao.pt?.pt_code ?? null}
-      evolucao={ligacao.scope_evolucao}
-      videos={ligacao.scope_videos}
-      metricas={ligacao.scope_metricas}
-    />
+    <section className="flex flex-col gap-1">
+      <h2 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: COR.tinta }}>
+        Está tudo em dia
+      </h2>
+      <p className="apex-tipo-corpo" style={{ color: COR.fraco }}>
+        Nenhum aluno precisa de atenção agora.
+      </p>
+    </section>
+  );
+}
+
+function ListaAlunos({
+  alunos,
+  atencaoPorAluno,
+}: {
+  alunos: Ligacao[];
+  atencaoPorAluno: Map<string, MotivoAtencao[]>;
+}) {
+  return (
+    <section className="flex flex-col gap-2">
+      <h2 className="apex-tipo-titulo-seccao" style={{ marginTop: 0, color: COR.tinta }}>
+        Alunos{alunos.length > 0 ? ` (${alunos.length})` : ""}
+      </h2>
+      {alunos.length === 0 ? (
+        <p className="apex-tipo-corpo" style={{ color: COR.fraco }}>
+          Ainda não tens alunos ligados.
+        </p>
+      ) : (
+        <div className="flex flex-col">
+          {alunos.map((a) => (
+            <div key={a.id} className="apex-linha-exercicio">
+              <div className="apex-linha-exercicio__principal">
+                <span className="apex-tipo-nome-exercicio" style={{ color: COR.tinta }}>
+                  {a.aluno?.name ?? "Atleta"}
+                </span>
+                <span className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
+                  {a.aluno?.id && atencaoPorAluno.has(a.aluno.id) ? (
+                    <span className="apex-chip-alerta" style={{ marginRight: 6 }}>
+                      {atencaoPorAluno
+                        .get(a.aluno.id)!
+                        .map((m) => MOTIVO_LABEL[m])
+                        .join(" · ")}
+                    </span>
+                  ) : null}
+                  Autorizou: <Scopes l={a} />
+                </span>
+              </div>
+              {a.aluno?.id ? (
+                <Link
+                  href={`/pt/aluno/${a.aluno.id}`}
+                  className="apex-tipo-etiqueta shrink-0 border px-3 py-1.5"
+                  style={{ borderColor: COR.linha, color: COR.tinta }}
+                >
+                  Plano
+                </Link>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -352,5 +668,5 @@ function Scopes({ l }: { l: Pick<Ligacao, "scope_evolucao" | "scope_videos" | "s
     l.scope_videos && "vídeos",
     l.scope_metricas && "métricas",
   ].filter(Boolean) as string[];
-  return <span className="text-zinc-300">{ativos.join(", ")}</span>;
+  return <span style={{ color: COR.fraco }}>{ativos.join(", ")}</span>;
 }
