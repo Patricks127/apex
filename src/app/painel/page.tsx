@@ -4,7 +4,12 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { carregarPlanoAtivo, treinoDeHojeFeito, janelaRecente } from "@/lib/treino/perfil";
 import { indiceDiaSemanaHoje, proximoDiaDeTreino, construirLinhaTempo } from "@/lib/treino/linha-tempo";
-import { avaliarAtencao, type MotivoAtencao } from "@/lib/treino/atencao";
+import {
+  avaliarAtencao,
+  JANELA_ATENCAO_DIAS,
+  MIN_SESSOES_PARA_RPE,
+  type MotivoAtencao,
+} from "@/lib/treino/atencao";
 import type { DiaGerado } from "@/lib/motor";
 import { sair } from "@/app/actions/auth";
 import { responderPedido, revogarAcesso } from "@/app/actions/ligacoes";
@@ -379,6 +384,7 @@ async function contarFeedbackRecente(
 const MOTIVO_LABEL: Record<MotivoAtencao, string> = {
   dor_recorrente: "dor recorrente",
   adesao_baixa: "adesão baixa",
+  esforco_alto: "esforço muito alto",
   inativo: "inativo",
 };
 
@@ -413,6 +419,14 @@ async function SeccaoPt({ userId, ptCode }: { userId: string; ptCode: string | n
   const atencaoPorAluno = new Map<string, MotivoAtencao[]>();
 
   if (alunoIds.length) {
+    // Dor recorrente, adesão e esforço olham todos para a mesma janela
+    // (3 semanas) — um sinal de atenção tem de expirar, senão um PT com
+    // muitos alunos passa a ignorar alertas que nunca desaparecem. A
+    // sessão mais recente de sempre (para "inativo") não tem esse corte —
+    // precisamos de saber SE há muito que o aluno não treina, mesmo que
+    // "muito" seja mais do que 3 semanas.
+    const corteAtencao = janelaRecente(JANELA_ATENCAO_DIAS);
+
     const [{ data: vids }, { count: msgsCount }, { data: checkins }, { data: sessoes }] = await Promise.all([
       supabase.from("training_videos").select("id").in("user_id", alunoIds),
       supabase
@@ -425,14 +439,15 @@ async function SeccaoPt({ userId, ptCode }: { userId: string; ptCode: string | n
         .from("workout_checkins")
         .select("user_id, discomfort_zones")
         .in("user_id", alunoIds)
-        .gte("created_at", janelaRecente(30)),
-      // Sem filtro de data — precisamos da sessão mais recente de sempre para
-      // saber se um aluno está inativo, não só das últimas semanas. Limite
-      // defensivo (não é paginação a sério, só um travão a crescimento
-      // patológico) — nenhum PT real tem isto hoje.
+        .gte("created_at", corteAtencao),
+      // Sem filtro de data aqui — precisamos da sessão mais recente de
+      // sempre para "inativo" (a janela de atenção filtra-se abaixo, em
+      // memória, para adesão/esforço). Limite defensivo (não é paginação
+      // a sério, só um travão a crescimento patológico) — nenhum PT real
+      // tem isto hoje.
       supabase
         .from("workout_sessions")
-        .select("user_id, completion, created_at")
+        .select("user_id, completion, avg_rpe, created_at")
         .in("user_id", alunoIds)
         .order("created_at", { ascending: false })
         .limit(1000),
@@ -455,13 +470,26 @@ async function SeccaoPt({ userId, ptCode }: { userId: string; ptCode: string | n
       const sessoesDoAluno = (sessoes ?? []).filter((s) => s.user_id === alunoId);
       const ultima = sessoesDoAluno[0];
       const diasDesdeUltimaSessao = ultima ? diasDesde(ultima.created_at) : null;
-      const recentes = sessoesDoAluno
-        .slice(0, 3)
-        .map((s) => s.completion)
-        .filter((c): c is number => c != null);
-      const completionMedia = recentes.length ? recentes.reduce((a, b) => a + b, 0) / recentes.length : null;
 
-      const motivos = avaliarAtencao({ diasDesdeUltimaSessao, checkinsComDesconforto: checkinsComDor, completionMedia });
+      // Só sessões DENTRO da janela de atenção — uma sessão incompleta de
+      // há dois meses não pode continuar a pesar na média de hoje.
+      const naJanela = sessoesDoAluno.filter((s) => s.created_at >= corteAtencao);
+
+      const completions = naJanela.map((s) => s.completion).filter((c): c is number => c != null);
+      const completionMediaNaJanela = completions.length
+        ? completions.reduce((a, b) => a + b, 0) / completions.length
+        : null;
+
+      const rpes = naJanela.map((s) => s.avg_rpe).filter((r): r is number => r != null);
+      const rpeMedioNaJanela =
+        rpes.length >= MIN_SESSOES_PARA_RPE ? rpes.reduce((a, b) => a + b, 0) / rpes.length : null;
+
+      const motivos = avaliarAtencao({
+        diasDesdeUltimaSessao,
+        checkinsComDesconfortoNaJanela: checkinsComDor,
+        completionMediaNaJanela,
+        rpeMedioNaJanela,
+      });
       if (motivos.length) atencaoPorAluno.set(alunoId, motivos);
     }
   }
