@@ -241,6 +241,53 @@ export async function escolherPlano(formData: FormData): Promise<void> {
 
 export type EstadoRegisto = { erro?: string };
 
+/** Uma linha de `exercise_logs` (migração 008) tal como o treino ao vivo a
+ *  monta no fim da sessão (RegistoTreino → logs_json). Sem tipos partilhados
+ *  com o cliente de propósito — é só um JSON solto num campo escondido,
+ *  validado aqui como qualquer outro FormData; nunca se confia na forma. */
+type LogExercicioValidado = {
+  exercise_id: string;
+  ordem: number;
+  skipped: boolean;
+  load_kg: number | null;
+  reps: number | null;
+  rpe: number | null;
+  sets_done: number;
+};
+
+/** Best-effort: linhas com forma inesperada são ignoradas, nunca rebentam o
+ *  registo do treino — exercise_logs é o detalhe por exercício (base do
+ *  motor v2 §5, ainda não consumida por nada em produção), não a sessão em
+ *  si (workout_sessions/workout_checkins, essas sim têm de ter sucesso). */
+function validarLogsExercicio(raw: string): LogExercicioValidado[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+
+  const out: LogExercicioValidado[] = [];
+  for (const item of parsed) {
+    if (!item || typeof item !== "object") continue;
+    const o = item as Record<string, unknown>;
+    if (typeof o.exercicioId !== "string" || !o.exercicioId) continue;
+    const setsDone = Number.isInteger(o.setsDone) && (o.setsDone as number) >= 0 ? (o.setsDone as number) : 0;
+    const rpe = typeof o.rpe === "number" && o.rpe >= 6 && o.rpe <= 10 ? o.rpe : null;
+    out.push({
+      exercise_id: o.exercicioId.slice(0, 100),
+      ordem: Number.isInteger(o.ordem) ? (o.ordem as number) : 1,
+      skipped: o.skipped === true || setsDone === 0,
+      load_kg: typeof o.loadKg === "number" && Number.isFinite(o.loadKg) ? o.loadKg : null,
+      reps: Number.isInteger(o.reps) ? (o.reps as number) : null,
+      rpe,
+      sets_done: setsDone,
+    });
+  }
+  return out.slice(0, 30); // defensivo — nenhum dia do motor/PT chega perto disto
+}
+
 export async function gravarTreino(
   _anterior: EstadoRegisto,
   formData: FormData,
@@ -305,6 +352,23 @@ export async function gravarTreino(
   });
 
   if (erroCheckin) return { erro: BLOQUEIO_RLS };
+
+  // Registo por exercício (exercise_logs) — best-effort, ver
+  // validarLogsExercicio. Não bloqueia o registo do treino se falhar: a
+  // sessão e o check-in (o que já é usado — /plano, avancarSemana) já
+  // gravaram com sucesso a esta altura.
+  const logs = validarLogsExercicio(String(formData.get("logs_json") ?? "[]"));
+  if (logs.length > 0) {
+    const { error: erroLogs } = await supabase.from("exercise_logs").insert(
+      logs.map((l) => ({
+        ...l,
+        user_id: user.id,
+        session_id: sessao.id,
+        week_number: Number.isInteger(weekNumber) ? weekNumber : 1,
+      })),
+    );
+    if (erroLogs) console.error("exercise_logs: falha ao gravar (best-effort)", erroLogs);
+  }
 
   revalidatePath("/plano");
   redirect("/plano?treino=gravado");

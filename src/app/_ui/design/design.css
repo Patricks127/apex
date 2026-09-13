@@ -6,12 +6,9 @@
    A mudança de modo é um sinal: quando o ecrã escurece, está-se a
    treinar.
 
-   Este ficheiro só define tokens + os componentes base da fase 1
-   (botão, linha de exercício, aviso da app, cabeçalho de ecrã,
-   bloco de dados). Todas as classes usam o prefixo "apex-" e não
-   são usadas por nenhum ecrã existente ainda — só por /estilo.
-   Nenhum ecrã atual referencia estas classes, por isso importar
-   este ficheiro globalmente não muda nada do que já existe.
+   Tokens + componentes base (fase 1, ver /estilo), a linha do tempo do
+   dia (fase 2, /plano) e o treino ao vivo em modo escuro (fase 3,
+   /treino/[dia]). Todas as classes usam o prefixo "apex-".
    ============================================================ */
 
 :root {
@@ -430,4 +427,231 @@
   width: 18px;
   height: 18px;
   border: 1px solid var(--apex-cinza-linha);
+}
+
+/* ============================================================
+   Treino ao vivo (Estrutura A, modo escuro) — uma série de cada vez.
+   Ver referencia/SISTEMA-DESIGN.md, "Treino ao vivo". Cantos 14–16px
+   (tátil), alvos de toque ≥64px, verde só aqui (descanso/séries feitas).
+   ============================================================ */
+
+.apex-treino {
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+  background: var(--apex-fundo-treino);
+  color: var(--apex-texto-treino);
+}
+
+/* Barra de progresso das séries, no topo — fixa, não desloca o conteúdo. */
+.apex-treino-progresso {
+  height: 3px;
+  width: 100%;
+  background: var(--apex-linha-treino);
+}
+
+.apex-treino-progresso__preenchido {
+  height: 100%;
+  background: var(--apex-verde);
+  transition: width var(--apex-mov-duracao) ease;
+}
+
+.apex-treino-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--apex-space-4) var(--apex-space-5);
+}
+
+/* Botão "lista completa" — um gesto, fora do caminho principal. */
+.apex-treino-botao-lista {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid var(--apex-linha-treino);
+  border-radius: 14px;
+  background: transparent;
+  color: var(--apex-texto-fraco);
+}
+
+/* --- a série atual --- */
+
+.apex-treino-serie {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--apex-space-3);
+  padding: var(--apex-space-6) var(--apex-space-5);
+  text-align: center;
+}
+
+.apex-treino-nome {
+  color: var(--apex-texto-fraco);
+}
+
+.apex-treino-contagem {
+  color: var(--apex-texto-treino);
+}
+
+.apex-treino-carga-linha {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: var(--apex-space-3);
+}
+
+.apex-treino-unidade {
+  color: var(--apex-texto-fraco);
+}
+
+.apex-treino-alvo {
+  color: var(--apex-texto-fraco);
+}
+
+/* Ajuste da carga antes de registar — passo de 2,5 kg (a mesma escala que
+   o resto da app usa, round25). */
+.apex-stepper {
+  display: flex;
+  align-items: center;
+  gap: var(--apex-space-4);
+}
+
+.apex-stepper__botao {
+  display: flex;
+  min-width: 64px;
+  min-height: 64px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--apex-linha-treino);
+  border-radius: 16px;
+  background: transparent;
+  color: var(--apex-texto-treino);
+  font-family: var(--apex-cond);
+  font-size: 32px;
+}
+
+.apex-stepper__botao:disabled {
+  opacity: 0.4;
+}
+
+/* --- calculadora de discos --- */
+
+.apex-discos {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 3px;
+}
+
+.apex-disco {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-family: var(--apex-sans);
+  font-weight: 700;
+  font-size: 10px;
+  /* cor do texto vem inline por disco — depende do disco ser claro ou escuro */
+}
+
+/* --- painel de RPE — sobe de baixo, 280ms (0 com reduced-motion) --- */
+
+.apex-rpe-fundo {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  background: rgb(13 15 19 / 60%);
+}
+
+.apex-rpe-painel {
+  width: 100%;
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+  background: var(--apex-superficie);
+  padding: var(--apex-space-6) var(--apex-space-5) var(--apex-space-7);
+  transform: translateY(0);
+  transition: transform var(--apex-mov-duracao) ease;
+}
+
+.apex-rpe-painel[data-a-entrar="true"] {
+  transform: translateY(100%);
+}
+
+.apex-rpe-grelha {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--apex-space-2);
+}
+
+.apex-rpe-botao {
+  display: flex;
+  min-height: 64px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--apex-linha-treino);
+  border-radius: 14px;
+  background: transparent;
+  color: var(--apex-texto-treino);
+  font-family: var(--apex-cond);
+  font-size: 28px;
+}
+
+/* --- descanso, ecrã cheio --- */
+
+.apex-descanso {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--apex-space-5);
+  background: var(--apex-fundo-treino);
+  text-align: center;
+}
+
+.apex-descanso-anel {
+  transform: rotate(-90deg);
+}
+
+.apex-descanso-anel circle {
+  fill: none;
+  stroke-width: 6;
+}
+
+.apex-descanso-anel circle.apex-descanso-anel__fundo {
+  stroke: var(--apex-linha-treino);
+}
+
+.apex-descanso-anel circle.apex-descanso-anel__progresso {
+  stroke: var(--apex-verde);
+  stroke-linecap: round;
+  transition: stroke-dashoffset var(--apex-mov-duracao) linear;
+}
+
+/* --- lista completa — um gesto, ecrã cheio --- */
+
+.apex-treino-lista {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  overflow-y: auto;
+  background: var(--apex-fundo-treino);
+  padding: var(--apex-space-5);
+}
+
+.apex-treino-lista-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--apex-space-3);
+  padding: var(--apex-space-4) 0;
+  border-bottom: 1px solid var(--apex-linha-treino);
 }

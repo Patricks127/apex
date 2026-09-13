@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { carregarPlanoAtivo, janelaRecente } from "@/lib/treino/perfil";
 import { type Injury } from "@/lib/motor";
-import { aplicarCautelaLeitura } from "@/lib/motor2";
+import { aplicarCautelaLeitura, exercicioPorId } from "@/lib/motor2";
 import { RegistoTreino } from "./registo-treino";
 
 export const metadata: Metadata = {
@@ -59,27 +59,40 @@ export default async function TreinoDiaPage({
 
   const diaGerado = diaBruto && !diaBruto.rest ? diaBruto : null;
 
+  // Quais exercícios usam barra (calculadora de discos) — resolvido aqui no
+  // servidor contra EXERCICIOS, para o cliente não precisar de importar a
+  // base inteira (128 exercícios) só para ler um booleano por exercício.
+  const usaBarraPorExercicio = (diaGerado?.exercises ?? []).map(
+    (e) => (e.exercicioId ? exercicioPorId(e.exercicioId)?.equipamento.includes("barra") : false) ?? false,
+  );
+
+  if (!diaGerado) {
+    return (
+      <main className="apex-ecra-claro mx-auto flex min-h-dvh w-full max-w-lg flex-col justify-center gap-3 px-5 py-10">
+        <h1 className="apex-tipo-titulo-ecra" style={{ color: "var(--apex-tinta)" }}>
+          Dia de descanso
+        </h1>
+        <p className="apex-tipo-corpo" style={{ color: "var(--apex-cinza-texto)" }}>
+          Não há treino marcado para este dia.
+        </p>
+        <Link
+          href="/plano"
+          className="apex-tipo-secundario mt-2 self-start underline underline-offset-4"
+          style={{ color: "var(--apex-tinta)" }}
+        >
+          Voltar ao plano
+        </Link>
+      </main>
+    );
+  }
+
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col px-4 py-8">
-      {!diaGerado ? (
-        <div className="flex flex-col gap-3">
-          <h1 className="text-2xl font-semibold text-zinc-100">Dia de descanso</h1>
-          <p className="text-sm text-zinc-400">Não há treino marcado para este dia.</p>
-          <Link
-            href="/plano"
-            className="mt-2 self-start text-sm font-medium text-zinc-300 underline underline-offset-4 hover:text-zinc-100"
-          >
-            Voltar ao plano
-          </Link>
-        </div>
-      ) : (
-        <RegistoTreino
-          dia={diaGerado}
-          weekNumber={weekNumber}
-          deload={deload}
-          checkinAtivo={checkinZones.length > 0}
-        />
-      )}
-    </main>
+    <RegistoTreino
+      dia={diaGerado}
+      usaBarraPorExercicio={usaBarraPorExercicio}
+      weekNumber={weekNumber}
+      deload={deload}
+      checkinAtivo={checkinZones.length > 0}
+    />
   );
 }
