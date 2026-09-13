@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { carregarPlanoAtivo } from "@/lib/treino/perfil";
+import { carregarPlanoAtivo, janelaRecente } from "@/lib/treino/perfil";
+import { indiceDiaSemanaHoje } from "@/lib/treino/linha-tempo";
 import { regenerarPlano, escolherPlano } from "@/app/actions/treino";
 import { VistaPlano } from "./vista-plano";
 
@@ -40,6 +41,24 @@ export default async function PlanoPage({
       .overrideTypes<{ id: string; name: string; owner_id: string; owner: { name: string | null } | null }[]>(),
   ]);
 
+  // Já treinaste hoje? Só interessa para o dia que É hoje na semana (ver
+  // src/lib/treino/linha-tempo.ts — "a decorrer" só existe para o dia de
+  // hoje). Casa por título com o dia real de hoje, não só "algo recente",
+  // para não marcar "feito" se o treino registado foi de outro dia.
+  const indiceHoje = indiceDiaSemanaHoje();
+  const diaHoje = planoAtivo?.days.days[indiceHoje];
+  const tituloHoje = diaHoje && !diaHoje.rest ? diaHoje.title : null;
+  let hojeFeito = false;
+  if (tituloHoje) {
+    const { count } = await supabase
+      .from("workout_sessions")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("title", tituloHoje)
+      .gte("created_at", janelaRecente(1));
+    hojeFeito = (count ?? 0) > 0;
+  }
+
   const outros: OutroPlano[] = (todos ?? [])
     .filter((p) => p.id !== planoAtivo?.id)
     .map((p) => ({
@@ -50,44 +69,48 @@ export default async function PlanoPage({
     }));
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col gap-4 px-4 py-10">
+    <main className="apex-ecra-claro mx-auto flex w-full max-w-lg flex-col gap-4 px-5 py-8">
       {treino === "gravado" ? (
-        <p className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">
+        <p
+          className="apex-tipo-corpo border-b pb-4"
+          style={{ color: "var(--apex-tinta)", borderColor: "var(--apex-cinza-linha)" }}
+        >
           Treino gravado. Quando fechares a semana, a progressão usa estes dados.
         </p>
       ) : null}
 
       {planoAtivo ? (
-        <VistaPlano plano={planoAtivo.days} nome={planoAtivo.name} />
+        <VistaPlano
+          plano={planoAtivo.days}
+          nome={planoAtivo.name}
+          indiceHoje={indiceHoje}
+          hojeFeito={hojeFeito}
+        />
       ) : !perfil?.goal && outros.length === 0 ? (
         <div className="flex flex-col gap-3">
-          <h1 className="text-2xl font-semibold text-zinc-100">Ainda não tens plano</h1>
-          <p className="text-sm text-zinc-400">
+          <h1 className="apex-tipo-titulo-ecra" style={{ color: "var(--apex-tinta)" }}>
+            Ainda não tens plano
+          </h1>
+          <p className="apex-tipo-corpo" style={{ color: "var(--apex-cinza-texto)" }}>
             Responde a seis perguntas rápidas e o motor gera a tua semana.
           </p>
-          <Link
-            href="/onboarding"
-            className="mt-2 inline-block self-start rounded-lg bg-zinc-100 px-4 py-2.5 text-sm font-semibold text-zinc-900 transition hover:bg-white"
-          >
+          <Link href="/onboarding" className="apex-botao apex-botao--claro mt-2">
             Fazer o onboarding
           </Link>
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          <h1 className="text-2xl font-semibold text-zinc-100">
+          <h1 className="apex-tipo-titulo-ecra" style={{ color: "var(--apex-tinta)" }}>
             {outros.length > 0 ? "Escolhe um plano" : "Plano por gerar"}
           </h1>
-          <p className="text-sm text-zinc-400">
+          <p className="apex-tipo-corpo" style={{ color: "var(--apex-cinza-texto)" }}>
             {outros.length > 0
               ? "Tens plano(s) disponível(eis) mas ainda não escolheste nenhum para seguir."
               : "O teu perfil está completo mas não há nenhum plano ativo."}
           </p>
           {perfil?.goal ? (
             <form action={regenerarPlano}>
-              <button
-                type="submit"
-                className="mt-2 rounded-lg bg-zinc-100 px-4 py-2.5 text-sm font-semibold text-zinc-900 transition hover:bg-white"
-              >
+              <button type="submit" className="apex-botao apex-botao--claro mt-2">
                 Gerar plano
               </button>
             </form>
@@ -96,23 +119,27 @@ export default async function PlanoPage({
       )}
 
       {outros.length > 0 ? (
-        <section className="flex flex-col gap-2 rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-          <h2 className="text-sm font-medium text-zinc-400">Trocar de plano</h2>
-          <ul className="flex flex-col gap-2">
+        <section className="flex flex-col gap-2 border-t pt-4" style={{ borderColor: "var(--apex-cinza-linha)" }}>
+          <h2 className="apex-tipo-titulo-seccao" style={{ marginTop: 0, color: "var(--apex-tinta)" }}>
+            Trocar de plano
+          </h2>
+          <ul className="flex flex-col">
             {outros.map((p) => (
               <li
                 key={p.id}
-                className="flex items-center justify-between gap-3 rounded-lg border border-zinc-800 bg-zinc-950 p-3"
+                className="flex items-center justify-between gap-3 border-b py-3"
+                style={{ borderColor: "var(--apex-cinza-linha)" }}
               >
                 <div>
-                  <p className="text-sm font-semibold text-zinc-100">{p.name}</p>
-                  <p className="text-xs text-zinc-500">{p.feito_por}</p>
+                  <p className="apex-tipo-nome-exercicio" style={{ color: "var(--apex-tinta)" }}>{p.name}</p>
+                  <p className="apex-tipo-etiqueta" style={{ color: "var(--apex-cinza-texto)" }}>{p.feito_por}</p>
                 </div>
                 <form action={escolherPlano}>
                   <input type="hidden" name="plan_id" value={p.id} />
                   <button
                     type="submit"
-                    className="shrink-0 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-200 transition hover:bg-zinc-800"
+                    className="apex-tipo-etiqueta shrink-0 border px-3 py-1.5"
+                    style={{ borderColor: "var(--apex-cinza-linha)", color: "var(--apex-tinta)" }}
                   >
                     Seguir este
                   </button>

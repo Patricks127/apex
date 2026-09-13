@@ -324,3 +324,110 @@
   margin-top: 2px;
   color: var(--apex-cinza-texto);
 }
+
+/* ============================================================
+   Moldura de ecrã claro — fundo/texto explícitos, para não herdar o
+   fundo escuro do body quando o sistema está em dark mode (o modo claro
+   aqui é uma escolha deliberada, não segue prefers-color-scheme).
+   ============================================================ */
+
+.apex-ecra-claro {
+  min-height: 100dvh;
+  background: var(--apex-branco);
+  color: var(--apex-tinta);
+}
+
+/* ============================================================
+   Linha do tempo do dia (Estrutura C) — tempo à esquerda, marcador ao
+   centro, conteúdo à direita. Ver referencia/SISTEMA-DESIGN.md, "Ecrã do
+   dia": vê-se onde se está, o que falta, a que horas se sai.
+   ============================================================ */
+
+.apex-linha-tempo {
+  display: flex;
+  flex-direction: column;
+}
+
+.apex-linha-tempo__item {
+  display: grid;
+  grid-template-columns: 44px 24px 1fr;
+  column-gap: var(--apex-space-3);
+}
+
+.apex-linha-tempo__hora {
+  padding-top: 2px;
+  text-align: right;
+  color: var(--apex-cinza-texto);
+}
+
+.apex-linha-tempo__marcador-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.apex-linha-tempo__marcador {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  margin-top: 4px;
+  border: 2px solid var(--apex-cinza-linha);
+  border-radius: 50%;
+  background: var(--apex-branco);
+}
+
+.apex-linha-tempo__traco {
+  width: 1px;
+  min-height: var(--apex-space-4);
+  flex: 1;
+  margin: 2px 0;
+  background: var(--apex-cinza-linha);
+}
+
+.apex-linha-tempo__conteudo {
+  padding-bottom: var(--apex-space-6);
+}
+
+/* feito: marcador e traço preenchidos, conteúdo esbatido — já não é onde a
+   atenção precisa de estar. */
+.apex-linha-tempo__item--feito .apex-linha-tempo__marcador {
+  border-color: var(--apex-tinta);
+  background: var(--apex-tinta);
+}
+
+.apex-linha-tempo__item--feito .apex-linha-tempo__traco {
+  background: var(--apex-tinta);
+}
+
+.apex-linha-tempo__item--feito .apex-linha-tempo__conteudo {
+  opacity: 0.5;
+}
+
+/* a decorrer: marcador maior e cheio — "estás aqui". */
+.apex-linha-tempo__item--a_decorrer .apex-linha-tempo__marcador {
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  border-color: var(--apex-tinta);
+  background: var(--apex-tinta);
+}
+
+/* por fazer: marcador oco (omisso de propósito — já é o omisso). */
+
+/* ============================================================
+   Quadrados das séries — só no bloco a decorrer (§ "No bloco atual, os
+   quadrados das séries"). Hollow: não há progresso real por série antes de
+   o treino ao vivo existir, isto é a estrutura das séries, não um registo.
+   ============================================================ */
+
+.apex-quadrados-series {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.apex-quadrado-serie {
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--apex-cinza-linha);
+}

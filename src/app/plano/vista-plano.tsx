@@ -2,8 +2,13 @@
 
 import Link from "next/link";
 import { useState, useActionState } from "react";
-import type { PlanoGerado, DiaGerado, Lift } from "@/lib/motor";
+import type { PlanoGerado, DiaGerado, ExercicioGerado, Movimento, Lift } from "@/lib/motor";
 import { regenerarPlano, avancarSemana, type EstadoAvanco } from "@/app/actions/treino";
+import { construirLinhaTempo, type ItemLinhaTempo } from "@/lib/treino/linha-tempo";
+import { CabecalhoEcra } from "../_ui/design/cabecalho-ecra";
+import { BlocoDados } from "../_ui/design/bloco-dados";
+import { AvisoApp } from "../_ui/design/aviso-app";
+import { Botao } from "../_ui/design/botao";
 
 const LIFT_LABEL: Record<Lift, string> = {
   agachamento: "Agach.",
@@ -15,15 +20,20 @@ const LIFT_LABEL: Record<Lift, string> = {
 export function VistaPlano({
   plano,
   nome,
+  indiceHoje,
+  hojeFeito,
 }: {
   plano: PlanoGerado;
   nome: string;
+  indiceHoje: number;
+  hojeFeito: boolean;
 }) {
   const meta = plano.meta;
   const dePt = meta.origem === "pt";
   const primeiroTreino = plano.days.findIndex((d) => !d.rest);
   const [sel, setSel] = useState(primeiroTreino < 0 ? 0 : primeiroTreino);
   const dia = plano.days[sel];
+  const ehHoje = dia.dayIndex === indiceHoje;
 
   const cargas =
     meta.origem === "pt"
@@ -33,22 +43,20 @@ export function VistaPlano({
           .join(" · ");
 
   return (
-    <div className="flex flex-col gap-5">
-      <header className="flex flex-col gap-1">
-        <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-zinc-600">
-          <span>{dePt ? "Plano do teu PT" : "O teu plano"}</span>
-          <span>· semana {meta.week ?? 1}</span>
-          {meta.deloadWeek ? (
-            <span className="rounded bg-amber-500/15 px-1.5 py-0.5 font-medium text-amber-300">
-              descarga
-            </span>
-          ) : null}
-        </div>
-        <h1 className="text-2xl font-semibold text-zinc-100">{nome}</h1>
-        <p className="text-sm text-zinc-400">
+    <div className="apex-ecra-claro flex flex-col gap-5">
+      <CabecalhoEcra marca="APEX" direita={`semana ${meta.week ?? 1}${meta.deloadWeek ? " · descarga" : ""}`} />
+
+      <div className="flex flex-col gap-1">
+        <span className="apex-tipo-etiqueta" style={{ color: "var(--apex-cinza-texto)" }}>
+          {dePt ? "Plano do teu PT" : "O teu plano"}
+        </span>
+        <h1 className="apex-tipo-titulo-ecra" style={{ color: "var(--apex-tinta)" }}>
+          {nome}
+        </h1>
+        <p className="apex-tipo-corpo" style={{ color: "var(--apex-cinza-texto)" }}>
           {meta.origem === "pt" ? `Atribuído por ${meta.ptNome}.` : meta.science}
         </p>
-      </header>
+      </div>
 
       {/* Tira da semana */}
       <div className="grid grid-cols-7 gap-1.5">
@@ -57,30 +65,31 @@ export function VistaPlano({
             key={i}
             type="button"
             onClick={() => setSel(i)}
-            className={`flex flex-col items-center gap-1 rounded-lg border px-1 py-2 text-xs transition ${
-              i === sel
-                ? "border-zinc-300 bg-zinc-800 text-zinc-100"
-                : d.rest
-                  ? "border-zinc-800 bg-zinc-950 text-zinc-600"
-                  : "border-zinc-800 bg-zinc-900 text-zinc-300 hover:border-zinc-600"
-            }`}
+            className="apex-tipo-etiqueta flex flex-col items-center gap-1 border py-2"
+            style={{
+              borderColor: i === sel ? "var(--apex-tinta)" : "var(--apex-cinza-linha)",
+              color: i === sel ? "var(--apex-tinta)" : d.rest ? "var(--apex-cinza-texto)" : "var(--apex-tinta)",
+              background: i === sel ? "var(--apex-cinza-fundo)" : "var(--apex-branco)",
+            }}
           >
-            <span className="font-semibold">{d.dayShort}</span>
+            <span>{d.dayShort}</span>
             <span
-              className={`h-1.5 w-1.5 rounded-full ${
-                d.rest ? "bg-zinc-700" : "bg-emerald-400"
-              }`}
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                background: d.rest ? "var(--apex-cinza-linha)" : "var(--apex-tinta)",
+              }}
             />
           </button>
         ))}
       </div>
 
-      <DiaDetalhe dia={dia} />
+      <DiaDetalhe dia={dia} ehHoje={ehHoje} hojeFeito={hojeFeito} />
 
       {cargas ? (
-        <p className="text-xs text-zinc-600">
-          Cargas de referência: {cargas}{" "}
-          <span className="text-zinc-500">(* = estimado do nível/sexo; sem * = recorde teu)</span>
+        <p className="apex-tipo-etiqueta" style={{ color: "var(--apex-cinza-texto)" }}>
+          Cargas de referência: {cargas} — * estimado do nível/sexo, sem * é recorde teu.
         </p>
       ) : null}
 
@@ -90,7 +99,8 @@ export function VistaPlano({
         <form action={regenerarPlano}>
           <button
             type="submit"
-            className="w-full rounded-lg border border-zinc-700 px-4 py-2.5 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800"
+            className="apex-tipo-secundario w-full border py-3"
+            style={{ borderColor: "var(--apex-cinza-linha)", color: "var(--apex-cinza-texto)" }}
           >
             Regenerar plano (reinicia a progressão)
           </button>
@@ -104,49 +114,39 @@ function AvancarSemana() {
   const [estado, acao, pendente] = useActionState(avancarSemana, {} as EstadoAvanco);
 
   return (
-    <form
-      action={acao}
-      className="flex flex-col gap-3 rounded-xl border border-zinc-800 bg-zinc-900 p-4"
-    >
+    <form action={acao} className="flex flex-col gap-3 border-t pt-4" style={{ borderColor: "var(--apex-cinza-linha)" }}>
       <div>
-        <p className="text-sm font-semibold text-zinc-200">Fechar a semana</p>
-        <p className="text-xs text-zinc-500">
-          Junta o RPE e o volume das sessões desta semana e decide a próxima:
-          progride, mantém ou descarga.
+        <p className="apex-tipo-nome-exercicio" style={{ color: "var(--apex-tinta)" }}>Fechar a semana</p>
+        <p className="apex-tipo-secundario" style={{ color: "var(--apex-cinza-texto)" }}>
+          Junta o RPE e o volume das sessões desta semana e decide a próxima: progride, mantém ou descarga.
         </p>
       </div>
 
       {estado.erro ? (
-        <p className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+        <p className="apex-tipo-secundario" style={{ color: "var(--apex-erro)" }} role="alert">
           {estado.erro}
         </p>
       ) : null}
 
       {estado.ok ? (
-        <div className="flex flex-col gap-2 rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-sm">
-          <p className="font-medium text-zinc-100">
+        <div className="flex flex-col gap-2 border py-3" style={{ borderColor: "var(--apex-cinza-linha)" }}>
+          <p className="apex-tipo-nome-exercicio px-3" style={{ color: "var(--apex-tinta)" }}>
             Semana {estado.semana}
             {estado.deload ? " · descarga" : ""}
           </p>
-          {estado.reason ? <p className="text-xs text-zinc-400">{estado.reason}</p> : null}
-          <table className="mt-1 text-xs">
+          {estado.reason ? (
+            <p className="apex-tipo-secundario px-3" style={{ color: "var(--apex-cinza-texto)" }}>
+              {estado.reason}
+            </p>
+          ) : null}
+          <table className="apex-tabular apex-tipo-secundario w-full px-3">
             <tbody>
               {estado.cargas?.map((c) => (
-                <tr key={c.lift} className="text-zinc-400">
-                  <td className="py-0.5 pr-3 text-zinc-300">{c.lift}</td>
-                  <td className="py-0.5 pr-2 font-mono">{c.antes} kg</td>
-                  <td className="py-0.5 pr-2">→</td>
-                  <td
-                    className={`py-0.5 font-mono ${
-                      c.depois > c.antes
-                        ? "text-emerald-400"
-                        : c.depois < c.antes
-                          ? "text-amber-400"
-                          : "text-zinc-400"
-                    }`}
-                  >
-                    {c.depois} kg
-                  </td>
+                <tr key={c.lift}>
+                  <td className="py-0.5 pl-3 pr-3" style={{ color: "var(--apex-tinta)" }}>{c.lift}</td>
+                  <td className="py-0.5 pr-2" style={{ color: "var(--apex-cinza-texto)" }}>{c.antes} kg</td>
+                  <td className="py-0.5 pr-2" style={{ color: "var(--apex-cinza-texto)" }}>→</td>
+                  <td className="py-0.5 pr-3" style={{ color: "var(--apex-tinta)" }}>{c.depois} kg</td>
                 </tr>
               ))}
             </tbody>
@@ -154,135 +154,203 @@ function AvancarSemana() {
         </div>
       ) : null}
 
-      <button
-        type="submit"
-        disabled={pendente}
-        className="rounded-lg bg-zinc-100 px-4 py-2.5 text-sm font-semibold text-zinc-900 transition hover:bg-white disabled:opacity-60"
-      >
+      <Botao variante="claro" type="submit" disabled={pendente}>
         {pendente ? "A calcular…" : "Avançar para a próxima semana"}
-      </button>
+      </Botao>
     </form>
   );
 }
 
-function DiaDetalhe({ dia }: { dia: DiaGerado }) {
+// ---------------------------------------------------------------------------
+// Detalhe do dia — Estrutura C: linha do tempo (tempo à esquerda, marcador
+// ao centro, conteúdo à direita). Ver referencia/SISTEMA-DESIGN.md.
+// ---------------------------------------------------------------------------
+
+function DiaDetalhe({ dia, ehHoje, hojeFeito }: { dia: DiaGerado; ehHoje: boolean; hojeFeito: boolean }) {
   if (dia.rest) {
     return (
-      <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 text-center">
-        <p className="text-sm font-semibold text-zinc-300">{dia.dayName}</p>
-        <p className="mt-1 text-sm text-zinc-500">Descanso. Recuperar faz parte do treino.</p>
+      <section className="flex flex-col items-center gap-1 border-t border-b py-8 text-center" style={{ borderColor: "var(--apex-cinza-linha)" }}>
+        <p className="apex-tipo-nome-exercicio" style={{ color: "var(--apex-tinta)" }}>{dia.dayName}</p>
+        <p className="apex-tipo-secundario" style={{ color: "var(--apex-cinza-texto)" }}>
+          Descanso. Recuperar faz parte do treino.
+        </p>
       </section>
     );
   }
 
+  const estadoDia = !ehHoje ? "neutro" : hojeFeito ? "feito" : "hoje_por_comecar";
+  const { itens, duracaoTotalMin, duracaoRestanteMin } = construirLinhaTempo(dia, { estadoDia });
+  const nExercicios = dia.exercises?.length ?? 0;
+  const nSeries = (dia.exercises ?? []).reduce((s, e) => s + e.sets.length, 0);
+
+  const quantoFalta =
+    estadoDia === "feito"
+      ? "Feito"
+      : estadoDia === "hoje_por_comecar"
+        ? `Sai às ${horaSaida(duracaoRestanteMin)}`
+        : `${duracaoTotalMin}′ estimados`;
+
   return (
-    <section className="flex flex-col gap-4 rounded-xl border border-zinc-800 bg-zinc-900 p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs uppercase tracking-wider text-zinc-600">{dia.dayName}</p>
-          <h2 className="text-lg font-semibold text-zinc-100">{dia.title}</h2>
-        </div>
-        <Link
-          href={`/treino/${dia.dayIndex}`}
-          className="shrink-0 rounded-lg bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-zinc-900 transition hover:bg-white"
-        >
-          Registar treino
-        </Link>
-      </div>
+    <section className="flex flex-col gap-4">
+      <CabecalhoEcra marca={dia.dayName} direita={quantoFalta} />
+
+      <BlocoDados
+        itens={[
+          { valor: String(nExercicios), etiqueta: "exercícios" },
+          { valor: String(nSeries), etiqueta: "séries" },
+          { valor: `${duracaoTotalMin}′`, etiqueta: "estimado" },
+        ]}
+      />
+
+      <Link href={`/treino/${dia.dayIndex}`} className="apex-botao apex-botao--claro">
+        Registar treino
+      </Link>
 
       {dia.why && dia.why.length > 0 ? (
-        <ul className="flex flex-col gap-1 border-l-2 border-zinc-800 pl-3 text-xs text-zinc-500">
-          {dia.why.map((w, i) => (
-            <li key={i}>{w}</li>
-          ))}
-        </ul>
+        <AvisoApp titulo="Porquê este treino">
+          <ul className="flex flex-col gap-0.5 pl-4" style={{ listStyle: "disc" }}>
+            {dia.why.map((w, i) => (
+              <li key={i}>{w}</li>
+            ))}
+          </ul>
+        </AvisoApp>
       ) : null}
 
-      {dia.warmup && dia.warmup.length > 0 ? (
-        <Bloco titulo="Aquecimento" itens={dia.warmup.map((m) => `${m.name} — ${m.dose}`)} />
-      ) : null}
-
-      {dia.rehab && dia.rehab.length > 0 ? (
-        <Bloco
-          titulo="Mobilidade / prevenção"
-          itens={dia.rehab.map((m) => `${m.name} — ${m.dose}`)}
-        />
-      ) : null}
-
-      <div className="flex flex-col gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-          Treino
-        </p>
-        <ol className="flex flex-col gap-2">
-          {dia.exercises!.map((e, i) => {
-            const s = e.sets[0];
-            const carga =
-              s.w != null ? `${s.w} kg` : e.bw ? "peso corporal" : "—";
-            const reps = s.reps > 0 ? `${e.sets.length}×${s.reps}` : `${e.sets.length} séries`;
-            return (
-              <li
-                key={i}
-                className="rounded-lg border border-zinc-800 bg-zinc-950 p-3"
-              >
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-sm font-medium text-zinc-100">
-                    {i + 1}. {e.name}
-                  </span>
-                  <span className="shrink-0 font-mono text-xs text-zinc-400">
-                    {reps} · {carga}
-                  </span>
-                </div>
-                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">
-                  <span>RPE {s.rpe}</span>
-                  <span>desc. {e.rest}</span>
-                  {e.muscle ? <span>{e.muscle}</span> : null}
-                  {e.substituted ? (
-                    <span className="rounded bg-amber-500/15 px-1.5 py-0.5 font-medium text-amber-300">
-                      substituído por lesão
-                    </span>
-                  ) : null}
-                  {e.focusTag ? (
-                    <span className="rounded bg-sky-500/15 px-1.5 py-0.5 font-medium text-sky-300">
-                      foco: {e.focusTag}
-                    </span>
-                  ) : null}
-                </div>
-                {e.swap ? (
-                  <p className="mt-1 text-xs text-amber-400/80">{e.swap}</p>
-                ) : null}
-                {e.detail ? (
-                  <p className="mt-1 text-xs text-zinc-500">{e.detail}</p>
-                ) : null}
-                {e.nota ? (
-                  <p className="mt-1 text-xs text-sky-300/90">Nota do PT: {e.nota}</p>
-                ) : null}
-              </li>
-            );
-          })}
-        </ol>
-      </div>
-
-      {dia.cooldown && dia.cooldown.length > 0 ? (
-        <Bloco
-          titulo="Retorno à calma"
-          itens={dia.cooldown.map((m) => `${m.name} — ${m.dose}`)}
-        />
-      ) : null}
+      <LinhaTempo itens={itens} />
     </section>
   );
 }
 
-function Bloco({ titulo, itens }: { titulo: string; itens: string[] }) {
+function horaSaida(minutosRestantes: number): string {
+  const agora = new Date(Date.now() + minutosRestantes * 60_000);
+  const hh = String(agora.getHours()).padStart(2, "0");
+  const mm = String(agora.getMinutes()).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
+function LinhaTempo({ itens }: { itens: ItemLinhaTempo[] }) {
+  return (
+    <div className="apex-linha-tempo">
+      {itens.map((item, i) => (
+        <div key={i} className={`apex-linha-tempo__item apex-linha-tempo__item--${item.estado}`}>
+          <span className="apex-tipo-etiqueta apex-tabular apex-linha-tempo__hora">{item.inicioMin}′</span>
+          <div className="apex-linha-tempo__marcador-col">
+            <span className="apex-linha-tempo__marcador" />
+            {i < itens.length - 1 ? <span className="apex-linha-tempo__traco" /> : null}
+          </div>
+          <div className="apex-linha-tempo__conteudo">
+            <ConteudoBloco item={item} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ConteudoBloco({ item }: { item: ItemLinhaTempo }) {
+  switch (item.tipo) {
+    case "aquecimento":
+      return <ConteudoMovimentos titulo="Aquecimento" movimentos={item.movimentos} />;
+    case "mobilidade":
+      return <ConteudoMovimentos titulo="Mobilidade / prevenção" movimentos={item.movimentos} />;
+    case "alongamento":
+      return <ConteudoMovimentos titulo="Alongamentos" movimentos={item.movimentos} />;
+    case "descanso":
+      return (
+        <span className="apex-tipo-secundario" style={{ color: "var(--apex-cinza-texto)" }}>
+          Descanso · {item.label}
+        </span>
+      );
+    case "exercicio":
+      return (
+        <ConteudoExercicio
+          exercicio={item.exercicio}
+          indice={item.indice}
+          mostrarQuadrados={item.estado === "a_decorrer"}
+        />
+      );
+  }
+}
+
+function ConteudoMovimentos({ titulo, movimentos }: { titulo: string; movimentos: Movimento[] }) {
   return (
     <div className="flex flex-col gap-1">
-      <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-        {titulo}
-      </p>
-      <ul className="flex flex-col gap-0.5 text-xs text-zinc-400">
-        {itens.map((t, i) => (
-          <li key={i}>{t}</li>
+      <span className="apex-tipo-nome-exercicio" style={{ color: "var(--apex-tinta)" }}>{titulo}</span>
+      <ul className="flex flex-col gap-0.5">
+        {movimentos.map((m, i) => (
+          <li key={i} className="apex-tipo-secundario" style={{ color: "var(--apex-cinza-texto)" }}>
+            {m.name} — {m.dose}
+          </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+function ConteudoExercicio({
+  exercicio,
+  indice,
+  mostrarQuadrados,
+}: {
+  exercicio: ExercicioGerado;
+  indice: number;
+  mostrarQuadrados: boolean;
+}) {
+  const s = exercicio.sets[0];
+  const carga = s.w != null ? `${s.w} kg` : exercicio.bw ? "peso corporal" : "—";
+  const series = s.reps > 0 ? `${exercicio.sets.length} × ${s.reps}` : `${exercicio.sets.length} séries`;
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="apex-tipo-nome-exercicio" style={{ color: "var(--apex-tinta)" }}>
+          {indice + 1}. {exercicio.name}
+        </span>
+        {!mostrarQuadrados ? (
+          <div className="apex-linha-exercicio__valores">
+            <span className="apex-tabular apex-linha-exercicio__carga">{carga}</span>
+            <span className="apex-tipo-secundario apex-tabular apex-linha-exercicio__series">{series}</span>
+          </div>
+        ) : null}
+      </div>
+
+      <span className="apex-tipo-etiqueta" style={{ color: "var(--apex-cinza-texto)" }}>
+        {[exercicio.muscle, `RPE ${s.rpe}`].filter(Boolean).join(" · ")}
+      </span>
+
+      {mostrarQuadrados ? (
+        <div className="mt-1 flex items-center gap-3">
+          <span className="apex-tabular apex-linha-exercicio__carga">{carga}</span>
+          <span className="apex-tipo-secundario apex-tabular" style={{ color: "var(--apex-cinza-texto)" }}>
+            {series}
+          </span>
+          <div className="apex-quadrados-series">
+            {exercicio.sets.map((_, i) => (
+              <span key={i} className="apex-quadrado-serie" />
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {exercicio.substituted ? (
+        <span className="apex-tipo-secundario" style={{ color: "var(--apex-azul)" }}>
+          Substituído por lesão
+        </span>
+      ) : null}
+      {exercicio.focusTag ? (
+        <span className="apex-tipo-secundario" style={{ color: "var(--apex-azul)" }}>
+          Foco: {exercicio.focusTag}
+        </span>
+      ) : null}
+      {exercicio.swap ? (
+        <p className="apex-tipo-secundario" style={{ color: "var(--apex-alerta)" }}>{exercicio.swap}</p>
+      ) : null}
+      {exercicio.detail ? (
+        <p className="apex-tipo-secundario" style={{ color: "var(--apex-cinza-texto)" }}>{exercicio.detail}</p>
+      ) : null}
+      {exercicio.nota ? (
+        <p className="apex-tipo-secundario" style={{ color: "var(--apex-azul)" }}>Nota do PT: {exercicio.nota}</p>
+      ) : null}
     </div>
   );
 }
