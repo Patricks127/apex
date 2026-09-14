@@ -928,3 +928,152 @@
   background: var(--apex-cinza-fundo);
   padding: var(--apex-space-3);
 }
+
+/* ============================================================
+   Progresso (modo claro) — gráficos, histórico e registo manual.
+
+   Regra de cor dos gráficos (SISTEMA-DESIGN.md): preto e branco, o azul
+   (--apex-azul) só marca marcos (novo recorde, semana de descarga). A
+   distinção manual/automático nos pontos de força é por FORMA (quadrado
+   vs círculo oco), nunca por cor — a cor está reservada.
+   ============================================================ */
+
+.apex-abas {
+  display: flex;
+  border: 1px solid var(--apex-tinta);
+}
+
+.apex-aba {
+  flex: 1;
+  padding: var(--apex-space-2) var(--apex-space-3);
+  font-family: var(--apex-sans);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  background: transparent;
+  color: var(--apex-tinta);
+  border: none;
+  cursor: pointer;
+}
+
+.apex-aba + .apex-aba {
+  border-left: 1px solid var(--apex-tinta);
+}
+
+.apex-aba[data-ativa="true"] {
+  background: var(--apex-tinta);
+  color: var(--apex-branco);
+}
+
+/* Variante para mais opções do que cabem em divisões iguais (ex.: as 6
+   métricas corporais) — desliza em vez de espremer cada aba. */
+.apex-abas--scroll {
+  overflow-x: auto;
+}
+
+.apex-abas--scroll .apex-aba {
+  flex: none;
+  padding: var(--apex-space-2) var(--apex-space-4);
+}
+
+.apex-grafico {
+  display: flex;
+  flex-direction: column;
+  gap: var(--apex-space-2);
+}
+
+.apex-grafico__vazio {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 160px;
+  border: 1px dashed var(--apex-cinza-linha);
+  color: var(--apex-cinza-texto);
+}
+
+.apex-grafico-legenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--apex-space-4);
+}
+
+.apex-grafico-legenda__item {
+  display: flex;
+  align-items: center;
+  gap: var(--apex-space-1);
+  font-family: var(--apex-sans);
+  font-size: 12px;
+  color: var(--apex-cinza-texto);
+}
+
+.apex-grafico-legenda__marca {
+  width: 9px;
+  height: 9px;
+  flex: none;
+}
+
+.apex-grafico-legenda__marca--manual {
+  background: var(--apex-tinta);
+}
+
+.apex-grafico-legenda__marca--auto {
+  border: 1.5px solid var(--apex-tinta);
+  border-radius: 50%;
+  background: var(--apex-branco);
+}
+
+.apex-grafico-legenda__marca--marco {
+  border-radius: 50%;
+  background: var(--apex-azul);
+}
+
+.apex-form-registo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--apex-space-3);
+  border: 1px solid var(--apex-cinza-linha);
+  background: var(--apex-cinza-fundo);
+  padding: var(--apex-space-4);
+}
+
+.apex-form-registo__linha {
+  display: flex;
+  gap: var(--apex-space-3);
+}
+
+.apex-form-registo select,
+.apex-form-registo input[type="number"] {
+  flex: 1;
+  border: 1px solid var(--apex-cinza-linha);
+  border-radius: 2px;
+  background: var(--apex-branco);
+  padding: 10px 12px;
+  font-family: var(--apex-sans);
+  font-size: 15px;
+  color: var(--apex-tinta);
+}
+
+.apex-historico-item {
+  border-bottom: 1px solid var(--apex-cinza-linha);
+  padding: var(--apex-space-3) 0;
+}
+
+.apex-historico-item__cabecalho {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--apex-space-3);
+  width: 100%;
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
+}
+
+.apex-historico-item__detalhe {
+  margin-top: var(--apex-space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--apex-space-1);
+}

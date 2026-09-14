@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { carregarPerfilMotor, carregarPlanoAtivo } from "@/lib/treino/perfil";
+import { estimarRecordesDaSessao } from "@/lib/treino/estimativa-1rm";
 import {
   advanceWeek,
   initProgression,
@@ -327,6 +328,13 @@ export async function gravarTreino(
   } = await supabase.auth.getUser();
   if (!user) return { erro: "Sessão inválida." };
 
+  // Semana de descarga da progressão ATIVA neste momento — para o gráfico
+  // de volume (/progresso) poder distinguir mais tarde uma quebra
+  // intencional de um treino saltado. Best-effort: se a leitura falhar,
+  // grava-se como false (limitação honesta) em vez de bloquear a sessão.
+  const planoAtivoAgora = await carregarPlanoAtivo(supabase, user.id).catch(() => null);
+  const isDeload = planoAtivoAgora?.progression?.deloadWeek ?? false;
+
   const { data: sessao, error: erroSessao } = await supabase
     .from("workout_sessions")
     .insert({
@@ -337,6 +345,7 @@ export async function gravarTreino(
       avg_rpe: avgRpe,
       completion,
       week_number: Number.isInteger(weekNumber) ? weekNumber : 1,
+      is_deload: isDeload,
     })
     .select("id")
     .single();
@@ -368,9 +377,27 @@ export async function gravarTreino(
       })),
     );
     if (erroLogs) console.error("exercise_logs: falha ao gravar (best-effort)", erroLogs);
+
+    // Estimativa automática de 1RM (migração 016) — best-effort, nunca
+    // bloqueia a sessão. Só entra no gráfico de progresso e, nas cargas
+    // prescritas, só se não houver nenhum 1RM manual para o mesmo
+    // levantamento (regra em maxesFromPRs, src/lib/motor).
+    const recordesAuto = estimarRecordesDaSessao(logs);
+    if (recordesAuto.length > 0) {
+      const { error: erroRecordes } = await supabase.from("personal_records").insert(
+        recordesAuto.map((r) => ({
+          user_id: user.id,
+          lift: r.lift,
+          value_kg: r.valueKg,
+          source: "auto",
+        })),
+      );
+      if (erroRecordes) console.error("personal_records (auto): falha ao gravar (best-effort)", erroRecordes);
+    }
   }
 
   revalidatePath("/plano");
+  revalidatePath("/progresso");
   redirect("/plano?treino=gravado");
 }
 

@@ -71,7 +71,7 @@ export async function carregarPerfilMotor(
 
   const { data: prs } = await supabase
     .from("personal_records")
-    .select("lift, value_kg")
+    .select("lift, value_kg, source")
     .eq("user_id", userId);
 
   const location = perfil.location as Location;

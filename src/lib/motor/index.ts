@@ -463,22 +463,42 @@ const PR_ALIASES: Record<Lift, string[]> = {
   ],
 };
 
-/** Reduz linhas de personal_records ({ lift, value_kg }) aos 4 levantamentos base. */
+/**
+ * Reduz linhas de personal_records ({ lift, value_kg, source? }) aos 4
+ * levantamentos base — para PRESCREVER cargas, não para o gráfico de
+ * progresso (esse lê as linhas em bruto, ver src/lib/treino/progresso-dados).
+ *
+ * `source` distingue um 1RM testado a sério ('manual') de uma estimativa
+ * calculada a partir de uma série do treino ao vivo ('auto', migração 016).
+ * Regra de segurança: para cargas de treino, usa-se sempre o MÁXIMO manual
+ * quando existe um; o auto só entra na ausência de qualquer manual para
+ * aquele levantamento — uma estimativa inflacionada nunca pode empurrar a
+ * prescrição para cima de um recorde real. Linhas sem `source` (todas as
+ * anteriores à migração 016) contam como manuais — é o que eram de facto,
+ * ninguém escrevia automaticamente antes desta fase.
+ */
 export function maxesFromPRs(
-  prs: { lift: string; value_kg: number | null }[] | null | undefined,
+  prs: { lift: string; value_kg: number | null; source?: string | null }[] | null | undefined,
 ): Partial<Record<Lift, number>> {
-  const out: Partial<Record<Lift, number>> = {};
-  if (!prs) return out;
+  const manual: Partial<Record<Lift, number>> = {};
+  const auto: Partial<Record<Lift, number>> = {};
+  if (!prs) return {};
   for (const pr of prs) {
     const v = Number(pr.value_kg);
     if (!pr.lift || !isFinite(v) || v <= 0) continue;
     const name = pr.lift.trim().toLowerCase();
     for (const lift of Object.keys(PR_ALIASES) as Lift[]) {
       if (PR_ALIASES[lift].some((a) => name === a || name.includes(a))) {
-        if (!out[lift] || v > (out[lift] as number)) out[lift] = v;
+        const balde = pr.source === "auto" ? auto : manual;
+        if (!balde[lift] || v > (balde[lift] as number)) balde[lift] = v;
         break;
       }
     }
+  }
+  const out: Partial<Record<Lift, number>> = {};
+  for (const lift of Object.keys(PR_ALIASES) as Lift[]) {
+    const escolhido = manual[lift] ?? auto[lift];
+    if (escolhido !== undefined) out[lift] = escolhido;
   }
   return out;
 }

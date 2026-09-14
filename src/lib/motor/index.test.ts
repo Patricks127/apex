@@ -174,6 +174,36 @@ test("maxesFromPRs: mapeia texto livre para os 4 levantamentos e escolhe o máxi
   assert.equal(out.press, undefined);
 });
 
+test("maxesFromPRs: sem source (linhas anteriores à migração 016) conta como manual", () => {
+  const out = maxesFromPRs([{ lift: "supino", value_kg: 100 }]);
+  assert.equal(out.supino, 100);
+});
+
+test("maxesFromPRs: manual vence auto mesmo quando o auto é mais alto (guarda-costas 2 — nunca prescrever a partir de estimativa inflacionada)", () => {
+  const out = maxesFromPRs([
+    { lift: "supino", value_kg: 100, source: "manual" },
+    { lift: "supino", value_kg: 140, source: "auto" },
+  ]);
+  assert.equal(out.supino, 100);
+});
+
+test("maxesFromPRs: auto só entra na ausência de qualquer manual para o mesmo levantamento", () => {
+  const out = maxesFromPRs([
+    { lift: "supino", value_kg: 90, source: "auto" },
+    { lift: "agachamento", value_kg: 150, source: "manual" },
+  ]);
+  assert.equal(out.supino, 90);
+  assert.equal(out.agachamento, 150);
+});
+
+test("maxesFromPRs: entre vários manuais do mesmo levantamento, ainda escolhe o máximo", () => {
+  const out = maxesFromPRs([
+    { lift: "supino", value_kg: 80, source: "manual" },
+    { lift: "supino", value_kg: 85, source: "manual" },
+  ]);
+  assert.equal(out.supino, 85);
+});
+
 test("as cargas geradas saem dos 1RM (round25) e não passam a estimativa em bruto", () => {
   const plan = buildWeek(profile({ goal: "hipertrofia", daysPerWeek: 4, level: "intermedio", sex: "homem" }));
   const dia0 = plan.days.find((d) => !d.rest)!;

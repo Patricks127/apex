@@ -127,6 +127,9 @@ async function SeccaoAtleta({ userId }: { userId: string }) {
         <Link href="/videos" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.tinta }}>
           Vídeos
         </Link>
+        <Link href="/progresso" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.tinta }}>
+          Progresso
+        </Link>
       </nav>
     </div>
   );
