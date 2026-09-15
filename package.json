@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test:motor": "node --test \"src/lib/motor/**/*.test.ts\"",
     "test:motor2": "node --test \"src/lib/motor2/**/*.test.ts\"",
-    "test:treino": "node --test \"src/lib/treino/**/*.test.ts\""
+    "test:treino": "node --test \"src/lib/treino/**/*.test.ts\"",
+    "test:social": "node --test \"src/lib/social/**/*.test.ts\""
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.5",

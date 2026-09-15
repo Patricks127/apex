@@ -3,10 +3,18 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ESPECIALIDADES, labelEspecialidade } from "@/lib/perfil";
+import { buscarPessoas } from "@/lib/social/feed-dados";
+import { BotaoSeguir } from "./botao-seguir";
 
 export const metadata: Metadata = {
-  title: "Descobrir PTs · APEX",
+  title: "Descobrir · APEX",
 };
+
+const COR = {
+  tinta: "var(--apex-tinta)",
+  fraco: "var(--apex-cinza-texto)",
+  linha: "var(--apex-cinza-linha)",
+} as const;
 
 export default async function DescobrirPage({
   searchParams,
@@ -22,37 +30,23 @@ export default async function DescobrirPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/entrar");
 
-  let req = supabase
-    .from("profiles")
-    .select("id, name, pt_code, avatar_url, headline, city, specialties, is_verified")
-    .eq("role", "pt")
-    .not("pt_code", "is", null)
-    .order("is_verified", { ascending: false })
-    .order("name", { ascending: true })
-    .limit(40);
+  const espMatch = query
+    ? ESPECIALIDADES.filter(
+        (e) => e.label.toLowerCase().includes(query.toLowerCase()) || e.id.includes(query.toLowerCase()),
+      ).map((e) => e.id)
+    : [];
 
-  if (query) {
-    const espMatch = ESPECIALIDADES.filter(
-      (e) =>
-        e.label.toLowerCase().includes(query.toLowerCase()) ||
-        e.id.includes(query.toLowerCase()),
-    ).map((e) => e.id);
-    const ors = [
-      `name.ilike.*${query}*`,
-      `city.ilike.*${query}*`,
-      `headline.ilike.*${query}*`,
-    ];
-    if (espMatch.length) ors.push(`specialties.ov.{${espMatch.join(",")}}`);
-    req = req.or(ors.join(","));
-  }
-
-  const { data: pts } = await req;
+  const pessoas = await buscarPessoas(supabase, user.id, query, espMatch);
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col gap-5 px-4 py-8">
+    <main className="apex-ecra-claro mx-auto flex min-h-dvh w-full max-w-lg flex-col gap-5 px-5 py-8">
       <header>
-        <h1 className="text-2xl font-semibold text-zinc-100">Descobrir PTs</h1>
-        <p className="text-sm text-zinc-400">Procura por nome, cidade ou especialidade.</p>
+        <h1 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: COR.tinta }}>
+          Descobrir
+        </h1>
+        <p className="apex-tipo-corpo" style={{ color: COR.fraco }}>
+          Procura atletas e PTs por nome, cidade ou especialidade.
+        </p>
       </header>
 
       <form method="GET" className="flex gap-2">
@@ -60,65 +54,56 @@ export default async function DescobrirPage({
           name="q"
           defaultValue={query}
           placeholder="ex.: Lisboa, powerlifting, Rui…"
-          className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-zinc-400"
+          className="apex-tipo-corpo w-full border px-3 py-2.5 outline-none"
+          style={{ borderColor: COR.linha, borderRadius: 2, background: "var(--apex-branco)", color: COR.tinta }}
         />
-        <button
-          type="submit"
-          className="shrink-0 rounded-lg bg-zinc-100 px-4 text-sm font-semibold text-zinc-900 transition hover:bg-white"
-        >
+        <button type="submit" className="apex-botao apex-botao--claro shrink-0" style={{ width: "auto", padding: "0 20px" }}>
           Procurar
         </button>
       </form>
 
-      {!pts || pts.length === 0 ? (
-        <p className="py-10 text-center text-sm text-zinc-600">
-          {query ? "Nenhum PT encontrado." : "Ainda não há PTs com perfil."}
+      {pessoas.length === 0 ? (
+        <p className="apex-tipo-corpo py-10 text-center" style={{ color: COR.fraco }}>
+          {query ? "Ninguém encontrado." : "Ainda não há ninguém para descobrir."}
         </p>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {pts.map((p) => (
-            <li key={p.id}>
-              <Link
-                href={`/pt/${p.pt_code}`}
-                className="flex items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900 p-3 transition hover:border-zinc-600"
-              >
-                <div className="size-12 shrink-0 overflow-hidden rounded-full border border-zinc-700 bg-zinc-800">
-                  {p.avatar_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={p.avatar_url} alt="" className="size-full object-cover" />
-                  ) : null}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="truncate text-sm font-semibold text-zinc-100">
-                      {p.name ?? "Personal Trainer"}
-                    </span>
-                    {p.is_verified ? (
-                      <span className="shrink-0 text-[11px] text-sky-400">✓</span>
-                    ) : null}
-                  </div>
-                  <p className="truncate text-xs text-zinc-400">
-                    {p.headline ?? ""}
-                  </p>
-                  <p className="truncate text-[11px] text-zinc-600">
-                    {[
-                      p.city,
-                      (p.specialties as string[] | null)
-                        ?.slice(0, 3)
-                        .map(labelEspecialidade)
-                        .join(", "),
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                </div>
-                <span className="shrink-0 font-mono text-[11px] text-zinc-600">
-                  {p.pt_code}
-                </span>
+        <div>
+          {pessoas.map((p) => (
+            <div key={p.id} className="apex-pessoa-item">
+              <Link href={p.role === "pt" && p.ptCode ? `/pt/${p.ptCode}` : `/u/${p.id}`} className="apex-avatar">
+                {p.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={p.avatarUrl} alt="" />
+                ) : (
+                  <span className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
+                    {(p.name ?? "?").slice(0, 1).toUpperCase()}
+                  </span>
+                )}
               </Link>
-            </li>
+              <div className="min-w-0 flex-1">
+                <Link
+                  href={p.role === "pt" && p.ptCode ? `/pt/${p.ptCode}` : `/u/${p.id}`}
+                  className="apex-tipo-nome-exercicio"
+                  style={{ color: COR.tinta, textDecoration: "none" }}
+                >
+                  {p.name ?? "Utilizador"}
+                  {p.role === "pt" ? (
+                    <span className="apex-chip-neutro apex-tipo-etiqueta" style={{ marginLeft: 6 }}>
+                      PT{p.isVerified ? " · verificado" : ""}
+                    </span>
+                  ) : null}
+                </Link>
+                <p className="apex-tipo-secundario truncate" style={{ color: COR.fraco }}>
+                  {p.headline ?? ""}
+                </p>
+                <p className="apex-tipo-etiqueta truncate" style={{ color: COR.fraco }}>
+                  {[p.city, p.specialties.slice(0, 2).map(labelEspecialidade).join(", ")].filter(Boolean).join(" · ")}
+                </p>
+              </div>
+              <BotaoSeguir followingId={p.id} aSeguir={p.souEuASeguir} />
+            </div>
           ))}
-        </ul>
+        </div>
       )}
     </main>
   );

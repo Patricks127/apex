@@ -130,6 +130,12 @@ async function SeccaoAtleta({ userId }: { userId: string }) {
         <Link href="/progresso" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.tinta }}>
           Progresso
         </Link>
+        <Link href="/feed" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.tinta }}>
+          Feed
+        </Link>
+        <Link href="/descobrir" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.tinta }}>
+          Descobrir
+        </Link>
       </nav>
     </div>
   );
@@ -457,13 +463,17 @@ async function SeccaoPt({ userId, ptCode }: { userId: string; ptCode: string | n
         <CodigoPt codigoInicial={ptCode} />
       </div>
 
-      <Link
-        href="/perfil/editar"
-        className="apex-tipo-secundario self-start underline underline-offset-4"
-        style={{ color: COR.tinta }}
-      >
-        Editar o meu perfil público
-      </Link>
+      <nav className="flex flex-wrap gap-4" style={{ color: COR.tinta }}>
+        <Link href="/perfil/editar" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.tinta }}>
+          Editar o meu perfil público
+        </Link>
+        <Link href="/feed" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.tinta }}>
+          Feed
+        </Link>
+        <Link href="/descobrir" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.tinta }}>
+          Descobrir
+        </Link>
+      </nav>
 
       <ListaAlunos alunos={alunos ?? []} />
     </div>
