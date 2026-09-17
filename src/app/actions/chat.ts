@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { linkPertenceAoUtilizador } from "@/lib/chat/link";
+import { notificar } from "@/lib/social/notificar";
 
 const BLOQUEIO_RLS =
   "Não foi possível enviar. As políticas de segurança da base de dados podem estar a bloquear esta operação.";
@@ -38,6 +39,15 @@ export async function enviarMensagem(
     body,
   });
   if (error) return { erro: BLOQUEIO_RLS };
+
+  const { data: remetente } = await supabase.from("profiles").select("name").eq("id", user.id).single();
+  await notificar(supabase, {
+    userId: link.outroId,
+    tipo: "mensagem",
+    titulo: "Nova mensagem",
+    corpo: `${remetente?.name ?? "Alguém"} enviou-te uma mensagem`,
+    refId: link.id,
+  });
 
   revalidatePath("/chat");
   return { ok: true };

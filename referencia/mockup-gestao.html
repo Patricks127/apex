@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>APEX · Área PT — claro, inspirado no mockup</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:#1C1E23;font-family:'Archivo',system-ui,sans-serif;padding:30px 18px 70px;color:#E9EAEC}
+.wrap{max-width:1500px;margin:0 auto}
+.intro{max-width:720px;margin-bottom:34px}
+.intro h1{font-size:28px;font-weight:800;letter-spacing:-.02em;margin-bottom:9px}
+.intro p{font-size:14.5px;line-height:1.6;color:#9BA0A8}
+.row{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start}
+.col{flex:0 0 auto}
+.cap{font-size:12px;color:#6E737C;margin:0 0 12px 4px;font-weight:600}
+
+/* ---- design tokens (modo claro) ---- */
+.ph{width:340px;height:720px;background:#fff;border-radius:26px;overflow:hidden;box-shadow:0 20px 55px rgba(0,0,0,.45);position:relative;color:#0A0A0B}
+.scr{height:100%;overflow-y:auto}
+.scr::-webkit-scrollbar{width:0}
+:root{
+  --tinta:#0A0A0B; --cinza:#6B6B70; --linha:#E2E2E4; --fundo:#F6F6F7;
+  --azul:#0047FF; --azul-bg:#EDF1FF; --verde:#0F9D6B; --verde-bg:#E7F7F0;
+  --alerta:#C8761A; --alerta-bg:#FBF0E2; --baixo:#C0392B; --baixo-bg:#FBECEA;
+}
+.tab{font-variant-numeric:tabular-nums}
+
+/* ---- barra topo ---- */
+.top{display:flex;align-items:center;justify-content:space-between;padding:18px 18px 0}
+.brand{display:flex;align-items:center;gap:8px}
+.logo{width:26px;height:26px;background:var(--tinta);border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:14px}
+.brand b{font-size:15px;font-weight:800;letter-spacing:.02em}
+.bell{width:38px;height:38px;border:1px solid var(--linha);border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:17px;position:relative}
+.bell .dot{position:absolute;top:8px;right:9px;width:7px;height:7px;background:var(--baixo);border-radius:50%;border:1.5px solid #fff}
+
+/* ---- saudação ---- */
+.hello{padding:20px 18px 4px}
+.hello .k{font-size:13px;color:var(--cinza);font-weight:500}
+.hello h2{font-size:24px;font-weight:800;letter-spacing:-.02em;margin-top:2px}
+
+/* ---- resumo negócio (4 quadros) ---- */
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:16px 18px 6px}
+.kpi{border:1px solid var(--linha);border-radius:14px;padding:13px 14px}
+.kpi .n{font-size:26px;font-weight:800;letter-spacing:-.03em;line-height:1}
+.kpi .l{font-size:12px;color:var(--cinza);margin-top:3px}
+.kpi .d{font-size:11px;font-weight:700;margin-top:6px}
+.kpi .up{color:var(--verde)} .kpi .flat{color:var(--cinza)}
+
+/* ---- secção título ---- */
+.sec{display:flex;align-items:center;justify-content:space-between;padding:20px 18px 10px}
+.sec h3{font-size:13px;font-weight:700;color:var(--cinza);letter-spacing:.01em}
+.sec a{font-size:12.5px;color:var(--azul);font-weight:600;text-decoration:none}
+
+/* ---- alerta atenção ---- */
+.att{margin:0 18px 10px;border:1px solid var(--alerta);background:var(--alerta-bg);border-radius:13px;padding:12px 14px;display:flex;gap:11px;align-items:flex-start}
+.att .ic{font-size:16px;line-height:1.3}
+.att .t{font-size:13px;font-weight:700;color:#8A5410}
+.att .s{font-size:12px;color:#8A5410;opacity:.8;margin-top:2px;line-height:1.4}
+
+/* ---- linha de aluno c/ tendência ---- */
+.stu{display:flex;align-items:center;gap:12px;padding:12px 18px;border-top:1px solid var(--linha)}
+.av{width:42px;height:42px;border-radius:13px;background:var(--fundo);border:1px solid var(--linha);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:var(--cinza);flex-shrink:0;overflow:hidden}
+.stu .info{flex:1;min-width:0}
+.stu .nm{font-size:14.5px;font-weight:700;letter-spacing:-.01em}
+.stu .meta{font-size:12px;color:var(--cinza);margin-top:2px}
+.spark{width:56px;height:26px;flex-shrink:0}
+.stu .adh{text-align:right;flex-shrink:0;min-width:42px}
+.stu .adh .p{font-size:15px;font-weight:800;letter-spacing:-.02em}
+.stu .adh .p.g{color:var(--verde)} .stu .adh .p.a{color:var(--alerta)} .stu .adh .p.b{color:var(--baixo)}
+.stu .adh .x{font-size:10px;color:var(--cinza);font-weight:600}
+
+/* ---- nav inferior ---- */
+.nav{position:absolute;bottom:0;left:0;right:0;height:62px;background:#fff;border-top:1px solid var(--linha);display:flex}
+.nav a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:10.5px;color:var(--cinza);font-weight:600;text-decoration:none}
+.nav a.on{color:var(--tinta)}
+.nav .i{font-size:19px}
+.nav a.on .i{filter:none}
+
+/* segundo telemóvel: lista alunos ---- */
+.search{margin:14px 18px 0;display:flex;align-items:center;gap:9px;border:1px solid var(--linha);border-radius:12px;padding:11px 13px;color:var(--cinza);font-size:13.5px}
+.chips{display:flex;gap:7px;padding:12px 18px 4px;overflow-x:auto}
+.chip{white-space:nowrap;font-size:12.5px;font-weight:600;padding:7px 13px;border-radius:100px;border:1px solid var(--linha);color:var(--cinza)}
+.chip.on{background:var(--tinta);color:#fff;border-color:var(--tinta)}
+
+/* terceiro: partilha pós-treino ---- */
+.done{padding:30px 22px;text-align:center}
+.done .big{font-family:'Barlow Condensed';font-size:15px;letter-spacing:.16em;color:var(--verde);font-weight:700}
+.done h2{font-size:27px;font-weight:900;letter-spacing:-.03em;margin:8px 0 22px}
+.done .grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;text-align:left}
+.done .box{border:1px solid var(--linha);border-radius:14px;padding:14px}
+.done .box .n{font-size:24px;font-weight:800;letter-spacing:-.03em}
+.done .box .l{font-size:11.5px;color:var(--cinza);margin-top:2px}
+.done .pr{border:1px solid var(--verde);background:var(--verde-bg)}
+.done .pr .n{color:var(--verde)}
+.done .btns{margin-top:22px;display:flex;flex-direction:column;gap:9px}
+.done .b1{padding:16px;border-radius:13px;background:var(--tinta);color:#fff;font-weight:800;font-size:15px;border:0}
+.done .b2{padding:14px;border-radius:13px;background:#fff;color:var(--tinta);font-weight:700;font-size:14px;border:1px solid var(--linha)}
+
+/* quarto: notificações ---- */
+.nt{display:flex;gap:12px;padding:14px 18px;border-top:1px solid var(--linha)}
+.nt.unread{background:var(--azul-bg)}
+.nt .ni{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.nt .ni.t{background:var(--azul-bg);color:var(--azul)}
+.nt .ni.p{background:var(--verde-bg);color:var(--verde)}
+.nt .ni.s{background:var(--fundo);color:var(--cinza)}
+.nt .nb{flex:1;min-width:0}
+.nt .nt1{font-size:13.5px;font-weight:600;line-height:1.35}
+.nt .nt1 b{font-weight:800}
+.nt .nw{font-size:11.5px;color:var(--cinza);margin-top:3px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="intro">
+  <h1>Área do PT — o mockup, no sistema claro</h1>
+  <p>A mesma organização e densidade do mockup que mostraste (resumo do negócio, mini-gráficos de tendência por aluno, navegação inferior), mas no sistema claro e rigoroso que já está no código. As melhorias que acrescentei estão anotadas por baixo de cada ecrã.</p>
+</div>
+
+<div class="row">
+
+  <!-- ============ 1 · PAINEL PT ============ -->
+  <div class="col">
+    <div class="cap">1 · Painel do PT</div>
+    <div class="ph"><div class="scr">
+      <div class="top">
+        <div class="brand"><div class="logo">A</div><b>APEX</b></div>
+        <div class="bell">🔔<span class="dot"></span></div>
+      </div>
+      <div class="hello">
+        <div class="k">Terça, 14 de janeiro</div>
+        <h2>Olá, Miguel</h2>
+      </div>
+      <div class="kpis">
+        <div class="kpi"><div class="n tab">6</div><div class="l">Alunos ativos</div><div class="d up">+1 este mês</div></div>
+        <div class="kpi"><div class="n tab">18</div><div class="l">Treinos esta semana</div><div class="d up">12 concluídos</div></div>
+        <div class="kpi"><div class="n tab">84%</div><div class="l">Adesão média</div><div class="d up">+6% vs. mês passado</div></div>
+        <div class="kpi"><div class="n tab">3</div><div class="l">Mensagens por ler</div><div class="d flat">2 alunos</div></div>
+      </div>
+      <div class="sec"><h3>PRECISA DE ATENÇÃO</h3></div>
+      <div class="att">
+        <div class="ic">⚠️</div>
+        <div><div class="t">Bruno Dias · desconforto no ombro</div><div class="s">Reportou 3 vezes nas últimas 2 semanas. Vê os treinos dele.</div></div>
+      </div>
+      <div class="att" style="border-color:var(--baixo);background:var(--baixo-bg)">
+        <div class="ic">📉</div>
+        <div><div class="t" style="color:#9B2C1E">Carla Mota · sem treinar há 12 dias</div><div class="s" style="color:#9B2C1E">O plano dela termina esta semana.</div></div>
+      </div>
+      <div class="sec"><h3>OS MEUS ALUNOS</h3><a href="#">Ver todos →</a></div>
+      <div class="stu">
+        <div class="av">AS</div>
+        <div class="info"><div class="nm">Ana Silva</div><div class="meta">Hipertrofia · Semana 6/12</div></div>
+        <svg class="spark" viewBox="0 0 56 26"><polyline points="2,20 12,17 22,18 32,12 42,9 54,4" fill="none" stroke="#0F9D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="adh"><div class="p g">92%</div><div class="x">adesão</div></div>
+      </div>
+      <div class="stu">
+        <div class="av">BD</div>
+        <div class="info"><div class="nm">Bruno Dias</div><div class="meta">Powerlifting · Semana 3/8</div></div>
+        <svg class="spark" viewBox="0 0 56 26"><polyline points="2,10 12,9 22,13 32,12 42,16 54,15" fill="none" stroke="#C8761A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="adh"><div class="p a">63%</div><div class="x">adesão</div></div>
+      </div>
+      <div class="stu">
+        <div class="av">CM</div>
+        <div class="info"><div class="nm">Carla Mota</div><div class="meta">Emagrecimento · termina 6ª</div></div>
+        <svg class="spark" viewBox="0 0 56 26"><polyline points="2,8 12,11 22,14 32,15 42,19 54,22" fill="none" stroke="#C0392B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="adh"><div class="p b">41%</div><div class="x">adesão</div></div>
+      </div>
+      <div class="stu">
+        <div class="av">DF</div>
+        <div class="info"><div class="nm">Diogo Fernandes</div><div class="meta">Hipertrofia · Semana 9/12</div></div>
+        <svg class="spark" viewBox="0 0 56 26"><polyline points="2,18 12,16 22,13 32,13 42,8 54,6" fill="none" stroke="#0F9D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="adh"><div class="p g">88%</div><div class="x">adesão</div></div>
+      </div>
+      <div style="height:70px"></div>
+      <div class="nav">
+        <a class="on"><span class="i">▦</span>Início</a>
+        <a><span class="i">👥</span>Alunos</a>
+        <a><span class="i">➕</span>Criar</a>
+        <a><span class="i">💬</span>Mensagens</a>
+        <a><span class="i">⋯</span>Mais</a>
+      </div>
+    </div></div>
+    <p style="font-size:12px;color:#7B8089;max-width:340px;margin-top:12px;line-height:1.55">
+      <b style="color:#9BA0A8">Melhorias minhas:</b> o mini-gráfico de tendência (verde a subir, laranja/vermelho a descer) usa os dados de progressão que já temos — diz-te num relance quem evolui. Os alertas de atenção usam a lógica que já construímos (dor recorrente, inatividade, adesão baixa), agora em destaque no topo.
+    </p>
+  </div>
+
+  <!-- ============ 2 · LISTA ALUNOS ============ -->
+  <div class="col">
+    <div class="cap">2 · Os meus alunos</div>
+    <div class="ph"><div class="scr">
+      <div class="top">
+        <div class="brand"><div class="logo">A</div><b>Alunos</b></div>
+        <div class="bell">🔔<span class="dot"></span></div>
+      </div>
+      <div class="search">🔍 Procurar aluno…</div>
+      <div class="chips">
+        <div class="chip on">Todos · 6</div>
+        <div class="chip">Atenção · 2</div>
+        <div class="chip">Ativos</div>
+        <div class="chip">Plano a terminar</div>
+        <div class="chip">Novos</div>
+      </div>
+      <div class="stu" style="border-top:none">
+        <div class="av">CM</div>
+        <div class="info"><div class="nm">Carla Mota</div><div class="meta" style="color:var(--baixo);font-weight:600">Sem treinar há 12 dias</div></div>
+        <svg class="spark" viewBox="0 0 56 26"><polyline points="2,8 12,11 22,14 32,15 42,19 54,22" fill="none" stroke="#C0392B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="adh"><div class="p b">41%</div><div class="x">adesão</div></div>
+      </div>
+      <div class="stu">
+        <div class="av">BD</div>
+        <div class="info"><div class="nm">Bruno Dias</div><div class="meta" style="color:var(--alerta);font-weight:600">Desconforto no ombro</div></div>
+        <svg class="spark" viewBox="0 0 56 26"><polyline points="2,10 12,9 22,13 32,12 42,16 54,15" fill="none" stroke="#C8761A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="adh"><div class="p a">63%</div><div class="x">adesão</div></div>
+      </div>
+      <div class="stu">
+        <div class="av">AS</div>
+        <div class="info"><div class="nm">Ana Silva</div><div class="meta">Hipertrofia · Semana 6/12</div></div>
+        <svg class="spark" viewBox="0 0 56 26"><polyline points="2,20 12,17 22,18 32,12 42,9 54,4" fill="none" stroke="#0F9D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="adh"><div class="p g">92%</div><div class="x">adesão</div></div>
+      </div>
+      <div class="stu">
+        <div class="av">DF</div>
+        <div class="info"><div class="nm">Diogo Fernandes</div><div class="meta">Hipertrofia · Semana 9/12</div></div>
+        <svg class="spark" viewBox="0 0 56 26"><polyline points="2,18 12,16 22,13 32,13 42,8 54,6" fill="none" stroke="#0F9D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="adh"><div class="p g">88%</div><div class="x">adesão</div></div>
+      </div>
+      <div class="stu">
+        <div class="av">EP</div>
+        <div class="info"><div class="nm">Eva Pinto</div><div class="meta">Calistenia · Semana 2/10</div></div>
+        <svg class="spark" viewBox="0 0 56 26"><polyline points="2,15 12,14 22,13 32,11 42,10 54,9" fill="none" stroke="#0F9D6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="adh"><div class="p g">79%</div><div class="x">adesão</div></div>
+      </div>
+      <div style="height:70px"></div>
+      <div class="nav">
+        <a><span class="i">▦</span>Início</a>
+        <a class="on"><span class="i">👥</span>Alunos</a>
+        <a><span class="i">➕</span>Criar</a>
+        <a><span class="i">💬</span>Mensagens</a>
+        <a><span class="i">⋯</span>Mais</a>
+      </div>
+    </div></div>
+    <p style="font-size:12px;color:#7B8089;max-width:340px;margin-top:12px;line-height:1.55">
+      <b style="color:#9BA0A8">Melhorias minhas:</b> ordenados por urgência (quem precisa de atenção primeiro), não por ordem alfabética. Os filtros do teu prompt estão lá. O motivo de atenção aparece na própria linha, a cor.
+    </p>
+  </div>
+
+  <!-- ============ 3 · PARTILHA PÓS-TREINO ============ -->
+  <div class="col">
+    <div class="cap">3 · Treino concluído (lado do aluno)</div>
+    <div class="ph"><div class="scr">
+      <div class="done">
+        <div class="big">TREINO CONCLUÍDO</div>
+        <h2>Peito e Tríceps</h2>
+        <div class="grid">
+          <div class="box"><div class="n tab">58<span style="font-size:14px;color:var(--cinza)">min</span></div><div class="l">Duração</div></div>
+          <div class="box"><div class="n tab">8</div><div class="l">Exercícios</div></div>
+          <div class="box"><div class="n tab">8.420<span style="font-size:13px;color:var(--cinza)"> kg</span></div><div class="l">Volume total</div></div>
+          <div class="box pr"><div class="n tab">2</div><div class="l">Recordes pessoais 🎉</div></div>
+        </div>
+        <div class="btns">
+          <button class="b1">Publicar no feed</button>
+          <button class="b2">Guardar sem publicar</button>
+        </div>
+        <p style="font-size:11.5px;color:var(--cinza);margin-top:16px;line-height:1.5">Só publicas o que escolheres. O teu check-in e as notas de desconforto ficam sempre privados.</p>
+      </div>
+      <div style="height:60px"></div>
+      <div class="nav">
+        <a class="on"><span class="i">▦</span>Início</a>
+        <a><span class="i">🏋️</span>Treino</a>
+        <a><span class="i">📈</span>Progresso</a>
+        <a><span class="i">🔥</span>Social</a>
+        <a><span class="i">👤</span>Perfil</a>
+      </div>
+    </div></div>
+    <p style="font-size:12px;color:#7B8089;max-width:340px;margin-top:12px;line-height:1.55">
+      <b style="color:#9BA0A8">Melhorias minhas:</b> os recordes pessoais em destaque verde (vêm da estimativa automática que já construímos). O lembrete de privacidade por baixo — o isolamento que fechámos, dito ao utilizador no momento certo.
+    </p>
+  </div>
+
+  <!-- ============ 4 · NOTIFICAÇÕES ============ -->
+  <div class="col">
+    <div class="cap">4 · Notificações</div>
+    <div class="ph"><div class="scr">
+      <div class="top">
+        <div class="brand"><div class="logo">A</div><b>Notificações</b></div>
+      </div>
+      <div style="padding:14px 18px 4px;font-size:12.5px;color:var(--azul);font-weight:700">HOJE</div>
+      <div class="nt unread">
+        <div class="ni t">🏋️</div>
+        <div class="nb"><div class="nt1"><b>Miguel</b> atribuiu-te um plano novo: <b>Hipertrofia 12 semanas</b></div><div class="nw">há 2 h</div></div>
+      </div>
+      <div class="nt unread">
+        <div class="ni p">🏆</div>
+        <div class="nb"><div class="nt1">Novo recorde no <b>Supino</b>: 57,5 kg</div><div class="nw">há 5 h</div></div>
+      </div>
+      <div style="padding:16px 18px 4px;font-size:12.5px;color:var(--cinza);font-weight:700">ONTEM</div>
+      <div class="nt">
+        <div class="ni t">💬</div>
+        <div class="nb"><div class="nt1"><b>Miguel</b> comentou o teu vídeo de agachamento</div><div class="nw">ontem, 18:30</div></div>
+      </div>
+      <div class="nt">
+        <div class="ni s">❤️</div>
+        <div class="nb"><div class="nt1"><b>Ana Silva</b> gostou da tua publicação</div><div class="nw">ontem, 14:12</div></div>
+      </div>
+      <div class="nt">
+        <div class="ni p">🎯</div>
+        <div class="nb"><div class="nt1">Concluíste <b>3 de 4 treinos</b> desta semana</div><div class="nw">ontem, 09:00</div></div>
+      </div>
+      <div style="height:70px"></div>
+      <div class="nav">
+        <a class="on"><span class="i">▦</span>Início</a>
+        <a><span class="i">🏋️</span>Treino</a>
+        <a><span class="i">📈</span>Progresso</a>
+        <a><span class="i">🔥</span>Social</a>
+        <a><span class="i">👤</span>Perfil</a>
+      </div>
+    </div></div>
+    <p style="font-size:12px;color:#7B8089;max-width:340px;margin-top:12px;line-height:1.55">
+      <b style="color:#9BA0A8">Melhorias minhas:</b> agrupadas por dia, não lidas com fundo azul suave (o azul reservado a "coisa da app", coerente com o sistema). Cada tipo com o seu ícone. Só mostra o que já acontece de verdade — nada inventado.
+    </p>
+  </div>
+
+</div>
+</div>
+</body>
+</html>

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { carregarPerfilMotor, carregarPlanoAtivo } from "@/lib/treino/perfil";
 import { estimarRecordesDaSessao } from "@/lib/treino/estimativa-1rm";
+import { notificar } from "@/lib/social/notificar";
 import {
   advanceWeek,
   initProgression,
@@ -396,6 +397,14 @@ export async function gravarTreino(
     }
   }
 
+  await notificar(supabase, {
+    userId: user.id,
+    tipo: "treino_concluido",
+    titulo: "Treino concluído",
+    corpo: `Treino concluído: ${title}`,
+    refId: sessao.id,
+  });
+
   revalidatePath("/plano");
   revalidatePath("/progresso");
   redirect("/plano?treino=gravado");
@@ -675,6 +684,13 @@ export async function atribuirPlanoPt(
     });
     if (error) return { erro: BLOQUEIO_RLS };
   }
+
+  await notificar(supabase, {
+    userId: alunoId,
+    tipo: "plano_atribuido",
+    titulo: "Plano atribuído",
+    corpo: `${perfilPt?.name ?? "O teu PT"} atribuiu-te um plano novo: ${nome}`,
+  });
 
   revalidatePath(`/pt/aluno/${alunoId}`);
   return { ok: true };

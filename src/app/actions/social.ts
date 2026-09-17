@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { prepararPost, type FontePost, type PostKind } from "@/lib/social/sanitizar-post";
 import { extensaoDe, idFicheiro } from "@/lib/chat/media";
+import { notificar } from "@/lib/social/notificar";
 
 const BLOQUEIO_RLS =
   "Não foi possível guardar. As políticas de segurança da base de dados podem estar a bloquear esta operação.";
@@ -194,6 +195,20 @@ export async function alternarGosto(formData: FormData): Promise<EstadoSocial> {
   } else {
     const { error } = await supabase.from("post_likes").insert({ post_id: postId, user_id: user.id });
     if (error) return { erro: BLOQUEIO_RLS };
+
+    // Notifica só ao CRIAR o gosto, nunca ao tirar. Nunca a mim próprio
+    // (a policy de notifications já bloqueia, mas evita a tentativa).
+    const { data: post } = await supabase.from("posts").select("author_id").eq("id", postId).single();
+    if (post && post.author_id !== user.id) {
+      const { data: quemGostou } = await supabase.from("profiles").select("name").eq("id", user.id).single();
+      await notificar(supabase, {
+        userId: post.author_id,
+        tipo: "gosto",
+        titulo: "Novo gosto",
+        corpo: `${quemGostou?.name ?? "Alguém"} gostou da tua publicação`,
+        refId: postId,
+      });
+    }
   }
 
   revalidatePath("/feed");
@@ -219,6 +234,18 @@ export async function comentar(_anterior: EstadoSocial, formData: FormData): Pro
 
   const { error } = await supabase.from("post_comments").insert({ post_id: postId, user_id: user.id, body });
   if (error) return { erro: BLOQUEIO_RLS };
+
+  const { data: post } = await supabase.from("posts").select("author_id").eq("id", postId).single();
+  if (post && post.author_id !== user.id) {
+    const { data: quemComentou } = await supabase.from("profiles").select("name").eq("id", user.id).single();
+    await notificar(supabase, {
+      userId: post.author_id,
+      tipo: "comentario",
+      titulo: "Novo comentário",
+      corpo: `${quemComentou?.name ?? "Alguém"} comentou a tua publicação`,
+      refId: postId,
+    });
+  }
 
   revalidatePath("/feed");
   return { ok: true };

@@ -136,6 +136,9 @@ async function SeccaoAtleta({ userId }: { userId: string }) {
         <Link href="/descobrir" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.tinta }}>
           Descobrir
         </Link>
+        <Link href="/notificacoes" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.tinta }}>
+          Notificações
+        </Link>
       </nav>
     </div>
   );
@@ -472,6 +475,9 @@ async function SeccaoPt({ userId, ptCode }: { userId: string; ptCode: string | n
         </Link>
         <Link href="/descobrir" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.tinta }}>
           Descobrir
+        </Link>
+        <Link href="/notificacoes" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.tinta }}>
+          Notificações
         </Link>
       </nav>
 

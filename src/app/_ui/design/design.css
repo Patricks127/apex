@@ -1200,3 +1200,28 @@
   align-items: center;
   gap: 2px;
 }
+
+/* ============================================================
+   Notificações (modo claro).
+   ============================================================ */
+
+.apex-notificacao {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--apex-space-3);
+  padding: var(--apex-space-3) var(--apex-space-4);
+  border-bottom: 1px solid var(--apex-cinza-linha);
+  width: 100%;
+  background: transparent;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--apex-sans);
+}
+
+/* azul reservado a "coisa da app" — aqui, a marca de não lida. */
+.apex-notificacao--nao-lida {
+  background: var(--apex-azul-fundo);
+}

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { LIFT_LABEL, type Lift } from "@/lib/motor";
 import { METRICAS, type MetricaId } from "@/lib/treino/metricas";
+import { notificar } from "@/lib/social/notificar";
 
 const BLOQUEIO_RLS =
   "Não foi possível guardar. As políticas de segurança da base de dados podem estar a bloquear esta operação.";
@@ -38,13 +39,25 @@ export async function registarRecorde(
   } = await supabase.auth.getUser();
   if (!user) return { erro: "Sessão inválida." };
 
+  const valorFinal = Math.round(value * 10) / 10;
   const { error } = await supabase.from("personal_records").insert({
     user_id: user.id,
     lift,
-    value_kg: Math.round(value * 10) / 10,
+    value_kg: valorFinal,
     source: "manual",
   });
   if (error) return { erro: BLOQUEIO_RLS };
+
+  // Só recordes MANUAIS notificam — uma estimativa automática do treino
+  // ao vivo não é um teste real, não merece o mesmo peso de notícia (e
+  // esta ação só grava 'manual', nunca 'auto' — essa distinção fica em
+  // gravarTreino/estimarRecordesDaSessao).
+  await notificar(supabase, {
+    userId: user.id,
+    tipo: "recorde",
+    titulo: "Novo recorde",
+    corpo: `Novo recorde em ${LIFT_LABEL[lift as Lift]}: ${valorFinal} kg`,
+  });
 
   revalidatePath("/progresso");
   return { ok: true };

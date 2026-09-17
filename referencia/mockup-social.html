@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>APEX · Social — PT e atleta, sistema claro</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:#1C1E23;font-family:'Archivo',system-ui,sans-serif;padding:30px 18px 70px;color:#E9EAEC}
+.wrap{max-width:1500px;margin:0 auto}
+.intro{max-width:720px;margin-bottom:34px}
+.intro h1{font-size:28px;font-weight:800;letter-spacing:-.02em;margin-bottom:9px}
+.intro p{font-size:14.5px;line-height:1.6;color:#9BA0A8}
+.row{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start}
+.cap{font-size:12px;color:#6E737C;margin:0 0 12px 4px;font-weight:600}
+.ph{width:340px;height:730px;background:#fff;border-radius:26px;overflow:hidden;box-shadow:0 20px 55px rgba(0,0,0,.45);position:relative;color:#0A0A0B}
+.scr{height:100%;overflow-y:auto}
+.scr::-webkit-scrollbar{width:0}
+:root{--tinta:#0A0A0B;--cinza:#6B6B70;--linha:#E2E2E4;--fundo:#F6F6F7;--azul:#0047FF;--azul-bg:#EDF1FF;--verde:#0F9D6B;--verde-bg:#E7F7F0;--alerta:#C8761A;--baixo:#C0392B}
+.tab{font-variant-numeric:tabular-nums}
+.note{font-size:12px;color:#7B8089;max-width:340px;margin-top:12px;line-height:1.55}
+.note b{color:#9BA0A8}
+
+.top{display:flex;align-items:center;justify-content:space-between;padding:18px 18px 0}
+.brand{display:flex;align-items:center;gap:8px}
+.logo{width:26px;height:26px;background:var(--tinta);border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:14px}
+.brand b{font-size:15px;font-weight:800;letter-spacing:.02em}
+.bell{width:38px;height:38px;border:1px solid var(--linha);border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:17px}
+
+.tabs{display:flex;gap:7px;padding:13px 18px 4px;overflow-x:auto}
+.tb{white-space:nowrap;font-size:13px;font-weight:600;padding:8px 14px;border-radius:100px;border:1px solid var(--linha);color:var(--cinza)}
+.tb.on{background:var(--tinta);color:#fff;border-color:var(--tinta)}
+
+/* post */
+.post{border-bottom:1px solid var(--linha);padding:15px 18px}
+.ph-head{display:flex;align-items:center;gap:11px}
+.av{width:42px;height:42px;border-radius:13px;background:var(--fundo);border:1px solid var(--linha);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:var(--cinza);flex-shrink:0}
+.av.pt{background:var(--verde-bg);border-color:var(--verde);color:var(--verde)}
+.ph-head .who{flex:1;min-width:0}
+.ph-head .nm{font-size:14.5px;font-weight:700;display:flex;align-items:center;gap:6px}
+.badge{font-size:9.5px;font-weight:800;color:var(--verde);border:1px solid var(--verde);border-radius:5px;padding:1px 5px;letter-spacing:.03em}
+.ph-head .sub{font-size:12px;color:var(--cinza);margin-top:1px}
+.follow{font-size:12.5px;font-weight:700;color:var(--azul);border:1px solid var(--azul);border-radius:9px;padding:6px 12px;background:none}
+.ptxt{font-size:14px;line-height:1.55;margin:12px 0 0}
+.wk{margin-top:12px;border:1px solid var(--linha);border-radius:14px;padding:13px 15px}
+.wk .t{font-weight:700;font-size:14px}
+.wk .r{display:flex;gap:18px;margin-top:9px}
+.wk .r div .n{font-size:16px;font-weight:800;letter-spacing:-.02em}
+.wk .r div .l{font-size:10.5px;color:var(--cinza);font-weight:600;letter-spacing:.05em}
+.rec{margin-top:12px;background:var(--verde-bg);border:1px solid var(--verde);border-radius:14px;padding:14px 15px;text-align:center}
+.rec .k{font-family:'Barlow Condensed';font-size:12px;letter-spacing:.14em;color:var(--verde);font-weight:700}
+.rec .v{font-size:26px;font-weight:900;letter-spacing:-.03em;margin-top:3px}
+.rec .x{font-size:12px;color:var(--cinza);margin-top:1px}
+.media{margin-top:12px;height:180px;border-radius:14px;background:linear-gradient(135deg,#E8E8EA,#D4D4D7);display:flex;align-items:center;justify-content:center;color:#A0A0A6;font-size:13px}
+.acts{display:flex;gap:20px;margin-top:13px;color:var(--cinza);font-size:13.5px;font-weight:600}
+.acts .a{display:flex;align-items:center;gap:6px}
+.acts .a.on{color:var(--baixo)}
+
+.nav{position:absolute;bottom:0;left:0;right:0;height:62px;background:#fff;border-top:1px solid var(--linha);display:flex}
+.nav a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:10.5px;color:var(--cinza);font-weight:600;text-decoration:none}
+.nav a.on{color:var(--tinta)}
+.nav .i{font-size:19px}
+
+/* perfil */
+.pf-hero{padding:20px 18px 0}
+.pf-top{display:flex;align-items:center;gap:14px}
+.pf-av{width:70px;height:70px;border-radius:20px;background:var(--fundo);border:1px solid var(--linha);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:22px;color:var(--cinza);flex-shrink:0}
+.pf-av.pt{background:var(--verde-bg);border-color:var(--verde);color:var(--verde)}
+.pf-top .nm{font-size:20px;font-weight:800;letter-spacing:-.02em;display:flex;align-items:center;gap:7px}
+.pf-top .hl{font-size:13px;color:var(--cinza);margin-top:2px;line-height:1.4}
+.pf-stats{display:flex;gap:26px;margin:16px 0 0}
+.pf-stats div .n{font-size:18px;font-weight:800;letter-spacing:-.02em}
+.pf-stats div .l{font-size:11px;color:var(--cinza);font-weight:600;letter-spacing:.04em;margin-top:1px}
+.pf-bio{font-size:13.5px;line-height:1.6;margin:14px 0 0;color:#2A2A2E}
+.spec{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.spec span{font-size:11px;font-weight:700;background:var(--verde-bg);border:1px solid var(--verde);color:var(--verde);border-radius:7px;padding:4px 9px}
+.pf-btn{display:flex;gap:9px;margin-top:16px}
+.pf-btn button{flex:1;padding:12px;border-radius:11px;font-weight:700;font-size:13.5px;border:1px solid var(--linha);background:#fff;color:var(--tinta)}
+.pf-btn .prim{background:var(--tinta);color:#fff;border-color:var(--tinta)}
+.pf-tabs{display:flex;border-bottom:1px solid var(--linha);margin-top:18px}
+.pf-tabs div{flex:1;text-align:center;padding:13px 0;font-size:13px;font-weight:700;color:var(--cinza);border-bottom:2px solid transparent}
+.pf-tabs div.on{color:var(--tinta);border-bottom-color:var(--tinta)}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;padding:3px}
+.grid3 .cell{aspect-ratio:1;background:linear-gradient(135deg,#E8E8EA,#D4D4D7);border-radius:3px;display:flex;align-items:center;justify-content:center;color:#A0A0A6;font-size:20px}
+.cert{padding:14px 18px;border-bottom:1px solid var(--linha);font-size:13.5px}
+.cert .c{display:flex;gap:9px;align-items:center;margin-top:3px}
+.ach{display:flex;gap:11px;padding:13px 18px;border-bottom:1px solid var(--linha);align-items:center}
+.ach .m{width:40px;height:40px;border-radius:11px;background:var(--verde-bg);color:var(--verde);display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}
+.ach .t{font-size:13.5px;font-weight:700}.ach .s{font-size:12px;color:var(--cinza);margin-top:1px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="intro">
+  <h1>A parte social — PT e atleta</h1>
+  <p>Feed único com separador "De PTs", e os dois perfis: o do PT como montra profissional (que angaria clientes), o do atleta como diário e comunidade. Reels ficam para depois, como combinámos.</p>
+</div>
+
+<div class="row">
+
+  <!-- ===== 1 · FEED ===== -->
+  <div>
+    <div class="cap">1 · Feed (visto por qualquer um)</div>
+    <div class="ph"><div class="scr">
+      <div class="top"><div class="brand"><div class="logo">A</div><b>Comunidade</b></div><div class="bell">🔍</div></div>
+      <div class="tabs"><div class="tb on">Tudo</div><div class="tb">A seguir</div><div class="tb">De PTs</div><div class="tb">Meus</div></div>
+
+      <div class="post">
+        <div class="ph-head">
+          <div class="av pt">MS</div>
+          <div class="who"><div class="nm">Miguel Santos <span class="badge">PT</span></div><div class="sub">há 3 h · dica</div></div>
+          <button class="follow">Seguir</button>
+        </div>
+        <p class="ptxt">Se consegues fazer mais 3 reps do que o prescrito, a carga está leve. Progressão não é opcional — é o treino a acontecer. 💪</p>
+        <div class="acts"><div class="a on">♥ 34</div><div class="a">💬 8</div><div class="a">↗ Partilhar</div><div class="a" style="margin-left:auto">🔖</div></div>
+      </div>
+
+      <div class="post">
+        <div class="ph-head">
+          <div class="av">AS</div>
+          <div class="who"><div class="nm">Ana Silva</div><div class="sub">há 5 h · recorde</div></div>
+        </div>
+        <div class="rec"><div class="k">🏆 NOVO RECORDE</div><div class="v">57,5 kg</div><div class="x">Supino com barra</div></div>
+        <p class="ptxt">Há um ano não levantava a barra vazia. Obrigada Miguel! 🙌</p>
+        <div class="acts"><div class="a on">♥ 52</div><div class="a">💬 12</div><div class="a">↗ Partilhar</div><div class="a" style="margin-left:auto">🔖</div></div>
+      </div>
+
+      <div class="post">
+        <div class="ph-head">
+          <div class="av">BD</div>
+          <div class="who"><div class="nm">Bruno Dias</div><div class="sub">ontem · treino</div></div>
+        </div>
+        <div class="wk"><div class="t">Powerlifting · Agachamento</div><div class="r"><div><div class="n tab">16</div><div class="l">SÉRIES</div></div><div><div class="n tab">8.4t</div><div class="l">VOLUME</div></div><div><div class="n tab">8,6</div><div class="l">RPE</div></div></div></div>
+        <div class="acts"><div class="a">♥ 18</div><div class="a">💬 3</div><div class="a">↗ Partilhar</div><div class="a" style="margin-left:auto">🔖</div></div>
+      </div>
+
+      <div style="height:70px"></div>
+      <div class="nav"><a><span class="i">▦</span>Início</a><a><span class="i">🏋️</span>Treino</a><a><span class="i">📈</span>Progresso</a><a class="on"><span class="i">🔥</span>Social</a><a><span class="i">👤</span>Perfil</a></div>
+    </div></div>
+    <p class="note"><b>Melhorias minhas:</b> o separador "De PTs" (que já existe no código) deixa filtrar só conteúdo profissional. Publicações de treino/recorde puxam dos dados reais, com o isolamento privado→público que fechámos. PTs têm selo verde.</p>
+  </div>
+
+  <!-- ===== 2 · PERFIL DO PT (montra) ===== -->
+  <div>
+    <div class="cap">2 · Perfil do PT — montra profissional</div>
+    <div class="ph"><div class="scr">
+      <div class="top"><div class="brand"><div class="logo">A</div><b>Perfil</b></div><div class="bell">⋯</div></div>
+      <div class="pf-hero">
+        <div class="pf-top">
+          <div class="pf-av pt">MS</div>
+          <div><div class="nm">Miguel Santos <span class="badge">PT ✓</span></div><div class="hl">Especialista em hipertrofia e força · Porto</div></div>
+        </div>
+        <div class="pf-stats">
+          <div><div class="n tab">6</div><div class="l">ATLETAS</div></div>
+          <div><div class="n tab">248</div><div class="l">SEGUIDORES</div></div>
+          <div><div class="n tab">37</div><div class="l">PUBLICAÇÕES</div></div>
+        </div>
+        <p class="pf-bio">8 anos a treinar atletas de força. Foco em progressão sustentável e técnica sólida. Aceito alunos online e presenciais.</p>
+        <div class="spec"><span>Hipertrofia</span><span>Força</span><span>Powerlifting</span></div>
+        <div class="pf-btn"><button class="prim">Pedir para ser meu aluno</button><button>Mensagem</button></div>
+      </div>
+      <div class="pf-tabs"><div class="on">Publicações</div><div>Sobre</div><div>Resultados</div></div>
+      <div class="grid3">
+        <div class="cell">💪</div><div class="cell">🏆</div><div class="cell">📊</div>
+        <div class="cell">🎥</div><div class="cell">💡</div><div class="cell">🔥</div>
+        <div class="cell">📈</div><div class="cell">🏋️</div><div class="cell">✅</div>
+      </div>
+      <div style="height:70px"></div>
+      <div class="nav"><a><span class="i">▦</span>Início</a><a><span class="i">👥</span>Alunos</a><a><span class="i">➕</span>Criar</a><a><span class="i">💬</span>Mensagens</a><a class="on"><span class="i">👤</span>Perfil</a></div>
+    </div></div>
+    <p class="note"><b>Melhorias minhas:</b> o perfil do PT é uma <b>montra que angaria clientes</b> — botão "Pedir para ser meu aluno" liga diretamente ao fluxo de ligação que já construímos. Selo verificado, especialidades, contadores. A aba "Resultados" mostra evoluções de alunos que autorizaram.</p>
+  </div>
+
+  <!-- ===== 3 · PERFIL DO ATLETA ===== -->
+  <div>
+    <div class="cap">3 · Perfil do atleta — diário e comunidade</div>
+    <div class="ph"><div class="scr">
+      <div class="top"><div class="brand"><div class="logo">A</div><b>Perfil</b></div><div class="bell">⚙️</div></div>
+      <div class="pf-hero">
+        <div class="pf-top">
+          <div class="pf-av">AS</div>
+          <div><div class="nm">Ana Silva</div><div class="hl">A caminho da 1ª maratona 🏃‍♀️</div></div>
+        </div>
+        <div class="pf-stats">
+          <div><div class="n tab">48</div><div class="l">TREINOS</div></div>
+          <div><div class="n tab">126</div><div class="l">SEGUIDORES</div></div>
+          <div><div class="n tab">3</div><div class="l">RECORDES</div></div>
+        </div>
+        <p class="pf-bio">Hipertrofia com a APEX desde junho. Treino com o Miguel. Bora! 💪</p>
+        <div class="pf-btn"><button class="prim">Seguir</button><button>Mensagem</button></div>
+      </div>
+      <div class="pf-tabs"><div class="on">Publicações</div><div>Recordes</div><div>Conquistas</div></div>
+      <div class="ach">
+        <div class="m">🏆</div><div><div class="t">Novo recorde · Supino 57,5 kg</div><div class="s">há 5 horas</div></div>
+      </div>
+      <div class="ach">
+        <div class="m">🔥</div><div><div class="t">30 treinos concluídos</div><div class="s">semana passada</div></div>
+      </div>
+      <div class="ach">
+        <div class="m">🎯</div><div><div class="t">4 semanas seguidas sem falhar</div><div class="s">há 2 semanas</div></div>
+      </div>
+      <div style="padding:14px 18px;font-size:12px;color:var(--cinza);line-height:1.5;border-top:1px solid var(--linha)">🔒 O peso, as medidas e as fotos de evolução da Ana ficam privados. Só aparece aqui o que ela escolher publicar.</div>
+      <div style="height:70px"></div>
+      <div class="nav"><a><span class="i">▦</span>Início</a><a><span class="i">🏋️</span>Treino</a><a><span class="i">📈</span>Progresso</a><a><span class="i">🔥</span>Social</a><a class="on"><span class="i">👤</span>Perfil</a></div>
+    </div></div>
+    <p class="note"><b>Melhorias minhas:</b> conquistas geradas automaticamente dos dados reais (recordes, streaks de adesão). O lembrete de privacidade no fim — peso, medidas e fotos nunca aparecem no perfil público, coerente com o isolamento que construímos.</p>
+  </div>
+
+</div>
+</div>
+</body>
+</html>
