@@ -1213,15 +1213,42 @@
   border-bottom: 1px solid var(--apex-cinza-linha);
   width: 100%;
   background: transparent;
-  border-left: none;
-  border-right: none;
-  border-top: none;
-  text-align: left;
-  cursor: pointer;
-  font-family: var(--apex-sans);
 }
 
 /* azul reservado a "coisa da app" — aqui, a marca de não lida. */
 .apex-notificacao--nao-lida {
   background: var(--apex-azul-fundo);
+}
+
+.apex-sino {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border: 1px solid var(--apex-cinza-linha);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--apex-tinta);
+  text-decoration: none;
+}
+
+.apex-sino__contador {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: var(--apex-azul);
+  color: var(--apex-branco);
+  font-family: var(--apex-sans);
+  font-size: 10px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--apex-branco);
 }

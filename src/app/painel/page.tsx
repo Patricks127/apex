@@ -10,6 +10,8 @@ import type { DiaGerado } from "@/lib/motor";
 import { sair } from "@/app/actions/auth";
 import { responderPedido, revogarAcesso } from "@/app/actions/ligacoes";
 import { BlocoDados } from "../_ui/design/bloco-dados";
+import { Sino } from "../_ui/social/sino";
+import { contarNaoLidas } from "@/lib/social/notificacoes-dados";
 import { CodigoPt } from "./codigo-pt";
 import { OMeuPt } from "./o-meu-pt";
 
@@ -50,11 +52,10 @@ export default async function PainelPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/entrar");
 
-  const { data: perfil } = await supabase
-    .from("profiles")
-    .select("name, role, pt_code")
-    .eq("id", user.id)
-    .single();
+  const [{ data: perfil }, naoLidas] = await Promise.all([
+    supabase.from("profiles").select("name, role, pt_code").eq("id", user.id).single(),
+    contarNaoLidas(supabase, user.id),
+  ]);
 
   return (
     <main className="apex-ecra-claro mx-auto flex w-full max-w-lg flex-col gap-8 px-5 py-8">
@@ -70,15 +71,18 @@ export default async function PainelPage() {
             {perfil?.role ? (NOME_PAPEL[perfil.role] ?? perfil.role) : "Perfil incompleto"}
           </p>
         </div>
-        <form action={sair}>
-          <button
-            type="submit"
-            className="apex-tipo-etiqueta border px-3 py-1.5"
-            style={{ borderColor: COR.linha, color: COR.fraco }}
-          >
-            Terminar sessão
-          </button>
-        </form>
+        <div className="flex items-center gap-2">
+          <Sino naoLidas={naoLidas} />
+          <form action={sair}>
+            <button
+              type="submit"
+              className="apex-tipo-etiqueta border px-3 py-1.5"
+              style={{ borderColor: COR.linha, color: COR.fraco }}
+            >
+              Terminar sessão
+            </button>
+          </form>
+        </div>
       </header>
 
       {perfil?.role === "pt" ? (

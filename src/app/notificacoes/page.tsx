@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { carregarNotificacoes, type Notificacao } from "@/lib/social/notificacoes-dados";
-import { marcarLida } from "@/app/actions/notificacoes";
+import { MarcarVisiveisLidas } from "./marcar-visiveis-lidas";
 
 export const metadata: Metadata = {
   title: "Notificações · APEX",
@@ -35,6 +35,7 @@ export default async function NotificacoesPage() {
   if (!user) redirect("/entrar");
 
   const notificacoes = await carregarNotificacoes(supabase, user.id);
+  const temNaoLidas = notificacoes.some((n) => !n.lida);
 
   const grupos = new Map<string, Notificacao[]>();
   for (const n of notificacoes) {
@@ -46,6 +47,11 @@ export default async function NotificacoesPage() {
 
   return (
     <main className="apex-ecra-claro mx-auto flex min-h-dvh w-full max-w-lg flex-col px-0 py-8">
+      {/* Marca as não lidas desta visita como lidas — o ecrã continua a
+          mostrar o fundo azul nesta visualização (dados já carregados
+          acima); só a próxima visita e o contador do sino refletem "lida". */}
+      {temNaoLidas ? <MarcarVisiveisLidas /> : null}
+
       <h1 className="apex-tipo-titulo-ecra px-5" style={{ marginTop: 0, color: COR.tinta }}>
         Notificações
       </h1>
@@ -73,8 +79,8 @@ export default async function NotificacoesPage() {
 }
 
 function ItemNotificacao({ notificacao }: { notificacao: Notificacao }) {
-  const conteudo = (
-    <>
+  return (
+    <div className={notificacao.lida ? "apex-notificacao" : "apex-notificacao apex-notificacao--nao-lida"}>
       <div className="min-w-0 flex-1">
         <p className="apex-tipo-corpo" style={{ color: COR.tinta }}>
           {notificacao.titulo}
@@ -88,19 +94,6 @@ function ItemNotificacao({ notificacao }: { notificacao: Notificacao }) {
           {hora(notificacao.createdAt)}
         </p>
       </div>
-    </>
-  );
-
-  if (notificacao.lida) {
-    return <div className="apex-notificacao">{conteudo}</div>;
-  }
-
-  return (
-    <form action={marcarLida}>
-      <input type="hidden" name="id" value={notificacao.id} />
-      <button type="submit" className="apex-notificacao apex-notificacao--nao-lida">
-        {conteudo}
-      </button>
-    </form>
+    </div>
   );
 }

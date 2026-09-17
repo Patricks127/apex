@@ -1,20 +1,21 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
-export async function marcarLida(formData: FormData): Promise<void> {
-  const id = String(formData.get("id") ?? "");
-  if (!id) return;
-
+/**
+ * Marca como lidas todas as notificações não lidas do próprio utilizador.
+ * Chamado uma vez ao abrir /notificacoes (ver MarcarVisiveisLidas) —
+ * plain function call num useEffect, NUNCA via <form action>, para não
+ * disparar um refresh da rota a meio da visita (o ecrã já carregado
+ * continua a mostrar o fundo azul de "não lida" nesta visita; só a
+ * PRÓXIMA navegação, e o contador do sino, refletem o "lida").
+ */
+export async function marcarTodasComoLidas(): Promise<void> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return;
 
-  // RLS restringe a só o dono, e só o campo `lida` (trigger) — o filtro
-  // aqui é só para um erro previsível, não a proteção em si.
-  await supabase.from("notifications").update({ lida: true }).eq("id", id).eq("user_id", user.id);
-  revalidatePath("/notificacoes");
+  await supabase.from("notifications").update({ lida: true }).eq("user_id", user.id).eq("lida", false);
 }
