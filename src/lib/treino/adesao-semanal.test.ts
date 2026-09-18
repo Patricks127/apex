@@ -1,11 +1,25 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  chaveSemanaIso,
   agruparAdesaoPorSemanaCalendario,
   direcaoAdesao,
   estadoAdesao,
   JANELAS_ADESAO_SEMANAS,
 } from "./adesao-semanal.ts";
+
+// Datas de referência conhecidas da norma ISO 8601 (semana começa
+// segunda; a semana 1 é a que contém a primeira quinta-feira do ano).
+// Movidos de tendencia-volume.test.ts quando chaveSemanaIso passou a
+// viver aqui (o único módulo que ainda a usava).
+test("chaveSemanaIso: casos de referência da norma ISO 8601", () => {
+  assert.equal(chaveSemanaIso("2026-01-01T12:00:00Z"), "2026-W01");
+  assert.equal(chaveSemanaIso("2025-12-29T12:00:00Z"), "2026-W01"); // segunda da mesma semana ISO que 1 jan 2026
+  assert.equal(chaveSemanaIso("2026-01-05T12:00:00Z"), "2026-W02");
+  assert.equal(chaveSemanaIso("2024-12-31T12:00:00Z"), "2025-W01");
+  // 1 jan 2027 é sexta-feira — pertence à última semana ISO de 2026, não à W01 de 2027
+  assert.equal(chaveSemanaIso("2027-01-01T12:00:00Z"), "2026-W53");
+});
 
 // "Agora" fixo numa quinta-feira (2026-W38) para todos os testes datarem
 // de forma previsível.

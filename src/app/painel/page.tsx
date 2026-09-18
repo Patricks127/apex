@@ -7,6 +7,7 @@ import { indiceDiaSemanaHoje, proximoDiaDeTreino, construirLinhaTempo } from "@/
 import { MOTIVO_LABEL, type MotivoAtencao } from "@/lib/treino/atencao";
 import { atencaoDosAlunos } from "@/lib/treino/atencao-dados";
 import { carregarResumoAlunos, type ResumoAluno } from "@/lib/treino/resumo-alunos";
+import { chaveSemanaIso } from "@/lib/treino/adesao-semanal";
 import type { DiaGerado } from "@/lib/motor";
 import { sair } from "@/app/actions/auth";
 import { responderPedido, revogarAcesso } from "@/app/actions/ligacoes";
@@ -419,11 +420,17 @@ async function SeccaoPt({ userId, nome, ptCode }: { userId: string; nome: string
   let atencaoPorAluno = new Map<string, MotivoAtencao[]>();
   let resumoPorAluno = new Map<string, ResumoAluno>();
   let novosEsteMes = 0;
-  let treinosConcluidos7d = 0;
+  let treinosConcluidosSemana = 0;
 
   if (alunoIds.length) {
     const corte30d = janelaRecente(30);
-    const [{ data: msgs }, atencao, resumos, { data: sessoes7d }] = await Promise.all([
+    // Semana de CALENDÁRIO, não 7 dias rolling — a mesma janela que o
+    // sinal de adesão da linha usa (adesao-semanal.ts). As duas já
+    // divergiram uma da outra ao vivo (100% no KPI, 33% na linha, para o
+    // mesmo aluno, na mesma altura) e isso mina a confiança nos números
+    // — nunca duas janelas diferentes para "esta semana".
+    const semanaAtualChave = chaveSemanaIso(new Date().toISOString());
+    const [{ data: msgs }, atencao, resumos, { data: sessoesJanela }] = await Promise.all([
       supabase
         .from("messages")
         .select("sender_id")
@@ -441,14 +448,16 @@ async function SeccaoPt({ userId, nome, ptCode }: { userId: string; nome: string
       // ser fiável desde a migração 019 — antes, um aluno com plano próprio
       // (gerado pelo motor) ficava invisível à RLS de training_plans e
       // contava sistematicamente "0 esperados". Ver apex-training-plans-rls.md.
-      supabase.from("workout_sessions").select("user_id").in("user_id", alunoIds).gte("performed_at", janelaRecente(7)),
+      // janelaRecente(7) é só o limite do FETCH (cobre a semana ISO atual
+      // mesmo no piorcaso, hoje=domingo); o filtro real é chaveSemanaIso.
+      supabase.from("workout_sessions").select("user_id, performed_at").in("user_id", alunoIds).gte("performed_at", janelaRecente(7)),
     ]);
 
     mensagensPorLerRows = msgs ?? [];
     atencaoPorAluno = atencao;
     resumoPorAluno = new Map(resumos.map((r) => [r.id, r]));
     novosEsteMes = (alunos ?? []).filter((a) => a.created_at >= corte30d).length;
-    treinosConcluidos7d = (sessoes7d ?? []).length;
+    treinosConcluidosSemana = (sessoesJanela ?? []).filter((s) => chaveSemanaIso(s.performed_at) === semanaAtualChave).length;
   }
 
   const primeiroNome = (nome ?? "").trim().split(/\s+/)[0] || "PT";
@@ -471,7 +480,7 @@ async function SeccaoPt({ userId, nome, ptCode }: { userId: string; nome: string
         alunosAtivos={alunoIds.length}
         novosEsteMes={novosEsteMes}
         resumos={[...resumoPorAluno.values()]}
-        treinosConcluidos7d={treinosConcluidos7d}
+        treinosConcluidosSemana={treinosConcluidosSemana}
         mensagensPorLerRows={mensagensPorLerRows}
       />
 
@@ -557,20 +566,20 @@ function KpisNegocio({
   alunosAtivos,
   novosEsteMes,
   resumos,
-  treinosConcluidos7d,
+  treinosConcluidosSemana,
   mensagensPorLerRows,
 }: {
   alunosAtivos: number;
   novosEsteMes: number;
   resumos: ResumoAluno[];
-  treinosConcluidos7d: number;
+  treinosConcluidosSemana: number;
   mensagensPorLerRows: { sender_id: string }[];
 }) {
   // Esperados = soma dos dias de treino previstos nos planos ativos de
   // todos os alunos; quem não tem plano ativo conta 0, nunca parte a soma
   // (diasPrevistosSemana é number | null).
-  const esperados7d = resumos.reduce((s, r) => s + (r.diasPrevistosSemana ?? 0), 0);
-  const pctEsperados = esperados7d > 0 ? treinosConcluidos7d / esperados7d : null;
+  const esperadosSemana = resumos.reduce((s, r) => s + (r.diasPrevistosSemana ?? 0), 0);
+  const pctEsperados = esperadosSemana > 0 ? treinosConcluidosSemana / esperadosSemana : null;
   const comAdesao = resumos.filter((r) => r.adesaoMedia != null);
   const adesaoMedia =
     comAdesao.length > 0 ? comAdesao.reduce((s, r) => s + (r.adesaoMedia as number), 0) / comAdesao.length : null;
@@ -595,7 +604,7 @@ function KpisNegocio({
         positiva
       />
       <Kpi
-        numero={`${treinosConcluidos7d} de ${esperados7d}`}
+        numero={`${treinosConcluidosSemana} de ${esperadosSemana}`}
         etiqueta="Treinos esta semana"
         variacao={pctEsperados != null ? `${Math.round(pctEsperados * 100)}%` : null}
         positiva={pctEsperados != null ? (pctEsperados >= 0.75 ? true : pctEsperados < 0.5 ? false : undefined) : undefined}
