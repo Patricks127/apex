@@ -420,7 +420,6 @@ async function SeccaoPt({ userId, nome, ptCode }: { userId: string; nome: string
   let resumoPorAluno = new Map<string, ResumoAluno>();
   let novosEsteMes = 0;
   let treinosConcluidos7d = 0;
-  let alunosQueTreinaram7d = 0;
 
   if (alunoIds.length) {
     const corte30d = janelaRecente(30);
@@ -438,13 +437,10 @@ async function SeccaoPt({ userId, nome, ptCode }: { userId: string; nome: string
           .filter((a) => a.aluno?.id)
           .map((a) => ({ id: a.aluno!.id, nome: a.aluno!.name, avatarUrl: a.aluno!.avatar_url })),
       ),
-      // Contagem de "esperados" ficaria de fora de propósito: viria de
-      // carregarPlanoAtivo, e a RLS de training_plans só deixa o PT ler
-      // planos que ELE PRÓPRIO atribuiu — um aluno com plano próprio
-      // (gerado pelo motor) ficaria invisível e contaria como "0
-      // esperados", uma subcontagem sistemática e enganosa. O KPI usa só
-      // o que a RLS de workout_sessions já deixa o PT ver por completo
-      // (scope_treinos): sessões realmente gravadas.
+      // "Esperados" (soma de diasPrevistosSemana dos resumos) só passou a
+      // ser fiável desde a migração 019 — antes, um aluno com plano próprio
+      // (gerado pelo motor) ficava invisível à RLS de training_plans e
+      // contava sistematicamente "0 esperados". Ver apex-training-plans-rls.md.
       supabase.from("workout_sessions").select("user_id").in("user_id", alunoIds).gte("performed_at", janelaRecente(7)),
     ]);
 
@@ -453,7 +449,6 @@ async function SeccaoPt({ userId, nome, ptCode }: { userId: string; nome: string
     resumoPorAluno = new Map(resumos.map((r) => [r.id, r]));
     novosEsteMes = (alunos ?? []).filter((a) => a.created_at >= corte30d).length;
     treinosConcluidos7d = (sessoes7d ?? []).length;
-    alunosQueTreinaram7d = new Set((sessoes7d ?? []).map((s) => s.user_id)).size;
   }
 
   const primeiroNome = (nome ?? "").trim().split(/\s+/)[0] || "PT";
@@ -477,7 +472,6 @@ async function SeccaoPt({ userId, nome, ptCode }: { userId: string; nome: string
         novosEsteMes={novosEsteMes}
         resumos={[...resumoPorAluno.values()]}
         treinosConcluidos7d={treinosConcluidos7d}
-        alunosQueTreinaram7d={alunosQueTreinaram7d}
         mensagensPorLerRows={mensagensPorLerRows}
       />
 
@@ -564,16 +558,19 @@ function KpisNegocio({
   novosEsteMes,
   resumos,
   treinosConcluidos7d,
-  alunosQueTreinaram7d,
   mensagensPorLerRows,
 }: {
   alunosAtivos: number;
   novosEsteMes: number;
   resumos: ResumoAluno[];
   treinosConcluidos7d: number;
-  alunosQueTreinaram7d: number;
   mensagensPorLerRows: { sender_id: string }[];
 }) {
+  // Esperados = soma dos dias de treino previstos nos planos ativos de
+  // todos os alunos; quem não tem plano ativo conta 0, nunca parte a soma
+  // (diasPrevistosSemana é number | null).
+  const esperados7d = resumos.reduce((s, r) => s + (r.diasPrevistosSemana ?? 0), 0);
+  const pctEsperados = esperados7d > 0 ? treinosConcluidos7d / esperados7d : null;
   const comAdesao = resumos.filter((r) => r.adesaoMedia != null);
   const adesaoMedia =
     comAdesao.length > 0 ? comAdesao.reduce((s, r) => s + (r.adesaoMedia as number), 0) / comAdesao.length : null;
@@ -598,11 +595,10 @@ function KpisNegocio({
         positiva
       />
       <Kpi
-        numero={String(treinosConcluidos7d)}
+        numero={`${treinosConcluidos7d} de ${esperados7d}`}
         etiqueta="Treinos esta semana"
-        variacao={
-          alunosAtivos > 0 ? `${alunosQueTreinaram7d} de ${alunosAtivos} aluno${alunosAtivos === 1 ? "" : "s"}` : null
-        }
+        variacao={pctEsperados != null ? `${Math.round(pctEsperados * 100)}%` : null}
+        positiva={pctEsperados != null ? (pctEsperados >= 0.75 ? true : pctEsperados < 0.5 ? false : undefined) : undefined}
       />
       <Kpi
         numero={adesaoMedia != null ? `${Math.round(adesaoMedia * 100)}%` : "—"}
