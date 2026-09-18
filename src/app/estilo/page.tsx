@@ -2,7 +2,7 @@
 //
 // Mostra tokens e os componentes base lado a lado para revisão, antes de
 // qualquer ecrã existente ser tocado. Ver referencia/SISTEMA-DESIGN.md.
-// Página pública (src/middleware.ts) — não depende de sessão nem de dados.
+// Página pública (src/proxy.ts) — não depende de sessão nem de dados.
 
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
