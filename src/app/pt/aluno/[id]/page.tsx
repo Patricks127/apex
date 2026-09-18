@@ -9,8 +9,10 @@ import { MOTIVO_LABEL } from "@/lib/treino/atencao";
 import { carregarPlanoAtivo } from "@/lib/treino/perfil";
 import { carregarProgresso } from "@/lib/treino/progresso-dados";
 import { agruparAdesaoPorSemanaCalendario } from "@/lib/treino/adesao-semanal";
+import { apagarPlanoDocumento } from "@/app/actions/plan-documents";
 import { EditorPlanoPt, type ExercicioPicker, type DiaEditorInicial } from "./editor-plano-pt";
 import { SeccaoAdesaoSemanal, SeccaoForcaLeitura, SeccaoVolumeLeitura, SeccaoMetricasLeitura } from "./graficos-aluno";
+import { AnexarPlanoForm } from "./anexar-plano-form";
 
 const JANELAS_ADESAO_FICHA = 12; // mais história do que a linha do painel (6) — a ficha tem espaço
 
@@ -64,7 +66,7 @@ export default async function FichaAlunoPage({
     );
   }
 
-  const [{ data: planoExistente }, atencaoMap, planoAtivo, progresso] = await Promise.all([
+  const [{ data: planoExistente }, atencaoMap, planoAtivo, progresso, { data: documentos }] = await Promise.all([
     supabase
       .from("training_plans")
       .select("name, days")
@@ -80,7 +82,31 @@ export default async function FichaAlunoPage({
     // atribuiu (para pré-preencher o editor), possa ou não ser o ativo.
     carregarPlanoAtivo(supabase, alunoId),
     carregarProgresso(supabase, alunoId),
+    // Planos em PDF anexados a este aluno — de qualquer PT com scope
+    // (migração 020, mesma decisão consciente da 019: histórico inclui
+    // anexos de um PT anterior já revogado, ver decisions-and-principles.md).
+    supabase
+      .from("plan_documents")
+      .select("id, pt_id, file_name, size_bytes, storage_path, created_at")
+      .eq("student_id", alunoId)
+      .order("created_at", { ascending: false }),
   ]);
+
+  const documentosComUrl = await Promise.all(
+    (documentos ?? []).map(async (d) => {
+      const { data: assinado } = await supabase.storage
+        .from("plan-documents")
+        .createSignedUrl(d.storage_path, 60 * 60);
+      return {
+        id: d.id as string,
+        nomeFicheiro: d.file_name as string,
+        sizeBytes: d.size_bytes as number,
+        createdAt: d.created_at as string,
+        souEuQueAnexei: d.pt_id === user.id,
+        url: assinado?.signedUrl ?? null,
+      };
+    }),
+  );
 
   const diasPrevistosSemana = planoAtivo ? planoAtivo.days.days.filter((d) => !d.rest).length : null;
   const pontosAdesao =
@@ -191,6 +217,8 @@ export default async function FichaAlunoPage({
 
       <Historico sessoes={progresso.sessoes.slice(0, 8)} />
 
+      <SeccaoPlanosDocumento alunoId={alunoId} documentos={documentosComUrl} />
+
       <section className="flex flex-col gap-4">
         <div>
           <h2 className="apex-tipo-titulo-seccao" style={{ marginTop: 0, color: COR.tinta }}>
@@ -213,6 +241,85 @@ export default async function FichaAlunoPage({
 }
 
 // ---------------------------------------------------------------------------
+
+type PlanoDocumento = {
+  id: string;
+  nomeFicheiro: string;
+  sizeBytes: number;
+  createdAt: string;
+  souEuQueAnexei: boolean;
+  url: string | null;
+};
+
+function formatarTamanho(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * Planos em PDF anexados — em paralelo ao plano estruturado abaixo, não em
+ * vez dele. Qualquer PT com scope vê o histórico (mesma decisão da 019),
+ * mas só quem anexou tem o botão de apagar — a RLS já bloquearia os
+ * outros, isto é só não mostrar um botão que nunca funcionaria.
+ */
+function SeccaoPlanosDocumento({ alunoId, documentos }: { alunoId: string; documentos: PlanoDocumento[] }) {
+  return (
+    <section className="flex flex-col gap-3">
+      <div>
+        <h2 className="apex-tipo-titulo-seccao" style={{ marginTop: 0, color: COR.tinta }}>
+          Plano em PDF
+        </h2>
+        <p className="apex-tipo-secundario" style={{ color: COR.fraco, marginTop: 4 }}>
+          Anexa um plano em ficheiro, além (ou em vez) do plano estruturado abaixo.
+        </p>
+      </div>
+
+      {documentos.length > 0 ? (
+        <div className="flex flex-col">
+          {documentos.map((d) => (
+            <div key={d.id} className="apex-linha-exercicio">
+              <div className="apex-linha-exercicio__principal">
+                {d.url ? (
+                  <a
+                    href={d.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="apex-tipo-nome-exercicio underline underline-offset-4"
+                    style={{ color: COR.tinta }}
+                  >
+                    {d.nomeFicheiro}
+                  </a>
+                ) : (
+                  <span className="apex-tipo-nome-exercicio" style={{ color: COR.fraco }}>
+                    {d.nomeFicheiro} (link indisponível)
+                  </span>
+                )}
+                <span className="apex-tipo-etiqueta apex-tabular" style={{ color: COR.fraco }}>
+                  {new Date(d.createdAt).toLocaleDateString("pt-PT")} · {formatarTamanho(d.sizeBytes)}
+                </span>
+              </div>
+              {d.souEuQueAnexei ? (
+                <form action={apagarPlanoDocumento}>
+                  <input type="hidden" name="id" value={d.id} />
+                  <input type="hidden" name="aluno_id" value={alunoId} />
+                  <button
+                    type="submit"
+                    className="apex-tipo-etiqueta shrink-0 border px-2.5 py-1.5"
+                    style={{ borderColor: COR.linha, color: COR.fraco }}
+                  >
+                    Apagar
+                  </button>
+                </form>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      <AnexarPlanoForm alunoId={alunoId} />
+    </section>
+  );
+}
 
 // Fotos de evolução (chat, is_evolution) — diferente de "Peso e medidas"
 // acima (essa é o registo estruturado de /progresso, gráfico com números).

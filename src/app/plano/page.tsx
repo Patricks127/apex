@@ -30,7 +30,7 @@ export default async function PlanoPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/entrar");
 
-  const [{ data: perfil }, planoAtivo, { data: todos }] = await Promise.all([
+  const [{ data: perfil }, planoAtivo, { data: todos }, { data: documentos }] = await Promise.all([
     supabase.from("profiles").select("goal").eq("id", user.id).single(),
     carregarPlanoAtivo(supabase, user.id),
     supabase
@@ -39,7 +39,29 @@ export default async function PlanoPage({
       .eq("student_id", user.id)
       .order("created_at", { ascending: false })
       .overrideTypes<{ id: string; name: string; owner_id: string; owner: { name: string | null } | null }[]>(),
+    // Planos em PDF que algum PT te anexou (migração 020) — em paralelo
+    // ao plano estruturado, não em vez dele.
+    supabase
+      .from("plan_documents")
+      .select("id, file_name, size_bytes, created_at, storage_path")
+      .eq("student_id", user.id)
+      .order("created_at", { ascending: false }),
   ]);
+
+  const documentosComUrl = await Promise.all(
+    (documentos ?? []).map(async (d) => {
+      const { data: assinado } = await supabase.storage
+        .from("plan-documents")
+        .createSignedUrl(d.storage_path, 60 * 60);
+      return {
+        id: d.id as string,
+        nomeFicheiro: d.file_name as string,
+        sizeBytes: d.size_bytes as number,
+        createdAt: d.created_at as string,
+        url: assinado?.signedUrl ?? null,
+      };
+    }),
+  );
 
   // Já treinaste hoje? Só interessa para o dia que É hoje na semana (ver
   // src/lib/treino/linha-tempo.ts — "a decorrer" só existe para o dia de
@@ -69,6 +91,8 @@ export default async function PlanoPage({
           Treino gravado. Quando fechares a semana, a progressão usa estes dados.
         </p>
       ) : null}
+
+      {documentosComUrl.length > 0 ? <PlanoDocumentoDestaque documentos={documentosComUrl} /> : null}
 
       {planoAtivo ? (
         <VistaPlano
@@ -141,5 +165,62 @@ export default async function PlanoPage({
         </section>
       ) : null}
     </main>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+type DocumentoPlano = { id: string; nomeFicheiro: string; sizeBytes: number; createdAt: string; url: string | null };
+
+function formatarTamanho(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** O mais recente em destaque; anteriores (se houver) listados por baixo,
+ *  mais discretos — nunca escondidos, só não competem pelo destaque. */
+function PlanoDocumentoDestaque({ documentos }: { documentos: DocumentoPlano[] }) {
+  const [recente, ...anteriores] = documentos;
+
+  return (
+    <section
+      className="flex flex-col gap-2 border p-4"
+      style={{ borderColor: "var(--apex-cinza-linha)", background: "var(--apex-cinza-fundo)" }}
+    >
+      <span className="apex-tipo-etiqueta" style={{ color: "var(--apex-cinza-texto)" }}>
+        Plano em PDF do teu PT
+      </span>
+      {recente.url ? (
+        <a href={recente.url} target="_blank" rel="noopener noreferrer" className="apex-botao apex-botao--claro">
+          Abrir {recente.nomeFicheiro}
+        </a>
+      ) : (
+        <p className="apex-tipo-corpo" style={{ color: "var(--apex-cinza-texto)" }}>
+          {recente.nomeFicheiro} — link indisponível de momento.
+        </p>
+      )}
+      <span className="apex-tipo-etiqueta apex-tabular" style={{ color: "var(--apex-cinza-texto)" }}>
+        {new Date(recente.createdAt).toLocaleDateString("pt-PT")} · {formatarTamanho(recente.sizeBytes)}
+      </span>
+
+      {anteriores.length > 0 ? (
+        <div className="mt-1 flex flex-col gap-1 border-t pt-2" style={{ borderColor: "var(--apex-cinza-linha)" }}>
+          {anteriores.map((d) =>
+            d.url ? (
+              <a
+                key={d.id}
+                href={d.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="apex-tipo-secundario underline underline-offset-4"
+                style={{ color: "var(--apex-cinza-texto)" }}
+              >
+                {d.nomeFicheiro} ({new Date(d.createdAt).toLocaleDateString("pt-PT")})
+              </a>
+            ) : null,
+          )}
+        </div>
+      ) : null}
+    </section>
   );
 }
