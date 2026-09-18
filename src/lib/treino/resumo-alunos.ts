@@ -2,11 +2,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { carregarPlanoAtivo } from "./perfil.ts";
 import { JANELA_ATENCAO_DIAS } from "./atencao.ts";
 import {
-  agruparVolumePorSemanaCalendario,
-  direcaoTendencia,
-  type Direcao,
-  type PontoTendencia,
-} from "./tendencia-volume.ts";
+  agruparAdesaoPorSemanaCalendario,
+  direcaoAdesao,
+  estadoAdesao,
+  type DirecaoAdesao,
+  type EstadoAdesao,
+  type PontoAdesaoSemanal,
+} from "./adesao-semanal.ts";
 
 export type ResumoAluno = {
   id: string;
@@ -22,14 +24,21 @@ export type ResumoAluno = {
   planoNome: string | null;
   semanaAtual: number | null;
   diasPrevistosSemana: number | null; // dias de treino (não-descanso) do plano ativo
-  adesaoMedia: number | null; // 0–1, últimos 21 dias; null = sem sessões na janela
+  adesaoMedia: number | null; // 0–1, últimos 21 dias (completion médio das sessões); null = sem sessões na janela
   adesaoMediaAnterior: number | null; // 0–1, os 21 dias antes desses — para a variação, só quando os dois existem
-  tendencia: PontoTendencia[]; // só semanas com sessão, cronológico
-  direcao: Direcao;
+  // Sinal de consistência da LINHA do painel — treinos feitos vs.
+  // previstos por semana de calendário, últimas ~6 semanas (ver
+  // adesao-semanal.ts). Diferente de adesaoMedia acima: aquela mede
+  // "quanto da sessão completaste", esta mede "treinaste as vezes que
+  // devias". pontosAdesao inclui SEMPRE as ~6 semanas (0 é um ponto
+  // real); pctAtual só existe quando direcaoAdesao !== "sem_dados".
+  pontosAdesao: PontoAdesaoSemanal[];
+  direcaoAdesao: DirecaoAdesao;
+  estadoAdesao: EstadoAdesao;
+  pctAtual: number | null;
 };
 
-const DIAS_LOOKBACK_TENDENCIA = 56; // ~8 semanas de calendário — cobre também a janela "anterior" da adesão (21–42 dias)
-const MAX_PONTOS_SPARKLINE = 6;
+const DIAS_LOOKBACK_TENDENCIA = 56; // ~8 semanas de calendário — cobre a janela "anterior" da adesão (21–42 dias) e as ~6 semanas do sinal de consistência
 
 function mediaCompletion(sessoes: { completion: number | null }[]): number | null {
   const valores = sessoes.map((s) => s.completion).filter((c): c is number => c != null);
@@ -41,8 +50,9 @@ function mediaCompletion(sessoes: { completion: number | null }[]): number | nul
  * (nome real do plano, nunca um "objetivo" inventado; nem todo o plano
  * tem um `goal` de motor, ex.: planos atribuídos pelo PT), semana atual
  * da progressão, adesão média (mesma janela de 3 semanas que "atenção"
- * já usa, para não inventar uma terceira janela), e a tendência de
- * volume por semana de calendário para o sparkline.
+ * já usa, para não inventar uma terceira janela), e o sinal de
+ * consistência (treinos feitos vs. previstos por semana, ~6 semanas) que
+ * alimenta o mini-gráfico da linha do aluno.
  */
 export async function carregarResumoAlunos(
   supabase: SupabaseClient,
@@ -58,18 +68,17 @@ export async function carregarResumoAlunos(
   const [{ data: sessoes }, planos] = await Promise.all([
     supabase
       .from("workout_sessions")
-      .select("user_id, performed_at, volume_kg, completion")
+      .select("user_id, performed_at, completion")
       .in("user_id", alunoIds)
       .gte("performed_at", corte),
     Promise.all(alunoIds.map((id) => carregarPlanoAtivo(supabase, id))),
   ]);
 
-  const sessoesPorAluno = new Map<string, { performedAt: string; volumeKg: number; completion: number | null }[]>();
+  const sessoesPorAluno = new Map<string, { performedAt: string; completion: number | null }[]>();
   for (const s of sessoes ?? []) {
     const lista = sessoesPorAluno.get(s.user_id as string) ?? [];
     lista.push({
       performedAt: s.performed_at as string,
-      volumeKg: (s.volume_kg as number) ?? 0,
       completion: s.completion as number | null,
     });
     sessoesPorAluno.set(s.user_id as string, lista);
@@ -86,10 +95,19 @@ export async function carregarResumoAlunos(
     const adesaoMedia = mediaCompletion(sessoesNaJanela);
     const adesaoMediaAnterior = mediaCompletion(sessoesNaJanelaAnterior);
 
-    const pontosTodos = agruparVolumePorSemanaCalendario(sessoesDoAluno);
-    const tendencia = pontosTodos.slice(-MAX_PONTOS_SPARKLINE);
-
     const diasPrevistosSemana = planoAtivo ? planoAtivo.days.days.filter((d) => !d.rest).length : null;
+
+    // Sinal de consistência: só faz sentido medir "feitos vs. previstos"
+    // quando existe um "previsto" real (plano ativo com pelo menos 1 dia
+    // de treino) — sem plano, é sem_dados, nunca 0% (0% afirmaria que o
+    // aluno falhou algo que nem chegou a ser prescrito).
+    const pontosAdesao =
+      diasPrevistosSemana && diasPrevistosSemana > 0
+        ? agruparAdesaoPorSemanaCalendario(sessoesDoAluno, diasPrevistosSemana)
+        : [];
+    const direcao = direcaoAdesao(pontosAdesao);
+    const estado = estadoAdesao(pontosAdesao, direcao);
+    const pctAtual = direcao !== "sem_dados" ? pontosAdesao[pontosAdesao.length - 1].pct : null;
 
     return {
       id: aluno.id,
@@ -100,8 +118,10 @@ export async function carregarResumoAlunos(
       diasPrevistosSemana,
       adesaoMedia,
       adesaoMediaAnterior,
-      tendencia,
-      direcao: direcaoTendencia(tendencia),
+      pontosAdesao,
+      direcaoAdesao: direcao,
+      estadoAdesao: estado,
+      pctAtual,
     };
   });
 }

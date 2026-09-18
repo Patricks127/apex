@@ -6,7 +6,7 @@ import { CabecalhoEcra } from "@/app/_ui/design/cabecalho-ecra";
 import { LIFT_LABEL, INJURIES, type Lift } from "@/lib/motor";
 import { marcarNovosRecordes } from "@/lib/treino/marcos";
 import { agruparVolumePorSemana } from "@/lib/treino/volume-historico";
-import { escalarPontos, pathLinha, escalarBarras } from "@/lib/treino/grafico";
+import { GraficoForca, GraficoMetrica, GraficoVolume } from "@/app/_ui/treino/graficos-progresso";
 import { registarRecorde, registarMetrica, type EstadoProgresso } from "@/app/actions/progresso";
 import { METRICAS, type MetricaId } from "@/lib/treino/metricas";
 import type { RecordePessoal, MetricaCorporal, SessaoHistorico } from "@/lib/treino/progresso-dados";
@@ -33,8 +33,6 @@ const EFFORT_LABEL: Record<string, string> = {
 
 const dataCurta = (iso: string) =>
   new Date(iso).toLocaleDateString("pt-PT", { day: "numeric", month: "short" });
-const dataLonga = (iso: string) =>
-  new Date(iso).toLocaleDateString("pt-PT", { day: "numeric", month: "long", year: "numeric" });
 
 export function ProgressoView({
   recordes,
@@ -138,66 +136,6 @@ function SeccaoForca({
   );
 }
 
-function GraficoForca({
-  pontos,
-}: {
-  pontos: (RecordePessoal & { novoRecorde: boolean })[];
-}) {
-  const LARGURA = 320;
-  const ALTURA = 160;
-  const coords = escalarPontos(
-    pontos.map((p) => p.valueKg),
-    LARGURA,
-    ALTURA,
-    24,
-  );
-  const path = pathLinha(coords);
-
-  return (
-    <svg
-      viewBox={`0 0 ${LARGURA} ${ALTURA}`}
-      className="apex-grafico__svg"
-      style={{ width: "100%", height: "auto" }}
-      role="img"
-      aria-label="Gráfico de evolução do 1RM"
-    >
-      <path d={path} fill="none" stroke={COR.tinta} strokeWidth={1.5} />
-      {coords.map((c, i) => {
-        const p = pontos[i];
-        const marco = p.novoRecorde;
-        const cor = marco ? COR.azul : COR.tinta;
-        const titulo = `${p.valueKg} kg · ${p.source === "auto" ? "estimativa do treino" : "testado no ginásio"} · ${dataLonga(p.recordedAt)}${marco ? " · novo recorde" : ""}`;
-        // aria-label, não <title> aninhado nem o atributo `title` (o SVGProps
-        // do React não o tipa) — um <title> dentro de <svg> é tratado pelo
-        // React como metadado do documento e sai vazio do lado do servidor,
-        // o que desalinha SSR/cliente.
-        return p.source === "auto" ? (
-          <circle
-            key={p.id}
-            cx={c.x}
-            cy={c.y}
-            r={marco ? 5.5 : 4}
-            fill={COR.branco}
-            stroke={cor}
-            strokeWidth={1.5}
-            aria-label={titulo}
-          />
-        ) : (
-          <rect
-            key={p.id}
-            x={c.x - (marco ? 4.5 : 3.5)}
-            y={c.y - (marco ? 4.5 : 3.5)}
-            width={marco ? 9 : 7}
-            height={marco ? 9 : 7}
-            fill={cor}
-            aria-label={titulo}
-          />
-        );
-      })}
-    </svg>
-  );
-}
-
 function FormRecorde({ liftInicial, aoGravado }: { liftInicial: Lift; aoGravado: () => void }) {
   const [estado, submeter, aEnviar] = useActionState<EstadoProgresso, FormData>(registarRecorde, {});
 
@@ -298,39 +236,6 @@ function SeccaoMetricas({
   );
 }
 
-function GraficoMetrica({ pontos }: { pontos: MetricaCorporal[] }) {
-  const LARGURA = 320;
-  const ALTURA = 140;
-  const coords = escalarPontos(
-    pontos.map((p) => p.value),
-    LARGURA,
-    ALTURA,
-    20,
-  );
-  const path = pathLinha(coords);
-
-  return (
-    <svg
-      viewBox={`0 0 ${LARGURA} ${ALTURA}`}
-      style={{ width: "100%", height: "auto" }}
-      role="img"
-      aria-label="Gráfico de evolução da métrica corporal"
-    >
-      <path d={path} fill="none" stroke={COR.tinta} strokeWidth={1.5} />
-      {coords.map((c, i) => (
-        <circle
-          key={pontos[i].id}
-          cx={c.x}
-          cy={c.y}
-          r={3.5}
-          fill={COR.tinta}
-          aria-label={`${pontos[i].value} · ${dataLonga(pontos[i].recordedAt)}`}
-        />
-      ))}
-    </svg>
-  );
-}
-
 function FormMetrica({
   metricInicial,
   aoGravado,
@@ -420,35 +325,6 @@ function SeccaoVolume({ sessoes }: { sessoes: SessaoHistorico[] }) {
         )}
       </div>
     </section>
-  );
-}
-
-function GraficoVolume({
-  barras,
-}: {
-  barras: { chave: string; valor: number; marco: boolean }[];
-}) {
-  const ALTURA = 120;
-  const alturas = escalarBarras(
-    barras.map((b) => b.valor),
-    ALTURA,
-  );
-
-  return (
-    <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: ALTURA }}>
-      {barras.map((b, i) => (
-        <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-          <div
-            title={`${b.chave}: ${Math.round(b.valor)} kg${b.marco ? " · descarga" : ""}`}
-            style={{
-              width: "100%",
-              height: Math.max(2, alturas[i]),
-              background: b.marco ? COR.azul : COR.tinta,
-            }}
-          />
-        </div>
-      ))}
-    </div>
   );
 }
 

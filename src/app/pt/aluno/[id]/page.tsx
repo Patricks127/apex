@@ -3,10 +3,16 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { EXERCICIOS, MUSCULO_LABEL } from "@/lib/motor2";
-import { LIFT_LABEL, type Lift, type PlanoGerado } from "@/lib/motor";
+import { type PlanoGerado } from "@/lib/motor";
 import { atencaoDosAlunos } from "@/lib/treino/atencao-dados";
 import { MOTIVO_LABEL } from "@/lib/treino/atencao";
+import { carregarPlanoAtivo } from "@/lib/treino/perfil";
+import { carregarProgresso } from "@/lib/treino/progresso-dados";
+import { agruparAdesaoPorSemanaCalendario } from "@/lib/treino/adesao-semanal";
 import { EditorPlanoPt, type ExercicioPicker, type DiaEditorInicial } from "./editor-plano-pt";
+import { SeccaoAdesaoSemanal, SeccaoForcaLeitura, SeccaoVolumeLeitura, SeccaoMetricasLeitura } from "./graficos-aluno";
+
+const JANELAS_ADESAO_FICHA = 12; // mais história do que a linha do painel (6) — a ficha tem espaço
 
 export const metadata: Metadata = {
   title: "Ficha do aluno · APEX",
@@ -32,7 +38,7 @@ export default async function FichaAlunoPage({
 
   const { data: link } = await supabase
     .from("pt_links")
-    .select("id, scope_treinos, scope_evolucao")
+    .select("id, scope_treinos, scope_evolucao, scope_metricas")
     .eq("pt_id", user.id)
     .eq("student_id", alunoId)
     .eq("status", "ativo")
@@ -58,7 +64,7 @@ export default async function FichaAlunoPage({
     );
   }
 
-  const [{ data: planoExistente }, atencaoMap, { data: prs }, { data: sessoes }] = await Promise.all([
+  const [{ data: planoExistente }, atencaoMap, planoAtivo, progresso] = await Promise.all([
     supabase
       .from("training_plans")
       .select("name, days")
@@ -68,14 +74,23 @@ export default async function FichaAlunoPage({
       .limit(1)
       .maybeSingle(),
     atencaoDosAlunos(supabase, [alunoId]),
-    supabase.from("personal_records").select("lift, value_kg").eq("user_id", alunoId),
-    supabase
-      .from("workout_sessions")
-      .select("title, completion, avg_rpe, week_number, created_at")
-      .eq("user_id", alunoId)
-      .order("created_at", { ascending: false })
-      .limit(8),
+    // Plano ATIVO real do aluno (próprio ou de qualquer PT, ver migração
+    // 019) — só para saber os dias previstos/semana da adesão abaixo.
+    // Diferente de `planoExistente`, que é sempre o plano que ESTE PT
+    // atribuiu (para pré-preencher o editor), possa ou não ser o ativo.
+    carregarPlanoAtivo(supabase, alunoId),
+    carregarProgresso(supabase, alunoId),
   ]);
+
+  const diasPrevistosSemana = planoAtivo ? planoAtivo.days.days.filter((d) => !d.rest).length : null;
+  const pontosAdesao =
+    diasPrevistosSemana && diasPrevistosSemana > 0
+      ? agruparAdesaoPorSemanaCalendario(
+          progresso.sessoes.map((s) => ({ performedAt: s.performedAt })),
+          diasPrevistosSemana,
+          JANELAS_ADESAO_FICHA,
+        )
+      : [];
 
   const evolucao = link.scope_evolucao
     ? await supabase
@@ -153,9 +168,28 @@ export default async function FichaAlunoPage({
         </Link>
       </nav>
 
-      <Metricas prs={prs ?? []} evolucao={evolucao} />
+      <SeccaoAdesaoSemanal pontos={pontosAdesao} />
 
-      <Historico sessoes={sessoes ?? []} />
+      <SeccaoForcaLeitura recordes={progresso.recordes} />
+
+      <SeccaoVolumeLeitura sessoes={progresso.sessoes} />
+
+      {link.scope_metricas ? (
+        <SeccaoMetricasLeitura metricas={progresso.metricas} />
+      ) : (
+        <section className="flex flex-col gap-1">
+          <h2 className="apex-tipo-titulo-seccao" style={{ marginTop: 0, color: COR.tinta }}>
+            Peso e medidas
+          </h2>
+          <p className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
+            Sem permissão de métricas.
+          </p>
+        </section>
+      )}
+
+      <Evolucao evolucao={evolucao} />
+
+      <Historico sessoes={progresso.sessoes.slice(0, 8)} />
 
       <section className="flex flex-col gap-4">
         <div>
@@ -180,59 +214,46 @@ export default async function FichaAlunoPage({
 
 // ---------------------------------------------------------------------------
 
-function Metricas({
-  prs,
+// Fotos de evolução (chat, is_evolution) — diferente de "Peso e medidas"
+// acima (essa é o registo estruturado de /progresso, gráfico com números).
+// Recordes pessoais já não aparecem aqui em lista plana — têm a secção
+// "Força" acima, com gráfico e o valor atual junto.
+function Evolucao({
   evolucao,
 }: {
-  prs: { lift: string; value_kg: number }[];
   evolucao: { weight_kg: number | null; measurement: string | null; created_at: string }[] | null;
 }) {
-  if (prs.length === 0 && (evolucao == null || evolucao.length === 0)) return null;
-
-  return (
-    <section className="flex flex-col gap-3">
-      <h2 className="apex-tipo-titulo-seccao" style={{ marginTop: 0, color: COR.tinta }}>
-        Métricas
-      </h2>
-
-      {prs.length > 0 ? (
-        <div className="flex flex-col gap-1.5">
-          <span className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
-            Recordes pessoais
-          </span>
-          <div className="flex flex-wrap gap-x-5 gap-y-1">
-            {prs.map((pr) => (
-              <span key={pr.lift} className="apex-tipo-secundario apex-tabular" style={{ color: COR.tinta }}>
-                {LIFT_LABEL[pr.lift as Lift] ?? pr.lift}: <strong>{pr.value_kg} kg</strong>
-              </span>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      {evolucao == null ? (
+  if (evolucao == null) {
+    return (
+      <section className="flex flex-col gap-1">
+        <h2 className="apex-tipo-titulo-seccao" style={{ marginTop: 0, color: COR.tinta }}>
+          Fotos de evolução
+        </h2>
         <p className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
           Sem permissão de evolução.
         </p>
-      ) : evolucao.length > 0 ? (
-        <div className="flex flex-col gap-1.5">
-          <span className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
-            Evolução recente
-          </span>
-          <div className="flex flex-col">
-            {evolucao.map((e, i) => (
-              <div key={i} className="flex items-center justify-between border-b py-1.5" style={{ borderColor: COR.linha }}>
-                <span className="apex-tipo-secundario apex-tabular" style={{ color: COR.fraco }}>
-                  {new Date(e.created_at).toLocaleDateString("pt-PT")}
-                </span>
-                <span className="apex-tipo-secundario apex-tabular" style={{ color: COR.tinta }}>
-                  {[e.weight_kg != null ? `${e.weight_kg} kg` : null, e.measurement].filter(Boolean).join(" · ")}
-                </span>
-              </div>
-            ))}
+      </section>
+    );
+  }
+  if (evolucao.length === 0) return null;
+
+  return (
+    <section className="flex flex-col gap-1.5">
+      <h2 className="apex-tipo-titulo-seccao" style={{ marginTop: 0, color: COR.tinta }}>
+        Fotos de evolução
+      </h2>
+      <div className="flex flex-col">
+        {evolucao.map((e, i) => (
+          <div key={i} className="flex items-center justify-between border-b py-1.5" style={{ borderColor: COR.linha }}>
+            <span className="apex-tipo-secundario apex-tabular" style={{ color: COR.fraco }}>
+              {new Date(e.created_at).toLocaleDateString("pt-PT")}
+            </span>
+            <span className="apex-tipo-secundario apex-tabular" style={{ color: COR.tinta }}>
+              {[e.weight_kg != null ? `${e.weight_kg} kg` : null, e.measurement].filter(Boolean).join(" · ")}
+            </span>
           </div>
-        </div>
-      ) : null}
+        ))}
+      </div>
     </section>
   );
 }
@@ -240,7 +261,7 @@ function Metricas({
 function Historico({
   sessoes,
 }: {
-  sessoes: { title: string; completion: number | null; avg_rpe: number | null; week_number: number; created_at: string }[];
+  sessoes: { title: string; completion: number | null; avgRpe: number | null; weekNumber: number | null; performedAt: string }[];
 }) {
   if (sessoes.length === 0) return null;
 
@@ -257,12 +278,13 @@ function Historico({
                 {s.title}
               </span>
               <span className="apex-tipo-etiqueta apex-tabular" style={{ color: COR.fraco }}>
-                {new Date(s.created_at).toLocaleDateString("pt-PT")} · semana {s.week_number}
+                {new Date(s.performedAt).toLocaleDateString("pt-PT")}
+                {s.weekNumber != null ? ` · semana ${s.weekNumber}` : ""}
               </span>
             </div>
             <span className="apex-tipo-secundario apex-tabular" style={{ color: COR.fraco }}>
               {s.completion != null ? `${Math.round(s.completion * 100)}%` : "—"}
-              {s.avg_rpe != null ? ` · RPE ${s.avg_rpe.toFixed(1)}` : ""}
+              {s.avgRpe != null ? ` · RPE ${s.avgRpe.toFixed(1)}` : ""}
             </span>
           </div>
         ))}

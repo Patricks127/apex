@@ -753,8 +753,10 @@ function ListaAlunos({
 }
 
 function LinhaAluno({ id, nome, resumo }: { id: string; nome: string; resumo: ResumoAluno | undefined }) {
-  const adesao = resumo?.adesaoMedia ?? null;
-  const corAdesao = adesao == null ? COR.fraco : adesao >= 0.75 ? "var(--apex-positivo)" : adesao >= 0.5 ? "var(--apex-alerta)" : "var(--apex-erro)";
+  const estado = resumo?.estadoAdesao ?? "sem_dados";
+  const pctAtual = resumo?.pctAtual ?? null;
+  const corAdesao =
+    estado === "sem_dados" ? COR.fraco : estado === "boa" ? "var(--apex-positivo)" : estado === "a_descer" ? "var(--apex-alerta)" : "var(--apex-erro)";
   const meta = [resumo?.planoNome, resumo?.semanaAtual != null ? `Semana ${resumo.semanaAtual}` : null]
     .filter(Boolean)
     .join(" · ");
@@ -779,10 +781,10 @@ function LinhaAluno({ id, nome, resumo }: { id: string; nome: string; resumo: Re
           {meta || "Sem plano ativo"}
         </p>
       </div>
-      <Sparkline tendencia={resumo?.tendencia ?? []} direcao={resumo?.direcao ?? "sem_dados"} />
+      <Sparkline pontos={resumo?.pontosAdesao ?? []} estado={estado} />
       <div className="apex-aluno-linha__adesao">
         <div className="apex-aluno-linha__adesao-valor apex-tabular" style={{ color: corAdesao }}>
-          {adesao != null ? `${Math.round(adesao * 100)}%` : "—"}
+          {pctAtual != null ? `${Math.round(pctAtual * 100)}%` : "—"}
         </div>
         <div className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
           adesão
