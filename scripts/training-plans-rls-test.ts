@@ -3,6 +3,13 @@
  * real. Cobre as 3 falhas encontradas na sondagem (scripts/training-plans-
  * rls-probe.ts) + o que já funcionava antes.
  *
+ * Alargado para a migração 019 (training_plans_pt_ve_todos) — casos 17-22:
+ * o PT passa a ver TODOS os planos do aluno (self-made incluído), continua
+ * SEM poder editar o que não criou, revogar corta tudo, e um PT sem ligação
+ * continua a não ver nada — incluindo o caso discutido explicitamente com o
+ * utilizador (ver decisions-and-principles.md): o PT atual vê o historial
+ * de planos criados por um PT anterior já revogado da mesma aluna.
+ *
  * Requisitos: "Confirm email" DESLIGADO. Uso: node scripts/training-plans-rls-test.ts
  */
 import { readFileSync } from "node:fs";
@@ -186,6 +193,51 @@ async function main() {
   const r16 = await get(A, `training_plans?id=eq.${planoB}&select=id`);
   if (Array.isArray(r16) && r16.length === 1) ok("aluno continua a ver o plano do (ex-)PT depois de revogar");
   else ko("aluno perdeu a visibilidade do próprio plano depois de revogar o PT", r16);
+
+  // --- migração 019: PT vê TODOS os planos do aluno com scope 'treinos' ---
+
+  // 17. novo PT D, liga-se a A (scope_treinos) — "o PT atual"
+  const D = await signup("trD", "pt", "PT D (atual)");
+  const linkD = await ligar(A, D);
+  console.log("  ligação A<->D ativa:", linkD);
+
+  // 18. objetivo da 019: PT D vê o plano que o PRÓPRIO ALUNO criou para si (planoA, owner_id=A)
+  const r18 = await get(D, `training_plans?id=eq.${planoA}&select=id,name`);
+  if (Array.isArray(r18) && r18.length === 1) ok("PT D vê o plano self-made do aluno (objetivo da 019)");
+  else ko("PT D não viu o plano self-made do aluno", r18);
+
+  // 19. mas continua a NÃO poder editá-lo — UPDATE inalterado, exige owner_id = auth.uid()
+  const r19 = await patch(D, `training_plans?id=eq.${planoA}`, { name: "Hackeado pelo PT D" });
+  const b19 = await r19.json();
+  if (r19.status >= 400 || (Array.isArray(b19) && b19.length === 0)) {
+    ok("PT D NÃO edita o plano self-made do aluno (vê, não edita)");
+  } else {
+    ko("PT D conseguiu editar o plano self-made do aluno", b19);
+  }
+
+  // 20. decisão consciente registada em decisions-and-principles.md: o PT atual
+  //     vê o plano que um PT ANTERIOR (B, revogado no passo 13) criou para a mesma aluna
+  const r20 = await get(D, `training_plans?id=eq.${planoB}&select=id,name`);
+  if (Array.isArray(r20) && r20.length === 1) {
+    ok("PT D (atual) vê o plano criado pelo PT B (antigo, já revogado) — decisão consciente");
+  } else {
+    ko("PT D não viu o plano do PT antigo — comportamento mudou face ao combinado?", r20);
+  }
+
+  // 21. um PT SEM ligação nenhuma a A não vê nada — nem o self-made, nem o de B, nem o de D
+  const E = await signup("trE", "pt", "PT E (sem ligação)");
+  const r21 = await get(E, `training_plans?student_id=eq.${A.id}&select=id`);
+  if (Array.isArray(r21) && r21.length === 0) ok("PT sem ligação nenhuma a A NÃO vê nenhum dos seus planos");
+  else ko("PT sem ligação viu planos de A", r21);
+
+  // 22. revogar D corta TUDO de imediato, incluindo o self-made que só passou a ver na 019
+  await patch(A, `pt_links?id=eq.${linkD}`, { status: "revogado" });
+  const r22 = await get(D, `training_plans?student_id=eq.${A.id}&select=id`);
+  if (Array.isArray(r22) && r22.length === 0) {
+    ok("PT D revogado deixa de ver TODOS os planos de A, incluindo o self-made");
+  } else {
+    ko("PT D revogado ainda vê planos de A", r22);
+  }
 
   console.log(`\n\x1b[1mResultado: ${pass} PASS / ${fail} FAIL\x1b[0m`);
   process.exit(fail > 0 ? 1 : 0);
