@@ -153,6 +153,33 @@ async function SeccaoAtleta({ userId }: { userId: string }) {
 
 async function BlocoTreinoHoje({ userId }: { userId: string }) {
   const supabase = await createClient();
+
+  // PDF manda (ver /plano) — se o PT anexou um plano em ficheiro, nem
+  // pedimos para gerar um estruturado nem mostramos o treino ao vivo,
+  // mesmo que exista um plano estruturado antigo por trás.
+  const { data: documentos } = await supabase.from("plan_documents").select("id").eq("student_id", userId).limit(1);
+  if ((documentos ?? []).length > 0) {
+    return (
+      <section className="flex flex-col gap-2">
+        <h2 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: COR.tinta }}>
+          O teu plano é um PDF
+        </h2>
+        <p className="apex-tipo-corpo" style={{ color: COR.fraco }}>
+          O treino ao vivo e a progressão automática não estão disponíveis para este plano — regista os teus
+          treinos manualmente.
+        </p>
+        <div className="flex flex-wrap gap-3" style={{ marginTop: "var(--apex-space-2)" }}>
+          <Link href="/treino/registar" className="apex-botao apex-botao--claro">
+            Registar treino de hoje
+          </Link>
+          <Link href="/plano" className="apex-tipo-secundario self-center underline underline-offset-4" style={{ color: COR.tinta }}>
+            Ver plano
+          </Link>
+        </div>
+      </section>
+    );
+  }
+
   const planoAtivo = await carregarPlanoAtivo(supabase, userId);
 
   if (!planoAtivo) {

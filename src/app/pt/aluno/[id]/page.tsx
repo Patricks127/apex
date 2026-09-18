@@ -8,7 +8,7 @@ import { atencaoDosAlunos } from "@/lib/treino/atencao-dados";
 import { MOTIVO_LABEL } from "@/lib/treino/atencao";
 import { carregarPlanoAtivo } from "@/lib/treino/perfil";
 import { carregarProgresso } from "@/lib/treino/progresso-dados";
-import { agruparAdesaoPorSemanaCalendario } from "@/lib/treino/adesao-semanal";
+import { pontosAdesaoComFallback } from "@/lib/treino/adesao-semanal";
 import { apagarPlanoDocumento } from "@/app/actions/plan-documents";
 import { EditorPlanoPt, type ExercicioPicker, type DiaEditorInicial } from "./editor-plano-pt";
 import { SeccaoAdesaoSemanal, SeccaoForcaLeitura, SeccaoVolumeLeitura, SeccaoMetricasLeitura } from "./graficos-aluno";
@@ -109,14 +109,13 @@ export default async function FichaAlunoPage({
   );
 
   const diasPrevistosSemana = planoAtivo ? planoAtivo.days.days.filter((d) => !d.rest).length : null;
-  const pontosAdesao =
-    diasPrevistosSemana && diasPrevistosSemana > 0
-      ? agruparAdesaoPorSemanaCalendario(
-          progresso.sessoes.map((s) => ({ performedAt: s.performedAt })),
-          diasPrevistosSemana,
-          JANELAS_ADESAO_FICHA,
-        )
-      : [];
+  // Fallback binário sem plano estruturado (inclui PDF) — mesma porta que
+  // a linha do painel usa, para nunca divergirem. Ver adesao-semanal.ts.
+  const pontosAdesao = pontosAdesaoComFallback(
+    progresso.sessoes.map((s) => ({ performedAt: s.performedAt })),
+    diasPrevistosSemana,
+    JANELAS_ADESAO_FICHA,
+  );
 
   const evolucao = link.scope_evolucao
     ? await supabase

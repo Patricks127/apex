@@ -81,6 +81,12 @@ export default async function PlanoPage({
       feito_por: p.owner_id === user.id ? "Gerado por ti" : `PT: ${p.owner?.name ?? "—"}`,
     }));
 
+  // PDF manda: se o PT anexou um plano em ficheiro, é ESSE o plano — não se
+  // mostra o plano estruturado a competir com ele (VistaPlano, pedido para
+  // gerar/escolher, "Trocar de plano"), mesmo que exista um antigo. Ver
+  // apex-plan-documents.md.
+  const temPdf = documentosComUrl.length > 0;
+
   return (
     <main className="apex-ecra-claro mx-auto flex w-full max-w-lg flex-col gap-4 px-5 py-8">
       {treino === "gravado" ? (
@@ -88,13 +94,15 @@ export default async function PlanoPage({
           className="apex-tipo-corpo border-b pb-4"
           style={{ color: "var(--apex-tinta)", borderColor: "var(--apex-cinza-linha)" }}
         >
-          Treino gravado. Quando fechares a semana, a progressão usa estes dados.
+          {temPdf
+            ? "Treino registado."
+            : "Treino gravado. Quando fechares a semana, a progressão usa estes dados."}
         </p>
       ) : null}
 
-      {documentosComUrl.length > 0 ? <PlanoDocumentoDestaque documentos={documentosComUrl} /> : null}
-
-      {planoAtivo ? (
+      {temPdf ? (
+        <PlanoDocumentoDestaque documentos={documentosComUrl} />
+      ) : planoAtivo ? (
         <VistaPlano
           plano={planoAtivo.days}
           nome={planoAtivo.name}
@@ -133,7 +141,7 @@ export default async function PlanoPage({
         </div>
       )}
 
-      {outros.length > 0 ? (
+      {!temPdf && outros.length > 0 ? (
         <section className="flex flex-col gap-2 border-t pt-4" style={{ borderColor: "var(--apex-cinza-linha)" }}>
           <h2 className="apex-tipo-titulo-seccao" style={{ marginTop: 0, color: "var(--apex-tinta)" }}>
             Trocar de plano
@@ -177,50 +185,65 @@ function formatarTamanho(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/** O mais recente em destaque; anteriores (se houver) listados por baixo,
- *  mais discretos — nunca escondidos, só não competem pelo destaque. */
+/**
+ * O plano é o PDF — não compete com um plano estruturado (o /plano
+ * principal já garante isso, escondendo VistaPlano/"Trocar de plano"
+ * quando isto aparece). O mais recente em destaque; anteriores (se
+ * houver) listados por baixo, mais discretos — nunca escondidos, só não
+ * competem pelo destaque.
+ */
 function PlanoDocumentoDestaque({ documentos }: { documentos: DocumentoPlano[] }) {
   const [recente, ...anteriores] = documentos;
 
   return (
-    <section
-      className="flex flex-col gap-2 border p-4"
-      style={{ borderColor: "var(--apex-cinza-linha)", background: "var(--apex-cinza-fundo)" }}
-    >
-      <span className="apex-tipo-etiqueta" style={{ color: "var(--apex-cinza-texto)" }}>
-        Plano em PDF do teu PT
-      </span>
-      {recente.url ? (
-        <a href={recente.url} target="_blank" rel="noopener noreferrer" className="apex-botao apex-botao--claro">
-          Abrir {recente.nomeFicheiro}
-        </a>
-      ) : (
-        <p className="apex-tipo-corpo" style={{ color: "var(--apex-cinza-texto)" }}>
-          {recente.nomeFicheiro} — link indisponível de momento.
-        </p>
-      )}
-      <span className="apex-tipo-etiqueta apex-tabular" style={{ color: "var(--apex-cinza-texto)" }}>
-        {new Date(recente.createdAt).toLocaleDateString("pt-PT")} · {formatarTamanho(recente.sizeBytes)}
-      </span>
+    <div className="flex flex-col gap-4">
+      <section
+        className="flex flex-col gap-2 border p-4"
+        style={{ borderColor: "var(--apex-cinza-linha)", background: "var(--apex-cinza-fundo)" }}
+      >
+        <span className="apex-tipo-etiqueta" style={{ color: "var(--apex-cinza-texto)" }}>
+          O teu plano (PDF do teu PT)
+        </span>
+        {recente.url ? (
+          <a href={recente.url} target="_blank" rel="noopener noreferrer" className="apex-botao apex-botao--claro">
+            Abrir {recente.nomeFicheiro}
+          </a>
+        ) : (
+          <p className="apex-tipo-corpo" style={{ color: "var(--apex-cinza-texto)" }}>
+            {recente.nomeFicheiro} — link indisponível de momento.
+          </p>
+        )}
+        <span className="apex-tipo-etiqueta apex-tabular" style={{ color: "var(--apex-cinza-texto)" }}>
+          {new Date(recente.createdAt).toLocaleDateString("pt-PT")} · {formatarTamanho(recente.sizeBytes)}
+        </span>
 
-      {anteriores.length > 0 ? (
-        <div className="mt-1 flex flex-col gap-1 border-t pt-2" style={{ borderColor: "var(--apex-cinza-linha)" }}>
-          {anteriores.map((d) =>
-            d.url ? (
-              <a
-                key={d.id}
-                href={d.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="apex-tipo-secundario underline underline-offset-4"
-                style={{ color: "var(--apex-cinza-texto)" }}
-              >
-                {d.nomeFicheiro} ({new Date(d.createdAt).toLocaleDateString("pt-PT")})
-              </a>
-            ) : null,
-          )}
-        </div>
-      ) : null}
-    </section>
+        {anteriores.length > 0 ? (
+          <div className="mt-1 flex flex-col gap-1 border-t pt-2" style={{ borderColor: "var(--apex-cinza-linha)" }}>
+            {anteriores.map((d) =>
+              d.url ? (
+                <a
+                  key={d.id}
+                  href={d.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="apex-tipo-secundario underline underline-offset-4"
+                  style={{ color: "var(--apex-cinza-texto)" }}
+                >
+                  {d.nomeFicheiro} ({new Date(d.createdAt).toLocaleDateString("pt-PT")})
+                </a>
+              ) : null,
+            )}
+          </div>
+        ) : null}
+      </section>
+
+      <p className="apex-tipo-etiqueta" style={{ color: "var(--apex-cinza-texto)" }}>
+        Com um plano em PDF, o treino ao vivo e a progressão automática não estão disponíveis — regista os teus
+        treinos manualmente.
+      </p>
+      <Link href="/treino/registar" className="apex-botao apex-botao--claro">
+        Registar treino de hoje
+      </Link>
+    </div>
   );
 }

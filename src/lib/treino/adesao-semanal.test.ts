@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   chaveSemanaIso,
   agruparAdesaoPorSemanaCalendario,
+  pontosAdesaoComFallback,
   direcaoAdesao,
   estadoAdesao,
   JANELAS_ADESAO_SEMANAS,
@@ -143,4 +144,53 @@ test("estadoAdesao: nível atual bom e a subir/estável → 'boa'", () => {
   const pontos = agruparAdesaoPorSemanaCalendario(sessoes, 3, 6, AGORA);
   assert.equal(pontos[pontos.length - 1].pct, 1);
   assert.equal(estadoAdesao(pontos, direcaoAdesao(pontos)), "boa");
+});
+
+// pontosAdesaoComFallback — sem plano estruturado (inclui quem só tem
+// plano em PDF: a app não lê o conteúdo, não sabe o previsto real).
+test("pontosAdesaoComFallback: com plano estruturado, é idêntico à chamada direta (previsto real)", () => {
+  const sessoes = [{ performedAt: "2026-09-15T10:00:00Z" }, { performedAt: "2026-09-16T10:00:00Z" }];
+  const comPlano = pontosAdesaoComFallback(sessoes, 3, 6, AGORA);
+  const direto = agruparAdesaoPorSemanaCalendario(sessoes, 3, 6, AGORA);
+  assert.deepEqual(comPlano, direto);
+});
+
+test("pontosAdesaoComFallback: sem plano (null), 1 sessão numa semana → 100%, não 'sem dados' para sempre", () => {
+  const sessoes = [{ performedAt: "2026-09-15T10:00:00Z" }]; // semana atual (W38)
+  const pontos = pontosAdesaoComFallback(sessoes, null, 6, AGORA);
+  assert.equal(pontos[pontos.length - 1].pct, 1);
+  assert.equal(pontos[pontos.length - 1].previstos, 1);
+});
+
+test("pontosAdesaoComFallback: sem plano, 0 (diasPrevistosSemana=0) tratado igual a null", () => {
+  const sessoes = [{ performedAt: "2026-09-15T10:00:00Z" }];
+  const comZero = pontosAdesaoComFallback(sessoes, 0, 6, AGORA);
+  const comNull = pontosAdesaoComFallback(sessoes, null, 6, AGORA);
+  assert.deepEqual(comZero, comNull);
+});
+
+test("pontosAdesaoComFallback: sem plano, 3 sessões na mesma semana → capado a 100%, nunca 300%", () => {
+  const sessoes = [
+    { performedAt: "2026-09-15T10:00:00Z" },
+    { performedAt: "2026-09-16T10:00:00Z" },
+    { performedAt: "2026-09-17T10:00:00Z" },
+  ];
+  const pontos = pontosAdesaoComFallback(sessoes, null, 6, AGORA);
+  assert.equal(pontos[pontos.length - 1].pct, 1);
+});
+
+test("pontosAdesaoComFallback: sem plano e sem sessão nenhuma → todas as semanas a 0%, direção sem_dados", () => {
+  const pontos = pontosAdesaoComFallback([], null, 6, AGORA);
+  assert.equal(pontos.length, 6);
+  assert.ok(pontos.every((p) => p.pct === 0 && p.feitos === 0));
+  assert.equal(direcaoAdesao(pontos), "sem_dados");
+});
+
+test("pontosAdesaoComFallback: sem plano, 2 semanas com treino → sinal real (não sem_dados), coerente com o painel do PT", () => {
+  const sessoes = [
+    { performedAt: "2026-08-11T10:00:00Z" }, // semana antiga, 1 sessão
+    { performedAt: "2026-09-15T10:00:00Z" }, // semana atual, 1 sessão
+  ];
+  const pontos = pontosAdesaoComFallback(sessoes, null, 6, AGORA);
+  assert.notEqual(direcaoAdesao(pontos), "sem_dados");
 });

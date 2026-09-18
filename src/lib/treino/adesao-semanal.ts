@@ -99,6 +99,30 @@ export function direcaoAdesao(pontos: PontoAdesaoSemanal[]): DirecaoAdesao {
 }
 
 /**
+ * Envolve agruparAdesaoPorSemanaCalendario com o fallback BINÁRIO para
+ * quando não há plano estruturado (`diasPrevistosSemana` null ou 0) —
+ * inclui quem só tem plano em PDF, cujo conteúdo a app não lê, logo não
+ * sabe quantos dias/semana ele prescreve. Nesse caso o "previsto" vira 1
+ * (treinou esta semana, sim/não, nunca "fez N das M sessões" — não temos
+ * o M) e o `pct` fica capado a 100%: treinar 3x numa semana sem plano não
+ * é "300%" de nada real, não há target nenhum para exceder.
+ *
+ * Porta única para este fallback — usada pela linha do painel
+ * (resumo-alunos.ts) e pela ficha do aluno, para nunca mostrarem números
+ * diferentes para a mesma semana do mesmo aluno.
+ */
+export function pontosAdesaoComFallback(
+  sessoes: { performedAt: string }[],
+  diasPrevistosSemana: number | null,
+  janelas: number = JANELAS_ADESAO_SEMANAS,
+  agora: Date = new Date(),
+): PontoAdesaoSemanal[] {
+  const temPrevistoReal = diasPrevistosSemana != null && diasPrevistosSemana > 0;
+  const pontos = agruparAdesaoPorSemanaCalendario(sessoes, temPrevistoReal ? diasPrevistosSemana : 1, janelas, agora);
+  return temPrevistoReal ? pontos : pontos.map((p) => ({ ...p, pct: Math.min(p.pct, 1) }));
+}
+
+/**
  * Estado para cor — não é só a direção: um aluno pode estar "estável"
  * mas já baixo (ex.: sempre a 40%), o que é mais urgente do que "a
  * descer" a partir de um nível alto. O nível ATUAL manda primeiro,

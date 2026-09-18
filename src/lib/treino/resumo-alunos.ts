@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { carregarPlanoAtivo } from "./perfil.ts";
 import { JANELA_ATENCAO_DIAS } from "./atencao.ts";
 import {
-  agruparAdesaoPorSemanaCalendario,
+  pontosAdesaoComFallback,
   direcaoAdesao,
   estadoAdesao,
   type DirecaoAdesao,
@@ -97,14 +97,15 @@ export async function carregarResumoAlunos(
 
     const diasPrevistosSemana = planoAtivo ? planoAtivo.days.days.filter((d) => !d.rest).length : null;
 
-    // Sinal de consistência: só faz sentido medir "feitos vs. previstos"
-    // quando existe um "previsto" real (plano ativo com pelo menos 1 dia
-    // de treino) — sem plano, é sem_dados, nunca 0% (0% afirmaria que o
-    // aluno falhou algo que nem chegou a ser prescrito).
-    const pontosAdesao =
-      diasPrevistosSemana && diasPrevistosSemana > 0
-        ? agruparAdesaoPorSemanaCalendario(sessoesDoAluno, diasPrevistosSemana)
-        : [];
+    // Sinal de consistência: "feitos vs. previstos" quando há plano
+    // estruturado; sem ele (inclui plano em PDF — a app não lê o
+    // conteúdo, não sabe o previsto real), fallback binário — ver
+    // pontosAdesaoComFallback em adesao-semanal.ts. Nunca fica preso em
+    // "sem dados" só por não ter plano estruturado: quem regista sessões
+    // reais (ex.: registo livre de quem segue um PDF) ganha um sinal
+    // real, com o mesmo limiar de 2 semanas com treino antes de mostrar
+    // direção.
+    const pontosAdesao = pontosAdesaoComFallback(sessoesDoAluno, diasPrevistosSemana);
     const direcao = direcaoAdesao(pontosAdesao);
     const estado = estadoAdesao(pontosAdesao, direcao);
     const pctAtual = direcao !== "sem_dados" ? pontosAdesao[pontosAdesao.length - 1].pct : null;
