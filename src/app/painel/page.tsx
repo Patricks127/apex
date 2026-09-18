@@ -780,7 +780,7 @@ function LinhaAluno({ id, nome, resumo }: { id: string; nome: string; resumo: Re
           {nome}
         </p>
         <p className="apex-tipo-etiqueta truncate" style={{ color: COR.fraco }}>
-          {meta || "Sem plano teu atribuído"}
+          {meta || "Sem plano ativo"}
         </p>
       </div>
       <Sparkline tendencia={resumo?.tendencia ?? []} direcao={resumo?.direcao ?? "sem_dados"} />

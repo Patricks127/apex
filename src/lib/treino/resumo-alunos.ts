@@ -12,15 +12,13 @@ export type ResumoAluno = {
   id: string;
   nome: string | null;
   avatarUrl: string | null;
-  // ATENÇÃO ao usar isto na UI: null aqui NÃO significa "o aluno não tem
-  // plano" — a RLS de training_plans (migração 011) só deixa o PT ler
-  // planos que ELE PRÓPRIO atribuiu; um plano que o aluno gerou para si
-  // via motor fica invisível ao PT (por desenho, é um limite de
-  // privacidade, não um bug). Confirmado ao vivo: um aluno com plano
-  // ativo próprio (owner_id=ele, is_active=true) devolve 0 linhas quando
-  // lido com a sessão do PT. Por isso o texto na UI é "Sem plano teu
-  // atribuído", nunca "Sem plano ativo" — a segunda afirmaria algo que
-  // não sabemos.
+  // Desde a migração 019 (Passo 2.1), o PT vê o plano ativo REAL do aluno
+  // — próprio (motor) ou atribuído por qualquer PT, atual ou anterior —
+  // sob o mesmo scope_treinos que já protege o resto. null aqui significa
+  // mesmo "sem plano ativo", não uma lacuna de RLS (ver
+  // apex-training-plans-rls.md / decisions-and-principles.md para o
+  // histórico: antes da 019, um plano self-made do aluno era invisível ao
+  // PT, daí o texto "Sem plano teu atribuído" que existiu na UI).
   planoNome: string | null;
   semanaAtual: number | null;
   diasPrevistosSemana: number | null; // dias de treino (não-descanso) do plano ativo
