@@ -6,11 +6,13 @@ import { carregarPlanoAtivo, treinoDeHojeFeito, janelaRecente } from "@/lib/trei
 import { indiceDiaSemanaHoje, proximoDiaDeTreino, construirLinhaTempo } from "@/lib/treino/linha-tempo";
 import { MOTIVO_LABEL, type MotivoAtencao } from "@/lib/treino/atencao";
 import { atencaoDosAlunos } from "@/lib/treino/atencao-dados";
+import { carregarResumoAlunos, type ResumoAluno } from "@/lib/treino/resumo-alunos";
 import type { DiaGerado } from "@/lib/motor";
 import { sair } from "@/app/actions/auth";
 import { responderPedido, revogarAcesso } from "@/app/actions/ligacoes";
 import { BlocoDados } from "../_ui/design/bloco-dados";
 import { Sino } from "../_ui/social/sino";
+import { Sparkline } from "../_ui/treino/sparkline";
 import { contarNaoLidas } from "@/lib/social/notificacoes-dados";
 import { CodigoPt } from "./codigo-pt";
 import { OMeuPt } from "./o-meu-pt";
@@ -86,7 +88,7 @@ export default async function PainelPage() {
       </header>
 
       {perfil?.role === "pt" ? (
-        <SeccaoPt userId={user.id} ptCode={perfil.pt_code ?? null} />
+        <SeccaoPt userId={user.id} nome={perfil.name} ptCode={perfil.pt_code ?? null} />
       ) : perfil?.role === "atleta" ? (
         <SeccaoAtleta userId={user.id} />
       ) : (
@@ -387,7 +389,7 @@ async function contarFeedbackRecente(
 // ---------------------------------------------------------------------------
 
 
-async function SeccaoPt({ userId, ptCode }: { userId: string; ptCode: string | null }) {
+async function SeccaoPt({ userId, nome, ptCode }: { userId: string; nome: string | null; ptCode: string | null }) {
   const supabase = await createClient();
 
   const { data: pedidos } = await supabase
@@ -403,65 +405,85 @@ async function SeccaoPt({ userId, ptCode }: { userId: string; ptCode: string | n
   const { data: alunos } = await supabase
     .from("pt_links")
     .select(
-      "id, status, scope_evolucao, scope_videos, scope_metricas, created_at, aluno:profiles!student_id(id, name)",
+      "id, status, scope_evolucao, scope_videos, scope_metricas, created_at, aluno:profiles!student_id(id, name, avatar_url)",
     )
     .eq("pt_id", userId)
     .eq("status", "ativo")
     .order("updated_at", { ascending: false })
-    .overrideTypes<Ligacao[]>();
+    .overrideTypes<(Ligacao & { aluno: (PerfilRef & { avatar_url: string | null }) | null })[]>();
 
   const linkIds = (alunos ?? []).map((a) => a.id);
   const alunoIds = (alunos ?? []).map((a) => a.aluno?.id).filter((x): x is string => !!x);
 
-  let videosPorVer = 0;
-  let mensagensPorLer = 0;
+  let mensagensPorLerRows: { sender_id: string }[] = [];
   let atencaoPorAluno = new Map<string, MotivoAtencao[]>();
+  let resumoPorAluno = new Map<string, ResumoAluno>();
+  let novosEsteMes = 0;
+  let treinosConcluidos7d = 0;
+  let alunosQueTreinaram7d = 0;
 
   if (alunoIds.length) {
-    const [{ data: vids }, { count: msgsCount }, atencao] = await Promise.all([
-      supabase.from("training_videos").select("id").in("user_id", alunoIds),
+    const corte30d = janelaRecente(30);
+    const [{ data: msgs }, atencao, resumos, { data: sessoes7d }] = await Promise.all([
       supabase
         .from("messages")
-        .select("id", { count: "exact", head: true })
+        .select("sender_id")
         .in("link_id", linkIds)
         .neq("sender_id", userId)
         .is("read_at", null),
       atencaoDosAlunos(supabase, alunoIds),
+      carregarResumoAlunos(
+        supabase,
+        (alunos ?? [])
+          .filter((a) => a.aluno?.id)
+          .map((a) => ({ id: a.aluno!.id, nome: a.aluno!.name, avatarUrl: a.aluno!.avatar_url })),
+      ),
+      // Contagem de "esperados" ficaria de fora de propósito: viria de
+      // carregarPlanoAtivo, e a RLS de training_plans só deixa o PT ler
+      // planos que ELE PRÓPRIO atribuiu — um aluno com plano próprio
+      // (gerado pelo motor) ficaria invisível e contaria como "0
+      // esperados", uma subcontagem sistemática e enganosa. O KPI usa só
+      // o que a RLS de workout_sessions já deixa o PT ver por completo
+      // (scope_treinos): sessões realmente gravadas.
+      supabase.from("workout_sessions").select("user_id").in("user_id", alunoIds).gte("performed_at", janelaRecente(7)),
     ]);
 
-    mensagensPorLer = msgsCount ?? 0;
+    mensagensPorLerRows = msgs ?? [];
     atencaoPorAluno = atencao;
-
-    const vidIds = (vids ?? []).map((v) => v.id);
-    if (vidIds.length) {
-      const { data: fbs } = await supabase.from("video_feedback").select("video_id").in("video_id", vidIds);
-      const comFeedback = new Set((fbs ?? []).map((f) => f.video_id));
-      videosPorVer = vidIds.filter((id) => !comFeedback.has(id)).length;
-    }
+    resumoPorAluno = new Map(resumos.map((r) => [r.id, r]));
+    novosEsteMes = (alunos ?? []).filter((a) => a.created_at >= corte30d).length;
+    treinosConcluidos7d = (sessoes7d ?? []).length;
+    alunosQueTreinaram7d = new Set((sessoes7d ?? []).map((s) => s.user_id)).size;
   }
+
+  const primeiroNome = (nome ?? "").trim().split(/\s+/)[0] || "PT";
+  const hoje = new Date().toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" });
 
   return (
     <div className="flex flex-col gap-8">
-      <BlocoPrincipalPt pedidos={pedidos ?? []} alunos={alunos ?? []} atencaoPorAluno={atencaoPorAluno} />
-
-      <div className="flex flex-col">
-        <Link href="/chat" className="apex-linha-exercicio" style={{ textDecoration: "none" }}>
-          <span className="apex-tipo-nome-exercicio" style={{ color: COR.tinta }}>
-            Mensagens
-          </span>
-          <span className="apex-tabular" style={{ color: mensagensPorLer > 0 ? COR.tinta : COR.fraco }}>
-            {mensagensPorLer > 0 ? `${mensagensPorLer} por ler` : "Tudo lido"}
-          </span>
-        </Link>
-        <Link href="/videos" className="apex-linha-exercicio" style={{ textDecoration: "none" }}>
-          <span className="apex-tipo-nome-exercicio" style={{ color: COR.tinta }}>
-            Vídeos
-          </span>
-          <span className="apex-tabular" style={{ color: videosPorVer > 0 ? COR.tinta : COR.fraco }}>
-            {videosPorVer > 0 ? `${videosPorVer} por rever` : "Tudo revisto"}
-          </span>
-        </Link>
+      <div>
+        <p className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
+          {hoje.charAt(0).toUpperCase() + hoje.slice(1)}
+        </p>
+        <h2 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: COR.tinta }}>
+          Olá, {primeiroNome}
+        </h2>
       </div>
+
+      {pedidos && pedidos.length > 0 ? <BlocoPedidosPendentes pedidos={pedidos} /> : null}
+
+      <KpisNegocio
+        alunosAtivos={alunoIds.length}
+        novosEsteMes={novosEsteMes}
+        resumos={[...resumoPorAluno.values()]}
+        treinosConcluidos7d={treinosConcluidos7d}
+        alunosQueTreinaram7d={alunosQueTreinaram7d}
+        mensagensPorLerRows={mensagensPorLerRows}
+      />
+
+      <BlocoAtencao alunos={alunos ?? []} atencaoPorAluno={atencaoPorAluno} />
+
+      <ListaAlunos alunos={alunos ?? []} resumoPorAluno={resumoPorAluno} />
 
       <div className="flex flex-col gap-2">
         <h2 className="apex-tipo-titulo-seccao" style={{ marginTop: 0, color: COR.tinta }}>
@@ -484,123 +506,293 @@ async function SeccaoPt({ userId, ptCode }: { userId: string; ptCode: string | n
           Notificações
         </Link>
       </nav>
-
-      <ListaAlunos alunos={alunos ?? []} />
     </div>
   );
 }
 
-function BlocoPrincipalPt({
-  pedidos,
-  alunos,
-  atencaoPorAluno,
-}: {
-  pedidos: Ligacao[];
-  alunos: Ligacao[];
-  atencaoPorAluno: Map<string, MotivoAtencao[]>;
-}) {
-  if (pedidos.length > 0) {
-    return (
-      <section className="flex flex-col gap-3">
-        <h2 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: COR.tinta }}>
-          {pedidos.length} pedido{pedidos.length > 1 ? "s" : ""} por responder
-        </h2>
-        <div className="flex flex-col">
-          {pedidos.map((p) => (
-            <div key={p.id} className="apex-linha-exercicio" style={{ alignItems: "flex-start" }}>
-              <div className="apex-linha-exercicio__principal">
-                <span className="apex-tipo-nome-exercicio" style={{ color: COR.tinta }}>
-                  {p.aluno?.name ?? "Atleta"}
-                </span>
-                <span className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
-                  Quer autorizar: <Scopes l={p} />
-                </span>
-              </div>
-              <form action={responderPedido} className="flex shrink-0 gap-2">
-                <input type="hidden" name="link_id" value={p.id} />
-                <button
-                  name="accao"
-                  value="aceitar"
-                  className="apex-tipo-etiqueta border px-2.5 py-1.5"
-                  style={{ borderColor: COR.tinta, color: COR.tinta }}
-                >
-                  Aceitar
-                </button>
-                <button
-                  name="accao"
-                  value="recusar"
-                  className="apex-tipo-etiqueta border px-2.5 py-1.5"
-                  style={{ borderColor: COR.linha, color: COR.fraco }}
-                >
-                  Recusar
-                </button>
-              </form>
-            </div>
-          ))}
-        </div>
-      </section>
-    );
-  }
-
-  const comAtencao = alunos.filter((a) => a.aluno?.id && atencaoPorAluno.has(a.aluno.id));
-
-  if (comAtencao.length > 0) {
-    return (
-      <section className="flex flex-col gap-3">
-        <h2 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: COR.tinta }}>
-          {comAtencao.length} aluno{comAtencao.length > 1 ? "s" : ""} a precisar de atenção
-        </h2>
-        <div className="flex flex-col">
-          {comAtencao.map((a) => (
-            <Link
-              key={a.id}
-              href={`/pt/aluno/${a.aluno!.id}`}
-              className="apex-linha-exercicio"
-              style={{ textDecoration: "none" }}
-            >
-              <span className="apex-tipo-nome-exercicio" style={{ color: COR.tinta }}>
-                {a.aluno?.name ?? "Atleta"}
-              </span>
-              <span className="flex gap-1.5">
-                {atencaoPorAluno.get(a.aluno!.id)!.map((m) => (
-                  <span key={m} className="apex-chip-alerta apex-tipo-etiqueta">
-                    {MOTIVO_LABEL[m]}
-                  </span>
-                ))}
-              </span>
-            </Link>
-          ))}
-        </div>
-      </section>
-    );
-  }
-
+function BlocoPedidosPendentes({ pedidos }: { pedidos: Ligacao[] }) {
   return (
-    <section className="flex flex-col gap-1">
-      <h2 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: COR.tinta }}>
-        Está tudo em dia
+    <section className="flex flex-col gap-3">
+      <h2 className="apex-tipo-titulo-seccao" style={{ marginTop: 0, color: COR.tinta }}>
+        {pedidos.length} pedido{pedidos.length > 1 ? "s" : ""} por responder
       </h2>
-      <p className="apex-tipo-corpo" style={{ color: COR.fraco }}>
-        Nenhum aluno precisa de atenção agora.
-      </p>
+      <div className="flex flex-col">
+        {pedidos.map((p) => (
+          <div key={p.id} className="apex-linha-exercicio" style={{ alignItems: "flex-start" }}>
+            <div className="apex-linha-exercicio__principal">
+              <span className="apex-tipo-nome-exercicio" style={{ color: COR.tinta }}>
+                {p.aluno?.name ?? "Atleta"}
+              </span>
+              <span className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
+                Quer autorizar: <Scopes l={p} />
+              </span>
+            </div>
+            <form action={responderPedido} className="flex shrink-0 gap-2">
+              <input type="hidden" name="link_id" value={p.id} />
+              <button
+                name="accao"
+                value="aceitar"
+                className="apex-tipo-etiqueta border px-2.5 py-1.5"
+                style={{ borderColor: COR.tinta, color: COR.tinta }}
+              >
+                Aceitar
+              </button>
+              <button
+                name="accao"
+                value="recusar"
+                className="apex-tipo-etiqueta border px-2.5 py-1.5"
+                style={{ borderColor: COR.linha, color: COR.fraco }}
+              >
+                Recusar
+              </button>
+            </form>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
 
-function ListaAlunos({ alunos }: { alunos: Ligacao[] }) {
+// ---------------------------------------------------------------------------
+// Resumo do negócio — 4 KPIs, só dados reais; variação só quando dá para
+// a calcular com verdade (nunca "+0%" a fingir que sabemos algo que não
+// sabemos).
+// ---------------------------------------------------------------------------
+
+function KpisNegocio({
+  alunosAtivos,
+  novosEsteMes,
+  resumos,
+  treinosConcluidos7d,
+  alunosQueTreinaram7d,
+  mensagensPorLerRows,
+}: {
+  alunosAtivos: number;
+  novosEsteMes: number;
+  resumos: ResumoAluno[];
+  treinosConcluidos7d: number;
+  alunosQueTreinaram7d: number;
+  mensagensPorLerRows: { sender_id: string }[];
+}) {
+  const comAdesao = resumos.filter((r) => r.adesaoMedia != null);
+  const adesaoMedia =
+    comAdesao.length > 0 ? comAdesao.reduce((s, r) => s + (r.adesaoMedia as number), 0) / comAdesao.length : null;
+
+  const comparaveis = resumos.filter((r) => r.adesaoMedia != null && r.adesaoMediaAnterior != null);
+  let variacaoAdesao: number | null = null;
+  if (comparaveis.length > 0) {
+    const atual = comparaveis.reduce((s, r) => s + (r.adesaoMedia as number), 0) / comparaveis.length;
+    const anterior = comparaveis.reduce((s, r) => s + (r.adesaoMediaAnterior as number), 0) / comparaveis.length;
+    if (anterior > 0) variacaoAdesao = (atual - anterior) / anterior;
+  }
+
+  const mensagensPorLer = mensagensPorLerRows.length;
+  const alunosComMensagem = new Set(mensagensPorLerRows.map((m) => m.sender_id)).size;
+
   return (
-    <div className="flex items-baseline justify-between border-t pt-4" style={{ borderColor: COR.linha }}>
-      <span className="apex-tipo-secundario" style={{ color: COR.fraco }}>
-        {alunos.length === 0
-          ? "Ainda não tens alunos ligados."
-          : `${alunos.length} aluno${alunos.length > 1 ? "s" : ""} ligado${alunos.length > 1 ? "s" : ""}`}
-      </span>
-      {alunos.length > 0 ? (
+    <div className="apex-kpis">
+      <Kpi
+        numero={String(alunosAtivos)}
+        etiqueta="Alunos ativos"
+        variacao={novosEsteMes > 0 ? `+${novosEsteMes} este mês` : null}
+        positiva
+      />
+      <Kpi
+        numero={String(treinosConcluidos7d)}
+        etiqueta="Treinos esta semana"
+        variacao={
+          alunosAtivos > 0 ? `${alunosQueTreinaram7d} de ${alunosAtivos} aluno${alunosAtivos === 1 ? "" : "s"}` : null
+        }
+      />
+      <Kpi
+        numero={adesaoMedia != null ? `${Math.round(adesaoMedia * 100)}%` : "—"}
+        etiqueta="Adesão média"
+        variacao={
+          variacaoAdesao != null
+            ? `${variacaoAdesao >= 0 ? "+" : ""}${Math.round(variacaoAdesao * 100)}% vs. período anterior`
+            : null
+        }
+        positiva={variacaoAdesao != null ? variacaoAdesao >= 0 : undefined}
+      />
+      <Kpi
+        numero={String(mensagensPorLer)}
+        etiqueta="Mensagens por ler"
+        variacao={
+          mensagensPorLer > 0 ? `${alunosComMensagem} aluno${alunosComMensagem === 1 ? "" : "s"}` : "Tudo lido"
+        }
+      />
+    </div>
+  );
+}
+
+function Kpi({
+  numero,
+  etiqueta,
+  variacao,
+  positiva,
+}: {
+  numero: string;
+  etiqueta: string;
+  variacao: string | null;
+  positiva?: boolean;
+}) {
+  return (
+    <div className="apex-kpi">
+      <span className="apex-kpi__numero apex-tabular">{numero}</span>
+      <span className="apex-kpi__etiqueta">{etiqueta}</span>
+      {variacao ? (
+        <span
+          className="apex-kpi__variacao apex-tabular"
+          style={{ color: positiva === undefined ? COR.fraco : positiva ? "var(--apex-positivo)" : "var(--apex-erro)" }}
+        >
+          {variacao}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Precisa de atenção — reusa atencaoDosAlunos; "está tudo em dia" quando
+// não há ninguém, nunca um alerta inventado.
+// ---------------------------------------------------------------------------
+
+function BlocoAtencao({
+  alunos,
+  atencaoPorAluno,
+}: {
+  alunos: Ligacao[];
+  atencaoPorAluno: Map<string, MotivoAtencao[]>;
+}) {
+  const comAtencao = alunos.filter((a) => a.aluno?.id && atencaoPorAluno.has(a.aluno.id));
+
+  return (
+    <section className="flex flex-col gap-3">
+      <h2 className="apex-tipo-titulo-seccao" style={{ marginTop: 0, color: COR.tinta }}>
+        Precisa de atenção
+      </h2>
+      {comAtencao.length === 0 ? (
+        <p className="apex-tipo-corpo" style={{ color: COR.fraco }}>
+          Está tudo em dia — nenhum aluno precisa de atenção agora.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {comAtencao.map((a) => {
+            const motivos = atencaoPorAluno.get(a.aluno!.id)!;
+            const grave = motivos.includes("dor_recorrente") || motivos.includes("inativo");
+            return (
+              <Link
+                key={a.id}
+                href={`/pt/aluno/${a.aluno!.id}`}
+                className={grave ? "apex-alerta-card apex-alerta-card--erro" : "apex-alerta-card"}
+              >
+                <div className="flex flex-col gap-0.5">
+                  <span className="apex-tipo-nome-exercicio" style={{ color: grave ? "#9b2c1e" : "#8a5410" }}>
+                    {a.aluno?.name ?? "Atleta"} · {motivos.map((m) => MOTIVO_LABEL[m]).join(", ")}
+                  </span>
+                  <span className="apex-tipo-secundario" style={{ color: grave ? "#9b2c1e" : "#8a5410", opacity: 0.85 }}>
+                    Vê a ficha para os detalhes.
+                  </span>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Os meus alunos — lista curta com tendência real; "Ver todos" para a
+// lista completa (/pt/alunos).
+// ---------------------------------------------------------------------------
+
+const MAX_ALUNOS_PREVIEW = 5;
+
+function ListaAlunos({
+  alunos,
+  resumoPorAluno,
+}: {
+  alunos: Ligacao[];
+  resumoPorAluno: Map<string, ResumoAluno>;
+}) {
+  if (alunos.length === 0) {
+    return (
+      <section className="flex flex-col gap-2">
+        <h2 className="apex-tipo-titulo-seccao" style={{ marginTop: 0, color: COR.tinta }}>
+          Os meus alunos
+        </h2>
+        <p className="apex-tipo-corpo" style={{ color: COR.fraco }}>
+          Ainda não tens alunos ligados. Partilha o teu código (abaixo) ou espera que um atleta te encontre em{" "}
+          <Link href="/descobrir" className="underline underline-offset-4" style={{ color: COR.tinta }}>
+            Descobrir
+          </Link>
+          .
+        </p>
+      </section>
+    );
+  }
+
+  const visiveis = alunos.slice(0, MAX_ALUNOS_PREVIEW);
+
+  return (
+    <section className="flex flex-col gap-2">
+      <div className="flex items-baseline justify-between">
+        <h2 className="apex-tipo-titulo-seccao" style={{ marginTop: 0, color: COR.tinta }}>
+          Os meus alunos
+        </h2>
         <Link href="/pt/alunos" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.tinta }}>
           Ver todos
         </Link>
-      ) : null}
-    </div>
+      </div>
+      <div className="flex flex-col">
+        {visiveis.map((a) => {
+          const resumo = a.aluno?.id ? resumoPorAluno.get(a.aluno.id) : undefined;
+          return <LinhaAluno key={a.id} id={a.aluno?.id ?? a.id} nome={a.aluno?.name ?? "Atleta"} resumo={resumo} />;
+        })}
+      </div>
+    </section>
+  );
+}
+
+function LinhaAluno({ id, nome, resumo }: { id: string; nome: string; resumo: ResumoAluno | undefined }) {
+  const adesao = resumo?.adesaoMedia ?? null;
+  const corAdesao = adesao == null ? COR.fraco : adesao >= 0.75 ? "var(--apex-positivo)" : adesao >= 0.5 ? "var(--apex-alerta)" : "var(--apex-erro)";
+  const meta = [resumo?.planoNome, resumo?.semanaAtual != null ? `Semana ${resumo.semanaAtual}` : null]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <Link href={`/pt/aluno/${id}`} className="apex-aluno-linha">
+      <div className="apex-avatar">
+        {resumo?.avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={resumo.avatarUrl} alt="" />
+        ) : (
+          <span className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
+            {nome.slice(0, 1).toUpperCase()}
+          </span>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="apex-tipo-nome-exercicio truncate" style={{ color: COR.tinta }}>
+          {nome}
+        </p>
+        <p className="apex-tipo-etiqueta truncate" style={{ color: COR.fraco }}>
+          {meta || "Sem plano teu atribuído"}
+        </p>
+      </div>
+      <Sparkline tendencia={resumo?.tendencia ?? []} direcao={resumo?.direcao ?? "sem_dados"} />
+      <div className="apex-aluno-linha__adesao">
+        <div className="apex-aluno-linha__adesao-valor apex-tabular" style={{ color: corAdesao }}>
+          {adesao != null ? `${Math.round(adesao * 100)}%` : "—"}
+        </div>
+        <div className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
+          adesão
+        </div>
+      </div>
+    </Link>
   );
 }
 
