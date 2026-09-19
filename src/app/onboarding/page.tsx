@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { FormularioOnboarding } from "./formulario-onboarding";
@@ -23,7 +24,10 @@ export default async function OnboardingPage() {
     .single();
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col px-4 py-10">
+    <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col gap-5 px-4 py-10">
+      <Link href="/painel" className="self-start text-sm text-zinc-500 hover:text-zinc-300">
+        ← Painel
+      </Link>
       <FormularioOnboarding
         inicial={{
           goal: perfil?.goal ?? null,

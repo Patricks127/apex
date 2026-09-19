@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { carregarPerfilPublico, carregarPostsDoUtilizador } from "@/lib/social/feed-dados";
 import { BotaoSeguir } from "@/app/descobrir/botao-seguir";
+import { BotaoVoltar } from "@/app/_ui/design/botao-voltar";
 import { ListaPosts } from "../lista-posts";
 
 export const metadata: Metadata = {
@@ -55,6 +56,7 @@ export default async function PerfilAtletaPage({
 
   return (
     <main className="apex-ecra-claro mx-auto flex min-h-dvh w-full max-w-lg flex-col gap-6 px-5 py-8">
+      <BotaoVoltar />
       <header className="apex-perfil-cabecalho">
         <div className="apex-avatar apex-avatar--grande">
           {perfil.avatarUrl ? (

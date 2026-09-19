@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { labelEspecialidade, labelServico } from "@/lib/perfil";
 import { carregarPerfilPublico, carregarPostsDoUtilizador } from "@/lib/social/feed-dados";
 import { BotaoSeguir } from "@/app/descobrir/botao-seguir";
+import { BotaoVoltar } from "@/app/_ui/design/botao-voltar";
 import { ListaPosts } from "@/app/u/lista-posts";
 
 export const metadata: Metadata = {
@@ -76,6 +77,7 @@ export default async function PerfilPublicoPage({
 
   return (
     <main className="apex-ecra-claro mx-auto flex min-h-dvh w-full max-w-lg flex-col gap-6 px-5 py-8">
+      <BotaoVoltar />
       <header className="apex-perfil-cabecalho">
         <div className="apex-avatar apex-avatar--grande">
           {pt.avatar_url ? (

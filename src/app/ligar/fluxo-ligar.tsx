@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import Link from "next/link";
 import {
   enviarPedidoLigacao,
   procurarPts,
@@ -31,6 +32,10 @@ export function FluxoLigar({ codigoInicial }: { codigoInicial?: string | null })
 
   return (
     <div className="flex flex-col gap-5">
+      <Link href="/painel" className="self-start text-sm text-zinc-500 hover:text-zinc-300">
+        ← Painel
+      </Link>
+
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold text-zinc-100">Ligar a um PT</h1>
         <p className="text-sm text-zinc-400">
