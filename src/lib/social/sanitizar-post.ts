@@ -31,7 +31,7 @@
 
 import type { Lift } from "../motor/index.ts";
 
-export type PostKind = "treino" | "recorde" | "conquista" | "video" | "texto";
+export type PostKind = "treino" | "recorde" | "conquista" | "video" | "imagem" | "texto";
 
 /** Sessão tal como a BD a devolve — inclui campos que NUNCA podem chegar
  *  a um post (avgRpe, completion, checkin). `title`/`nSets`/`volumeKg`
@@ -61,10 +61,19 @@ export type VideoParaPost = {
   feedback?: { body: string }[];
 };
 
+/** Imagem anexada NA HORA (upload direto do composer) — ao contrário de
+ *  vídeo, que copia de um `training_videos` privado já existente, aqui
+ *  não há fonte privada nenhuma para verificar posse: o storagePath já
+ *  vem de um upload feito pelo PRÓPRIO autor, para post-media (bucket
+ *  público), dentro da Server Action (ver actions/social.ts) — nunca
+ *  lido de private-media. */
+export type ImagemParaPost = { storagePath: string };
+
 export type FontePost =
   | { kind: "treino"; authorId: string; sessao: SessaoParaPost }
   | { kind: "recorde"; authorId: string; recorde: RecordeParaPost }
   | { kind: "video"; authorId: string; video: VideoParaPost }
+  | { kind: "imagem"; authorId: string; imagem: ImagemParaPost }
   | { kind: "conquista"; texto: string }
   | { kind: "texto"; texto: string };
 
@@ -150,6 +159,11 @@ export function sanitizePost(fonte: FontePost, bodyBruto: string): ColunasPost |
     case "video": {
       const { storagePath } = fonte.video;
       colunas = { ...colunasVazias(body), mediaPath: storagePath, mediaKind: "video" };
+      break;
+    }
+    case "imagem": {
+      const { storagePath } = fonte.imagem;
+      colunas = { ...colunasVazias(body), mediaPath: storagePath, mediaKind: "image" };
       break;
     }
   }

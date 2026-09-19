@@ -149,6 +149,11 @@ function ConteudoPost({ post }: { post: PostFeed }) {
         <div className="apex-post__estruturado">
           <video src={publicUrl(post.mediaPath)} controls />
         </div>
+      ) : post.kind === "imagem" && post.mediaPath ? (
+        <div className="apex-post__estruturado">
+          {/* eslint-disable-next-line @next/next/no-img-element -- post-media é público, sem otimização própria do Next necessária aqui (mesmo padrão de avatar/evolução no resto da app) */}
+          <img src={publicUrl(post.mediaPath)} alt="" />
+        </div>
       ) : null}
 
       {post.body ? (

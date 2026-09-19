@@ -62,6 +62,15 @@ test("sanitizePost(video): feedback do PT nunca chega ao resultado", () => {
   assert.equal(JSON.stringify(r).includes("feedback"), false);
 });
 
+test("sanitizePost(imagem): mediaPath/mediaKind='image' ficam preenchidos, o resto null", () => {
+  const r = sanitizePost({ kind: "imagem", authorId: "u1", imagem: { storagePath: "u1/abc.jpg" } }, "Olha o pump");
+  assert.ok(!("erro" in r));
+  assert.equal(r.mediaPath, "u1/abc.jpg");
+  assert.equal(r.mediaKind, "image");
+  assert.equal(r.workoutTitle, null);
+  assert.equal(r.recordLift, null);
+});
+
 test("sanitizePost(recorde): só recordLift/recordValue ficam preenchidos", () => {
   const r = sanitizePost({ kind: "recorde", authorId: "u1", recorde: { lift: "supino", valueKg: 85 } }, "Novo recorde!");
   assert.ok(!("erro" in r));
@@ -140,6 +149,12 @@ test("prepararPost: bloqueia publicar o RECORDE de outro utilizador", () => {
 test("prepararPost: bloqueia publicar o VÍDEO de outro utilizador (mesmo um PT com scope_videos)", () => {
   const fonte: FontePost = { kind: "video", authorId: "aluno-x", video: VIDEO_RICO };
   const r = prepararPost(fonte, "pt-y-com-scope-videos", "Vídeo do meu aluno!");
+  assert.ok("erro" in r);
+});
+
+test("prepararPost: bloqueia publicar a IMAGEM de outro utilizador (a Server Action nunca deveria construir isto, mas o guarda-costas não confia só nela)", () => {
+  const fonte: FontePost = { kind: "imagem", authorId: "aluno-x", imagem: { storagePath: "aluno-x/foto.jpg" } };
+  const r = prepararPost(fonte, "outro-qualquer", "Bela foto!");
   assert.ok("erro" in r);
 });
 

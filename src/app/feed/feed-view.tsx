@@ -4,6 +4,7 @@ import { useState, useActionState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LIFT_LABEL, type Lift } from "@/lib/motor";
+import { redimensionarImagem } from "@/lib/chat/media";
 import { criarPost, type EstadoSocial } from "@/app/actions/social";
 import { PostCard } from "@/app/_ui/social/post-card";
 import type {
@@ -34,6 +35,7 @@ const KIND_LABEL: Record<PostKind, string> = {
   recorde: "Recorde",
   conquista: "Conquista",
   video: "Vídeo",
+  imagem: "Foto",
   texto: "Texto",
 };
 
@@ -93,7 +95,7 @@ export function FeedView({
 // Composer
 // ---------------------------------------------------------------------------
 
-const KINDS: PostKind[] = ["treino", "recorde", "conquista", "video", "texto"];
+const KINDS: PostKind[] = ["treino", "recorde", "conquista", "video", "imagem", "texto"];
 
 function Composer({
   fontes,
@@ -104,7 +106,32 @@ function Composer({
 }) {
   const [aberto, setAberto] = useState(false);
   const [kind, setKind] = useState<PostKind>("texto");
-  const [estado, submeter, aEnviar] = useActionState<EstadoSocial, FormData>(criarPost, {});
+  const [erroImagem, setErroImagem] = useState<string | null>(null);
+
+  // O trabalho assíncrono (redimensionar) tem de viver DENTRO da função
+  // passada a useActionState, nunca num wrapper `async` à volta de
+  // `submeter` — chamar o dispatcher fora de uma transição dá um aviso
+  // do React e a submissão não chega a acontecer. `redimensionarImagem`
+  // (lib/chat/media.ts, mesma função do chat) só pode correr no browser,
+  // por isso o redimensionamento fica no cliente; o resultado (Blob) é
+  // que viaja para criarPost, nunca o ficheiro original em tamanho real.
+  async function acaoComposta(anterior: EstadoSocial, fd: FormData): Promise<EstadoSocial> {
+    setErroImagem(null);
+    const ficheiro = fd.get("imagem");
+    if (fd.get("kind") === "imagem" && ficheiro instanceof File && ficheiro.size > 0) {
+      try {
+        const blob = await redimensionarImagem(ficheiro);
+        fd.delete("imagem");
+        fd.set("imagem", blob, "imagem.jpg");
+      } catch {
+        setErroImagem("Não foi possível processar esta imagem.");
+        return anterior;
+      }
+    }
+    return criarPost(anterior, fd);
+  }
+
+  const [estado, submeter, aEnviar] = useActionState<EstadoSocial, FormData>(acaoComposta, {});
 
   const precisaDeFonte = kind === "treino" || kind === "recorde" || kind === "video";
   const listaFontes = kind === "treino" ? fontes.treinos : kind === "recorde" ? fontes.recordes : kind === "video" ? fontes.videos : [];
@@ -121,6 +148,11 @@ function Composer({
   return (
     <form
       action={(fd) => {
+        // submeter(fd) TEM de ser chamado sincronamente aqui dentro — não
+        // em onSubmit separado (desmonta o form antes do React despachar
+        // a ação) nem atrás de um await (dá aviso do React e a submissão
+        // nem chega a acontecer). O trabalho assíncrono (redimensionar)
+        // já vive dentro de acaoComposta, que é isso que submeter dispara.
         submeter(fd);
         setAberto(false);
         aoPublicado();
@@ -182,6 +214,17 @@ function Composer({
         )
       ) : null}
 
+      {kind === "imagem" ? (
+        <input
+          type="file"
+          name="imagem"
+          accept="image/*"
+          required
+          className="apex-tipo-secundario"
+          style={{ color: COR.tinta }}
+        />
+      ) : null}
+
       <textarea
         name="body"
         rows={precisaDeFonte ? 2 : 3}
@@ -198,6 +241,11 @@ function Composer({
         style={{ borderColor: COR.linha, borderRadius: 2, background: "var(--apex-branco)", color: COR.tinta }}
       />
 
+      {erroImagem ? (
+        <p className="apex-tipo-secundario" style={{ color: COR.erro }}>
+          {erroImagem}
+        </p>
+      ) : null}
       {estado.erro ? (
         <p className="apex-tipo-secundario" style={{ color: COR.erro }}>
           {estado.erro}

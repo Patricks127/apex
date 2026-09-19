@@ -11,7 +11,8 @@ const BLOQUEIO_RLS =
 
 export type EstadoSocial = { erro?: string; ok?: boolean };
 
-const KINDS: PostKind[] = ["treino", "recorde", "conquista", "video", "texto"];
+const KINDS: PostKind[] = ["treino", "recorde", "conquista", "video", "imagem", "texto"];
+const MAX_IMAGEM_BYTES = 8 * 1024 * 1024; // 8 MB — já vem redimensionada do cliente (~1200px, JPEG); margem defensiva
 
 // ---------------------------------------------------------------------------
 // Publicar — o composer nunca envia o payload, só kind + source_id (para
@@ -112,6 +113,33 @@ export async function criarPost(
       kind: "video",
       authorId: data.user_id,
       video: { storagePath: novoPath },
+    };
+  } else if (kind === "imagem") {
+    // Upload DIRETO, sem fonte privada nenhuma a copiar — ao contrário do
+    // vídeo (que lê de private-media/{uid}/videos/... e confirma posse
+    // antes de copiar), a imagem nunca existiu em lado nenhum antes desta
+    // publicação: o composer redimensiona no browser e envia o Blob aqui
+    // dentro do FormData (mesmo padrão do plan-documents — o servidor
+    // gera o caminho, nunca aceita um do cliente). Isolamento
+    // privado→público garantido por CONSTRUÇÃO: este ramo nunca chama
+    // `.from("private-media")`, só escreve em post-media.
+    const ficheiro = formData.get("imagem");
+    if (!(ficheiro instanceof File) || ficheiro.size === 0) return { erro: "Escolhe uma imagem." };
+    if (!ficheiro.type.startsWith("image/")) return { erro: "Só ficheiros de imagem." };
+    if (ficheiro.size > MAX_IMAGEM_BYTES) return { erro: "Imagem demasiado grande." };
+
+    const extensao = extensaoDe(ficheiro.type);
+    const novoPath = `${user.id}/${idFicheiro()}.${extensao}`;
+    const bytes = new Uint8Array(await ficheiro.arrayBuffer());
+    const { error: erroUpload } = await supabase.storage
+      .from("post-media")
+      .upload(novoPath, bytes, { contentType: ficheiro.type });
+    if (erroUpload) return { erro: "Não foi possível publicar a imagem." };
+
+    fonte = {
+      kind: "imagem",
+      authorId: user.id,
+      imagem: { storagePath: novoPath },
     };
   } else {
     // conquista | texto — sem fonte externa, é só o texto escrito na hora.
