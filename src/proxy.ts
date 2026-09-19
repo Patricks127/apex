@@ -67,5 +67,12 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  // manifest.json fica de fora — o browser vai buscá-lo para decidir se
+  // oferece "Instalar app" mesmo antes de haver sessão (ex.: ainda em
+  // /entrar), e teria de vir sempre JSON válido, nunca um redirect para
+  // /entrar. Não expõe nada sensível, é o mesmo tipo de exceção que as
+  // imagens estáticas já tinham.
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|manifest\\.json|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
 };

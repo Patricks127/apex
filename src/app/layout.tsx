@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Archivo, Barlow_Condensed, Geist, Geist_Mono } from "next/font/google";
 import { Rodape } from "./_ui/rodape";
 import "./globals.css";
@@ -32,6 +32,30 @@ const barlowCondensed = Barlow_Condensed({
 export const metadata: Metadata = {
   title: "APEX",
   description: "Treino com acompanhamento PT e comunidade.",
+  manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
+  appleWebApp: {
+    capable: true,
+    title: "APEX",
+    statusBarStyle: "default",
+  },
+  // `appleWebApp.capable` só gera "mobile-web-app-capable" — o Safari mais
+  // antigo (antes do iOS 17.4) só reconhece o nome "apple-" prefixado, por
+  // isso o par de tags aqui, à mão.
+  other: {
+    "apple-mobile-web-app-capable": "yes",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0a0a0b",
+  colorScheme: "light",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
