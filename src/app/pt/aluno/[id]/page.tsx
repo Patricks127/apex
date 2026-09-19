@@ -193,6 +193,37 @@ export default async function FichaAlunoPage({
         </Link>
       </nav>
 
+      <div className="flex flex-col gap-1">
+        <h2 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: COR.tinta }}>
+          Dar um plano
+        </h2>
+        <p className="apex-tipo-secundario" style={{ color: COR.fraco }}>
+          Dois caminhos independentes — escolhe um, ou os dois (o PDF manda sempre que existir, ver /plano do aluno).
+        </p>
+      </div>
+
+      <SeccaoPlanosDocumento alunoId={alunoId} documentos={documentosComUrl} />
+
+      <section className="flex flex-col gap-4 border-t pt-6" style={{ borderColor: COR.linha }}>
+        <div>
+          <h2 className="apex-tipo-titulo-seccao" style={{ marginTop: 0, color: COR.tinta }}>
+            Criar plano na app
+          </h2>
+          <p className="apex-tipo-secundario" style={{ color: COR.fraco }}>
+            {planoExistente
+              ? "Editar o plano que atribuíste a este aluno."
+              : "O editor completo, dia a dia — precisa de pelo menos um dia com exercícios antes de gravar."}
+          </p>
+        </div>
+
+        <EditorPlanoPt
+          alunoId={alunoId}
+          exercicios={exercicios}
+          nomeInicial={planoExistente?.name ?? ""}
+          diasIniciais={diasIniciais}
+        />
+      </section>
+
       <SeccaoAdesaoSemanal pontos={pontosAdesao} />
 
       <SeccaoForcaLeitura recordes={progresso.recordes} />
@@ -215,26 +246,6 @@ export default async function FichaAlunoPage({
       <Evolucao evolucao={evolucao} />
 
       <Historico sessoes={progresso.sessoes.slice(0, 8)} />
-
-      <SeccaoPlanosDocumento alunoId={alunoId} documentos={documentosComUrl} />
-
-      <section className="flex flex-col gap-4">
-        <div>
-          <h2 className="apex-tipo-titulo-seccao" style={{ marginTop: 0, color: COR.tinta }}>
-            {planoExistente ? "Editar plano" : "Atribuir plano"}
-          </h2>
-          <p className="apex-tipo-secundario" style={{ color: COR.fraco }}>
-            {planoExistente ? "Editar o plano que atribuíste a este aluno." : "Criar um plano para este aluno."}
-          </p>
-        </div>
-
-        <EditorPlanoPt
-          alunoId={alunoId}
-          exercicios={exercicios}
-          nomeInicial={planoExistente?.name ?? ""}
-          diasIniciais={diasIniciais}
-        />
-      </section>
     </main>
   );
 }
@@ -256,20 +267,23 @@ function formatarTamanho(bytes: number): string {
 }
 
 /**
- * Planos em PDF anexados — em paralelo ao plano estruturado abaixo, não em
- * vez dele. Qualquer PT com scope vê o histórico (mesma decisão da 019),
- * mas só quem anexou tem o botão de apagar — a RLS já bloquearia os
- * outros, isto é só não mostrar um botão que nunca funcionaria.
+ * Caminho 1 de 2 para dar um plano — completamente independente do editor
+ * estruturado abaixo (secção própria, form próprio, Server Action própria,
+ * sem validação de dias nenhuma). O caminho rápido: o PT já tem o plano
+ * feito, anexa o ficheiro, a aluna vê-o de imediato. Qualquer PT com scope
+ * vê o histórico (mesma decisão da 019), mas só quem anexou tem o botão de
+ * apagar — a RLS já bloquearia os outros, isto é só não mostrar um botão
+ * que nunca funcionaria.
  */
 function SeccaoPlanosDocumento({ alunoId, documentos }: { alunoId: string; documentos: PlanoDocumento[] }) {
   return (
     <section className="flex flex-col gap-3">
       <div>
         <h2 className="apex-tipo-titulo-seccao" style={{ marginTop: 0, color: COR.tinta }}>
-          Plano em PDF
+          Anexar plano em PDF
         </h2>
         <p className="apex-tipo-secundario" style={{ color: COR.fraco, marginTop: 4 }}>
-          Anexa um plano em ficheiro, além (ou em vez) do plano estruturado abaixo.
+          O caminho rápido — já tens o plano feito, anexa o ficheiro e a aluna vê-o de imediato.
         </p>
       </div>
 
