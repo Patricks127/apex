@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Archivo, Barlow_Condensed, Geist, Geist_Mono } from "next/font/google";
 import { Rodape } from "./_ui/rodape";
+import { GestorHistoricoAndroid } from "./_ui/pwa/gestor-historico-android";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -65,6 +66,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} ${archivo.variable} ${barlowCondensed.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <GestorHistoricoAndroid />
         <div className="flex flex-1 flex-col">{children}</div>
         <Rodape />
       </body>
