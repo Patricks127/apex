@@ -1316,6 +1316,27 @@
   background: var(--apex-erro-fundo);
 }
 
+/* Cartão genérico do dashboard do atleta — mesma linguagem em todos os
+   cartões (borda 1px, cantos vivos, escala de espaçamento 8/12/16/20/24/32,
+   igual ao resto do sistema: .apex-kpi, .apex-alerta-card). "--destaque" é
+   só para o cartão principal (treino de hoje) se distinguir dos outros por
+   um fundo, nunca por tamanho de letra fora da escala. */
+.apex-cartao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--apex-space-3);
+  padding: var(--apex-space-5);
+  border: 1px solid var(--apex-cinza-linha);
+}
+
+.apex-cartao--destaque {
+  background: var(--apex-cinza-fundo);
+}
+
+.apex-grafico__vazio--compacto {
+  height: 96px;
+}
+
 .apex-aluno-linha {
   display: flex;
   align-items: center;

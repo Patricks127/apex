@@ -57,6 +57,12 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   themeColor: "#0a0a0b",
   colorScheme: "light",
+  // Sem isto, env(safe-area-inset-*) resolve sempre a 0 no iOS — mesmo com
+  // notch/Dynamic Island/barra de gestos, o WebKit só reserva espaço real
+  // para eles quando a página pede para desenhar por baixo (viewport-fit
+  // cover). Necessário para a PWA instalada no iOS (standalone, sem chrome
+  // do Safari) respeitar as safe areas.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

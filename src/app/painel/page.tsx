@@ -2,21 +2,23 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { carregarPlanoAtivo, treinoDeHojeFeito, janelaRecente } from "@/lib/treino/perfil";
-import { indiceDiaSemanaHoje, proximoDiaDeTreino, construirLinhaTempo } from "@/lib/treino/linha-tempo";
+import { janelaRecente } from "@/lib/treino/perfil";
+import { carregarProgresso } from "@/lib/treino/progresso-dados";
 import { MOTIVO_LABEL, type MotivoAtencao } from "@/lib/treino/atencao";
 import { atencaoDosAlunos } from "@/lib/treino/atencao-dados";
 import { carregarResumoAlunos, type ResumoAluno } from "@/lib/treino/resumo-alunos";
 import { chaveSemanaIso } from "@/lib/treino/adesao-semanal";
-import type { DiaGerado } from "@/lib/motor";
 import { sair } from "@/app/actions/auth";
 import { responderPedido, revogarAcesso } from "@/app/actions/ligacoes";
-import { BlocoDados } from "../_ui/design/bloco-dados";
 import { Sino } from "../_ui/social/sino";
 import { Sparkline } from "../_ui/treino/sparkline";
 import { contarNaoLidas } from "@/lib/social/notificacoes-dados";
 import { CodigoPt } from "./codigo-pt";
 import { OMeuPt } from "./o-meu-pt";
+import { CabecalhoAtleta } from "./atleta/cabecalho-atleta";
+import { CartaoTreinoHoje } from "./atleta/cartao-treino-hoje";
+import { CartaoProgresso } from "./atleta/cartao-progresso";
+import { CartaoAtividade } from "./atleta/cartao-atividade";
 
 export const metadata: Metadata = {
   title: "Painel · APEX",
@@ -61,32 +63,46 @@ export default async function PainelPage() {
   ]);
 
   return (
-    <main className="apex-ecra-claro mx-auto flex w-full max-w-lg flex-col gap-8 px-5 py-8">
-      <header className="flex items-start justify-between">
-        <div>
-          <p className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
-            APEX
-          </p>
-          <h1 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: COR.tinta }}>
-            {perfil?.name ?? "—"}
-          </h1>
-          <p className="apex-tipo-secundario" style={{ color: COR.fraco }}>
-            {perfil?.role ? (NOME_PAPEL[perfil.role] ?? perfil.role) : "Perfil incompleto"}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Sino naoLidas={naoLidas} />
-          <form action={sair}>
-            <button
-              type="submit"
-              className="apex-tipo-etiqueta border px-3 py-1.5"
-              style={{ borderColor: COR.linha, color: COR.fraco }}
-            >
-              Terminar sessão
-            </button>
-          </form>
-        </div>
-      </header>
+    <main
+      className="apex-ecra-claro mx-auto flex w-full max-w-lg flex-col gap-8 px-5 py-8"
+      // Aditivo ao py-8 já existente — no iPhone instalado como PWA
+      // (standalone, sem chrome do Safari), o topo fica por baixo do
+      // notch/Dynamic Island sem isto. env() sem suporte cai para 0px,
+      // inofensivo em qualquer outro dispositivo/browser.
+      style={{
+        paddingTop: "calc(var(--apex-space-8) + env(safe-area-inset-top, 0px))",
+        paddingBottom: "calc(var(--apex-space-8) + env(safe-area-inset-bottom, 0px))",
+      }}
+    >
+      {perfil?.role === "atleta" ? (
+        <CabecalhoAtleta nome={perfil.name} naoLidas={naoLidas} />
+      ) : (
+        <header className="flex items-start justify-between">
+          <div>
+            <p className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
+              APEX
+            </p>
+            <h1 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: COR.tinta }}>
+              {perfil?.name ?? "—"}
+            </h1>
+            <p className="apex-tipo-secundario" style={{ color: COR.fraco }}>
+              {perfil?.role ? (NOME_PAPEL[perfil.role] ?? perfil.role) : "Perfil incompleto"}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Sino naoLidas={naoLidas} />
+            <form action={sair}>
+              <button
+                type="submit"
+                className="apex-tipo-etiqueta border px-3 py-1.5"
+                style={{ borderColor: COR.linha, color: COR.fraco }}
+              >
+                Terminar sessão
+              </button>
+            </form>
+          </div>
+        </header>
+      )}
 
       {perfil?.role === "pt" ? (
         <SeccaoPt userId={user.id} nome={perfil.name} ptCode={perfil.pt_code ?? null} />
@@ -116,14 +132,24 @@ export default async function PainelPage() {
 }
 
 // ---------------------------------------------------------------------------
-// Atleta — "o que faço agora?" em dois segundos
+// Atleta — "o que faço agora?" em dois segundos. Fase 1 (referencia/plano-
+// execucao-apex.md, pontos 3/4/18): o PDF é UM cartão do plano, nunca o
+// ecrã inteiro; treino de hoje é o herói; progresso e atividade resumidos.
 // ---------------------------------------------------------------------------
 
 async function SeccaoAtleta({ userId }: { userId: string }) {
+  const supabase = await createClient();
+  const [{ sessoes, metricas }, feedbackRecente] = await Promise.all([
+    carregarProgresso(supabase, userId),
+    contarFeedbackRecente(supabase, userId),
+  ]);
+
   return (
-    <div className="flex flex-col gap-8">
-      <BlocoTreinoHoje userId={userId} />
+    <div className="flex flex-col gap-6">
+      <CartaoTreinoHoje userId={userId} />
       <BlocoPtDoAtleta userId={userId} />
+      <CartaoProgresso metricas={metricas} />
+      <CartaoAtividade sessoes={sessoes} feedbackRecente={feedbackRecente} />
       <nav className="flex flex-wrap gap-4 border-t pt-4" style={{ borderColor: COR.linha }}>
         <Link href="/plano" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.tinta }}>
           Plano
@@ -149,173 +175,6 @@ async function SeccaoAtleta({ userId }: { userId: string }) {
       </nav>
     </div>
   );
-}
-
-async function BlocoTreinoHoje({ userId }: { userId: string }) {
-  const supabase = await createClient();
-
-  // PDF manda (ver /plano) — se o PT anexou um plano em ficheiro, nem
-  // pedimos para gerar um estruturado nem mostramos o treino ao vivo,
-  // mesmo que exista um plano estruturado antigo por trás.
-  const { data: documentos } = await supabase.from("plan_documents").select("id").eq("student_id", userId).limit(1);
-  if ((documentos ?? []).length > 0) {
-    return (
-      <section className="flex flex-col gap-2">
-        <h2 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: COR.tinta }}>
-          O teu plano é um PDF
-        </h2>
-        <p className="apex-tipo-corpo" style={{ color: COR.fraco }}>
-          O treino ao vivo e a progressão automática não estão disponíveis para este plano — regista os teus
-          treinos manualmente.
-        </p>
-        <div className="flex flex-wrap gap-3" style={{ marginTop: "var(--apex-space-2)" }}>
-          <Link href="/treino/registar" className="apex-botao apex-botao--claro">
-            Registar treino de hoje
-          </Link>
-          <Link href="/plano" className="apex-tipo-secundario self-center underline underline-offset-4" style={{ color: COR.tinta }}>
-            Ver plano
-          </Link>
-        </div>
-      </section>
-    );
-  }
-
-  const planoAtivo = await carregarPlanoAtivo(supabase, userId);
-
-  if (!planoAtivo) {
-    return (
-      <section className="flex flex-col gap-2">
-        <h2 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: COR.tinta }}>
-          Ainda sem plano
-        </h2>
-        <p className="apex-tipo-corpo" style={{ color: COR.fraco }}>
-          Responde a seis perguntas rápidas e o motor gera a tua semana.
-        </p>
-        <Link href="/plano" className="apex-botao apex-botao--claro" style={{ marginTop: "var(--apex-space-2)" }}>
-          Começar
-        </Link>
-      </section>
-    );
-  }
-
-  const dias = planoAtivo.days.days;
-  const indiceHoje = indiceDiaSemanaHoje();
-  const diaHoje = dias[indiceHoje];
-
-  const semanaAtual = planoAtivo.progression?.week ?? 1;
-  const nPrevistos = dias.filter((d) => !d.rest).length;
-  const { count: nFeitosCru } = await supabase
-    .from("workout_sessions")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", userId)
-    .eq("week_number", semanaAtual);
-  const nFeitos = Math.min(nPrevistos, nFeitosCru ?? 0);
-  const percursoSemana = nPrevistos > 0 ? Math.round((nFeitos / nPrevistos) * 100) : 0;
-
-  return (
-    <section className="flex flex-col gap-5">
-      {diaHoje.rest ? (
-        <DescansoHoje dias={dias} indiceHoje={indiceHoje} />
-      ) : (
-        <TreinoHoje userId={userId} dia={diaHoje} indiceHoje={indiceHoje} />
-      )}
-
-      {nPrevistos > 0 ? (
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-baseline justify-between">
-            <span className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
-              Esta semana
-            </span>
-            <span className="apex-tipo-secundario apex-tabular" style={{ color: COR.fraco }}>
-              {nFeitos} de {nPrevistos}
-            </span>
-          </div>
-          <div className="apex-progresso-claro">
-            <div className="apex-progresso-claro__preenchido" style={{ width: `${percursoSemana}%` }} />
-          </div>
-        </div>
-      ) : null}
-    </section>
-  );
-}
-
-async function TreinoHoje({
-  userId,
-  dia,
-  indiceHoje,
-}: {
-  userId: string;
-  dia: DiaGerado;
-  indiceHoje: number;
-}) {
-  const supabase = await createClient();
-  const titulo = dia.title ?? "Treino";
-  const feito = await treinoDeHojeFeito(supabase, userId, titulo);
-  const { duracaoTotalMin } = construirLinhaTempo(dia, { estadoDia: "neutro" });
-  const nExercicios = dia.exercises?.length ?? 0;
-
-  if (feito) {
-    return (
-      <div className="flex flex-col gap-1">
-        <span className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
-          Hoje · {dia.dayName}
-        </span>
-        <h2 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: COR.tinta }}>
-          {titulo}
-        </h2>
-        <p className="apex-tipo-corpo" style={{ color: COR.fraco }}>
-          Já treinaste hoje. Bom trabalho.
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-3">
-      <div>
-        <span className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
-          Hoje · {dia.dayName}
-        </span>
-        <h2 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: COR.tinta }}>
-          {titulo}
-        </h2>
-      </div>
-      <BlocoDados
-        itens={[
-          { valor: String(nExercicios), etiqueta: "exercícios" },
-          { valor: `${duracaoTotalMin}′`, etiqueta: "estimado" },
-        ]}
-      />
-      <Link href={`/treino/${indiceHoje}`} className="apex-botao apex-botao--claro">
-        Começar treino
-      </Link>
-    </div>
-  );
-}
-
-function DescansoHoje({ dias, indiceHoje }: { dias: DiaGerado[]; indiceHoje: number }) {
-  const proximo = proximoDiaDeTreino(dias, indiceHoje);
-  return (
-    <div className="flex flex-col gap-1">
-      <span className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
-        Hoje
-      </span>
-      <h2 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: COR.tinta }}>
-        Descanso
-      </h2>
-      <p className="apex-tipo-corpo" style={{ color: COR.fraco }}>
-        {proximo
-          ? `Próximo treino ${rotuloOffset(proximo.offset)}: ${proximo.dia.title} (${proximo.dia.dayName}).`
-          : "Sem treinos marcados esta semana."}
-      </p>
-    </div>
-  );
-}
-
-function rotuloOffset(offset: number): string {
-  if (offset === 1) return "amanhã";
-  if (offset === 2) return "depois de amanhã";
-  return `daqui a ${offset} dias`;
 }
 
 async function BlocoPtDoAtleta({ userId }: { userId: string }) {
