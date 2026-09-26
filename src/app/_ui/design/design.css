@@ -343,12 +343,29 @@
      (incluindo qualquer seta de voltar lá dentro) fica fisicamente por
      baixo da zona física reservada — o Chromium, sem hardware nenhum a
      simular, mostra-a "bem" num screenshot, mas num iPhone a sério fica
-     tapada. margin (não padding) para nunca colidir com o px-*/py-* que
-     cada ecrã já põe na mesma tag — soma-se por fora, nunca é sobreposto
-     pela ordem do CSS compilado. env() sem suporte cai para 0px.
-     Aplicado aqui (a UMA classe, partilhada por todos os ecrãs claros) em
-     vez de em cada página — a versão anterior só tinha isto no /painel,
-     que foi exatamente o que deixou os outros ecrãs por corrigir. */
+     tapada. margin (não padding) para nunca colidir com o padding
+     horizontal/vertical que cada ecrã já põe na mesma tag — soma-se por
+     fora, nunca é sobreposto pela ordem do CSS compilado. env() sem
+     suporte cai para 0px. Aplicado aqui (a UMA classe, partilhada por
+     todos os ecrãs claros) em vez de em cada página — a versão anterior
+     só tinha isto no /painel, que foi exatamente o que deixou os outros
+     ecrãs por corrigir.
+
+     ACHADO GRAVE, corrigido no mesmo commit: a versão anterior deste
+     comentário mencionava as classes de espaçamento do Tailwind usando o
+     atalho com asterisco (px seguido de asterisco, barra, py seguido de
+     asterisco) — essa barra logo a seguir a um asterisco FECHA um
+     comentário CSS a meio, mesmo dentro de um comentário de bloco (CSS
+     não escapa nem aninha comentários; nunca escrever essa combinação de
+     dois carateres dentro de um comentário). Isso corrompia a regra
+     inteira — .apex-ecra-claro desaparecia por completo do CSS compilado
+     (confirmado a comparar o CSS servido com o código-fonte), deixando
+     main sem fundo/cor próprios em qualquer um dos 18 ecrãs que usam esta
+     classe. Em modo claro passava despercebido (o body, por baixo,
+     também já era branco); em modo escuro do sistema, o body ficava
+     escuro (ver o outro bug, em globals.css) e, sem esta regra a forçar
+     branco, esse escuro aparecia a app inteira — exatamente os dois
+     problemas relatados, de uma só causa raiz. */
   margin-top: env(safe-area-inset-top, 0px);
 }
 

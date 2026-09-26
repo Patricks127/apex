@@ -4,9 +4,21 @@
    referencia/SISTEMA-DESIGN.md e o próprio ficheiro para o porquê. */
 @import "./_ui/design/design.css";
 
+/* Regra do projeto: a app é SEMPRE clara, nunca dark — independentemente
+   do sistema (ponto 29 do plano de execução, "NÃO FAZER: dark"). Isto era
+   sobra do create-next-app (nunca usada por nenhum ecrã real — --background/
+   --foreground e bg-background/text-foreground não aparecem em lado
+   nenhum do código da app) e tinha um @media (prefers-color-scheme: dark)
+   a mudar --background para quase-preto sempre que o telemóvel/computador
+   estivesse em modo escuro. Combinado com um bug à parte em design.css
+   (.apex-ecra-claro corrompida, ver esse ficheiro) que deixava o <main> de
+   cada ecrã sem fundo próprio, isto era a causa de a app aparecer escura
+   no iPhone em modo escuro. Removido o @media; valores fixos, claros,
+   sempre — não seguem o sistema por definição, não por omissão. */
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  color-scheme: light;
 }
 
 @theme inline {
@@ -14,13 +26,6 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
