@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { autoregulate, type DiaGerado } from "@/lib/motor";
 import { decidirDescanso, type InfoMotorExercicio } from "@/lib/treino/descanso";
+import { BotaoVoltar } from "@/app/_ui/design/botao-voltar";
 import { SerieAtual, formatarNumero } from "./serie-atual";
 import { PainelRpe } from "./painel-rpe";
 import { EcraDescanso } from "./ecra-descanso";
@@ -69,7 +69,6 @@ export function RegistoTreino({
   deload: boolean;
   checkinAtivo: boolean;
 }) {
-  const router = useRouter();
   const [exs, setExs] = useState<EstadoEx[]>(() =>
     dia.exercises!.map((e, i) => ({
       nome: e.name,
@@ -226,18 +225,14 @@ export function RegistoTreino({
 
       <div className="apex-treino-cabecalho">
         <div className="flex items-center gap-3">
-          {/* router.back() — alcançável do /painel (cartão "Treino de
-              hoje") e do /plano; um destino fixo estaria errado sempre que
-              a origem real fosse a outra. Visível, não só o gesto do
-              telemóvel (o iOS instalado como PWA não tem gesto nenhum). */}
-          <button
-            type="button"
-            className="apex-treino-botao-lista"
-            onClick={() => router.back()}
-            aria-label="Voltar"
-          >
-            ←
-          </button>
+          {/* Mesmo componente de /treino/registar, /u/[id] e /pt/[codigo]
+              (o único padrão confirmado a funcionar no iPhone/Safari da
+              Daniela) — não um botão à parte com um glifo "←" sozinho
+              dentro de uma caixa: essa versão passava em todas as
+              verificações de CSS/DOM que consigo fazer (Chromium), mas
+              não aparecia no Safari a sério. Cor ajustada ao fundo escuro
+              do modo treino. */}
+          <BotaoVoltar cor="var(--apex-texto-fraco)" />
           <div className="flex flex-col">
             <span className="apex-tipo-etiqueta apex-tabular" style={{ color: "var(--apex-texto-fraco)" }}>
               {dia.dayName} · semana {weekNumber}

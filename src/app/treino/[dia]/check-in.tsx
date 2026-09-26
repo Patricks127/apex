@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useActionState } from "react";
-import { useRouter } from "next/navigation";
+import { BotaoVoltar } from "@/app/_ui/design/botao-voltar";
 import { gravarTreino, type EstadoRegisto } from "@/app/actions/treino";
 
 const EFFORTS = [
@@ -34,25 +34,18 @@ export function CheckIn({
   agg: { done: number; total: number; volume: number; avgRpe: number | null };
   logsJson: string;
 }) {
-  const router = useRouter();
   const [estado, acao, pendente] = useActionState(gravarTreino, {} as EstadoRegisto);
   const [semDesconforto, setSemDesconforto] = useState(true);
 
   return (
     <div className="apex-treino flex-1">
       <div className="mx-auto flex w-full max-w-lg flex-1 flex-col gap-5 px-5 py-8">
-        {/* Chega-se aqui por estado do cliente (fase==="checkin"), nunca
-            uma navegação própria — router.back() vai para quem levou a
-            /treino/[dia] (painel ou plano), o mesmo destino sensato de
-            desistir do check-in. Visível, não só o gesto do telemóvel. */}
-        <button
-          type="button"
-          className="apex-treino-botao-lista self-start"
-          onClick={() => router.back()}
-          aria-label="Voltar"
-        >
-          ←
-        </button>
+        {/* Mesmo componente de /treino/registar — o único padrão
+            confirmado a funcionar no iPhone/Safari da Daniela. Chega-se
+            aqui por estado do cliente (fase==="checkin"), nunca navegação
+            própria — router.back() (dentro do próprio BotaoVoltar) vai
+            para quem levou a /treino/[dia] (painel ou plano). */}
+        <BotaoVoltar cor="var(--apex-texto-fraco)" />
         <div>
           <p className="apex-tipo-etiqueta" style={{ color: "var(--apex-texto-fraco)" }}>
             Treino feito
