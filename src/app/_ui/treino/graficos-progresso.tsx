@@ -14,7 +14,14 @@ const COR = {
   azul: "var(--apex-azul)",
 } as const;
 
-const dataLonga = (iso: string) => new Date(iso).toLocaleDateString("pt-PT", { day: "numeric", month: "long", year: "numeric" });
+// Fuso FIXO — usado nos aria-label dos pontos do gráfico, dentro de
+// componentes cliente (progresso-view.tsx, graficos-aluno.tsx). Sem
+// timeZone explícito, o servidor (UTC) e o telemóvel (Portugal) podiam
+// discordar sobre que dia é perto da meia-noite — hidratação a menos.
+const FUSO = "Europe/Lisbon";
+
+const dataLonga = (iso: string) =>
+  new Date(iso).toLocaleDateString("pt-PT", { day: "numeric", month: "long", year: "numeric", timeZone: FUSO });
 
 /** Evolução do 1RM — quadrado cheio = testado no ginásio, círculo vazio =
  *  estimativa do treino ao vivo. Cor azul só no marco de novo recorde. */

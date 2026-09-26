@@ -39,8 +39,15 @@ const KIND_LABEL: Record<PostKind, string> = {
   texto: "Texto",
 };
 
+// Fuso FIXO — mesmo raciocínio de chat-view.tsx: sem timeZone explícito,
+// toLocaleDateString usa o fuso de onde o código corre, e o servidor
+// (Vercel, UTC) discorda do telemóvel de quem usa a app (Portugal) sobre
+// que dia é uma data perto da meia-noite — o React acusa isso como erro de
+// hidratação (#418) ao comparar o HTML do servidor com o do cliente.
+const FUSO = "Europe/Lisbon";
+
 const dataCurta = (iso: string) =>
-  new Date(iso).toLocaleDateString("pt-PT", { day: "numeric", month: "short" });
+  new Date(iso).toLocaleDateString("pt-PT", { day: "numeric", month: "short", timeZone: FUSO });
 
 export function FeedView({
   meId,

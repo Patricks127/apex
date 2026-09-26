@@ -31,8 +31,14 @@ const EFFORT_LABEL: Record<string, string> = {
   passei: "Passei-me",
 };
 
+// Fuso FIXO — sem timeZone explícito, esta data (histórico de sessões,
+// visível logo no primeiro render) divergia entre o servidor (Vercel, UTC)
+// e o telemóvel de quem usa a app (Portugal) perto da meia-noite, e o
+// React acusava isso como erro de hidratação (#418).
+const FUSO = "Europe/Lisbon";
+
 const dataCurta = (iso: string) =>
-  new Date(iso).toLocaleDateString("pt-PT", { day: "numeric", month: "short" });
+  new Date(iso).toLocaleDateString("pt-PT", { day: "numeric", month: "short", timeZone: FUSO });
 
 export function ProgressoView({
   recordes,

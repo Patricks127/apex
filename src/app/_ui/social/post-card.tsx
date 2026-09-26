@@ -19,6 +19,13 @@ const COR = {
   erro: "var(--apex-erro)",
 } as const;
 
+// Fuso FIXO — mesmo raciocínio de chat-view.tsx/feed-view.tsx: sem
+// timeZone explícito, esta data (mostrada em TODOS os posts do feed, logo
+// no primeiro render) divergia entre o servidor (Vercel, UTC) e o
+// telemóvel de quem usa a app (Portugal) perto da meia-noite — a causa
+// mais provável do erro de hidratação (#418) visto no /feed.
+const FUSO = "Europe/Lisbon";
+
 const dataLonga = (iso: string) =>
   new Date(iso).toLocaleDateString("pt-PT", {
     day: "numeric",
@@ -26,6 +33,7 @@ const dataLonga = (iso: string) =>
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: FUSO,
   });
 
 const publicUrl = (path: string) =>

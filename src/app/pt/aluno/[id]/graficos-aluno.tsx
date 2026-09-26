@@ -27,6 +27,11 @@ const COR = {
   erro: "var(--apex-erro)",
 } as const;
 
+// Fuso FIXO — mesmo raciocínio de chat-view.tsx: sem timeZone explícito,
+// esta data (rótulo do gráfico de volume, na ficha do aluno) divergia
+// entre o servidor (UTC) e o telemóvel do PT (Portugal) perto da meia-noite.
+const FUSO = "Europe/Lisbon";
+
 const LIFTS = Object.keys(LIFT_LABEL) as Lift[];
 const METRICA_IDS = Object.keys(METRICAS) as MetricaId[];
 
@@ -170,7 +175,7 @@ export function SeccaoVolumeLeitura({ sessoes }: { sessoes: SessaoHistorico[] })
     vista === "semana"
       ? porSemana.map((s) => ({ chave: `S${s.weekNumber}`, valor: s.volumeKg, marco: s.isDeload }))
       : ultimasSessoes.map((s) => ({
-          chave: new Date(s.performedAt).toLocaleDateString("pt-PT", { day: "numeric", month: "short" }),
+          chave: new Date(s.performedAt).toLocaleDateString("pt-PT", { day: "numeric", month: "short", timeZone: FUSO }),
           valor: s.volumeKg,
           marco: s.isDeload,
         }));

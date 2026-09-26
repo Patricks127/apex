@@ -47,18 +47,37 @@ const COR = {
 
 const MS_DIA = 86_400_000;
 
+// Fuso FIXO (não o do sistema onde o código corre) — nunca "new Date()" a
+// decidir "que dia é hoje" sozinho, nem toLocale*String sem timeZone. Sem
+// isto, o servidor (Vercel, UTC) e o telemóvel de quem usa a app (Portugal)
+// podiam calcular "Hoje"/"Ontem"/a hora de forma diferente — o HTML que o
+// servidor manda já não bate certo com o que o cliente calcula ao hidratar,
+// e o React acusa isso como erro (#418), mesmo sendo só uma hora de
+// diferença perto da meia-noite. Um fuso explícito, IGUAL dos dois lados,
+// elimina a divergência pela raiz — não é "o fuso de ninguém", é o fuso de
+// quem usa a app hoje.
+const FUSO = "Europe/Lisbon";
+
+/** "YYYY-MM-DD" no FUSO fixo — comparável como string, correto mesmo à
+ *  volta da mudança de hora (DST), sem matemática de milissegundos à mão. */
+function chaveDia(d: Date): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: FUSO, year: "numeric", month: "2-digit", day: "2-digit" }).format(
+    d,
+  );
+}
+
 function rotuloDia(iso: string): string {
   const d = new Date(iso);
   const hoje = new Date();
-  const zerar = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
-  const diff = Math.round((zerar(hoje) - zerar(d)) / MS_DIA);
-  if (diff === 0) return "Hoje";
-  if (diff === 1) return "Ontem";
-  return d.toLocaleDateString("pt-PT", { day: "numeric", month: "long" });
+  const ontem = new Date(hoje.getTime() - MS_DIA);
+  const chaveD = chaveDia(d);
+  if (chaveD === chaveDia(hoje)) return "Hoje";
+  if (chaveD === chaveDia(ontem)) return "Ontem";
+  return d.toLocaleDateString("pt-PT", { day: "numeric", month: "long", timeZone: FUSO });
 }
 
 const hhmm = (iso: string) =>
-  new Date(iso).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
+  new Date(iso).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit", timeZone: FUSO });
 
 export function ChatView({
   linkId,
@@ -377,6 +396,7 @@ function TimelineEvolucao({
                     day: "numeric",
                     month: "long",
                     year: "numeric",
+                    timeZone: FUSO,
                   })}
                 </span>
                 <span className="apex-tipo-secundario apex-tabular" style={{ color: COR.fraco }}>

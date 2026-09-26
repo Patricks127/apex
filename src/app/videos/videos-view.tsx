@@ -40,8 +40,13 @@ const COR = {
   erro: "var(--apex-erro)",
 } as const;
 
+// Fuso FIXO — sem timeZone explícito, a data de cada vídeo divergia entre
+// o servidor (Vercel, UTC) e o telemóvel de quem usa a app (Portugal)
+// perto da meia-noite — erro de hidratação (#418).
+const FUSO = "Europe/Lisbon";
+
 const data = (iso: string) =>
-  new Date(iso).toLocaleDateString("pt-PT", { day: "numeric", month: "long", year: "numeric" });
+  new Date(iso).toLocaleDateString("pt-PT", { day: "numeric", month: "long", year: "numeric", timeZone: FUSO });
 
 const EXERCICIOS = [
   "Agachamento",
