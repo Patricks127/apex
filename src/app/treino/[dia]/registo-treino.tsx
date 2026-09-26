@@ -219,83 +219,91 @@ export function RegistoTreino({
 
   return (
     <div className="apex-treino">
-      <div className="apex-treino-progresso">
-        <div className="apex-treino-progresso__preenchido" style={{ width: `${percurso}%` }} />
-      </div>
-
-      <div className="apex-treino-cabecalho">
-        <div className="flex items-center gap-3">
-          {/* Mesmo componente de /treino/registar, /u/[id] e /pt/[codigo]
-              (o único padrão confirmado a funcionar no iPhone/Safari da
-              Daniela) — não um botão à parte com um glifo "←" sozinho
-              dentro de uma caixa: essa versão passava em todas as
-              verificações de CSS/DOM que consigo fazer (Chromium), mas
-              não aparecia no Safari a sério. Cor ajustada ao fundo escuro
-              do modo treino. */}
-          <BotaoVoltar cor="var(--apex-texto-fraco)" />
-          <div className="flex flex-col">
-            <span className="apex-tipo-etiqueta apex-tabular" style={{ color: "var(--apex-texto-fraco)" }}>
-              {dia.dayName} · semana {weekNumber}
-              {deload ? " · descarga" : ""}
-            </span>
-            <span className="apex-tipo-nome-exercicio" style={{ color: "var(--apex-texto-treino)" }}>
-              {dia.title}
-            </span>
-          </div>
+      {/* Contentor mx-auto/max-w-lg, tal como /treino/registar e o
+          check-in (que já tinha isto e o "← Voltar" lá dentro sempre
+          apareceu no Safari da Daniela) — o fundo escuro de .apex-treino
+          continua a ocupar o ecrã todo, só o CONTEÚDO (incluindo o
+          cabeçalho/seta) é que fica dentro da coluna centrada. Antes, o
+          cabeçalho era filho direto do full-bleed, sem esta moldura — a
+          única diferença estrutural real entre o ecrã que funcionava e
+          este, que não. ListaTreino fica de fora de propósito: é um
+          overlay position:fixed;inset:0, cobre o ecrã todo por definição
+          própria. */}
+      <div className="mx-auto flex w-full max-w-lg flex-1 flex-col">
+        <div className="apex-treino-progresso">
+          <div className="apex-treino-progresso__preenchido" style={{ width: `${percurso}%` }} />
         </div>
-        <button
-          type="button"
-          className="apex-treino-botao-lista"
-          onClick={() => setListaAberta(true)}
-          aria-label="Ver treino completo"
-        >
-          ☰
-        </button>
+
+        <div className="apex-treino-cabecalho">
+          <div className="flex items-center gap-3">
+            {/* Mesmo componente de /treino/registar, /u/[id] e /pt/[codigo]
+                (o único padrão confirmado a funcionar no iPhone/Safari da
+                Daniela). Cor ajustada ao fundo escuro do modo treino. */}
+            <BotaoVoltar cor="var(--apex-texto-fraco)" />
+            <div className="flex flex-col">
+              <span className="apex-tipo-etiqueta apex-tabular" style={{ color: "var(--apex-texto-fraco)" }}>
+                {dia.dayName} · semana {weekNumber}
+                {deload ? " · descarga" : ""}
+              </span>
+              <span className="apex-tipo-nome-exercicio" style={{ color: "var(--apex-texto-treino)" }}>
+                {dia.title}
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="apex-treino-botao-lista"
+            onClick={() => setListaAberta(true)}
+            aria-label="Ver treino completo"
+          >
+            ☰
+          </button>
+        </div>
+
+        {checkinAtivo ? (
+          <p
+            className="apex-tipo-etiqueta"
+            style={{ padding: "0 var(--apex-space-5)", color: "var(--apex-texto-fraco)" }}
+          >
+            Cargas ajustadas onde reportaste desconforto no último check-in.
+          </p>
+        ) : null}
+
+        {fase === "serie" || fase === "rpe" ? (
+          <SerieAtual
+            nomeExercicio={exAtual.nome}
+            muscle={exAtual.muscle}
+            numero={cursor.set + 1}
+            total={exAtual.sets.length}
+            bw={exAtual.bw}
+            w={serieAtual.w}
+            repsAlvo={serieAtual.reps}
+            rpeAlvoTexto={serieAtual.rpeAlvo}
+            usaBarra={exAtual.usaBarra}
+            incrementoKg={exAtual.incrementoKg}
+            caution={exAtual.caution}
+            substituted={exAtual.substituted}
+            focusTag={exAtual.focusTag}
+            swap={exAtual.swap}
+            onAjustar={ajustarCarga}
+            onDefinir={definirCarga}
+            onFeito={() => setFase("rpe")}
+          />
+        ) : null}
+
+        {fase === "rpe" ? <PainelRpe onEscolher={registarRpe} /> : null}
+
+        {fase === "descanso" && descansoInfo ? (
+          <EcraDescanso
+            duracaoSeg={descansoInfo.duracaoSeg}
+            motivo={descansoInfo.motivo}
+            proximoNome={exs[descansoInfo.proximo.ex].nome}
+            proximoValor={valorAlvo(exs[descansoInfo.proximo.ex], exs[descansoInfo.proximo.ex].sets[descansoInfo.proximo.set])}
+            onFim={avancarDoDescanso}
+            onSaltar={avancarDoDescanso}
+          />
+        ) : null}
       </div>
-
-      {checkinAtivo ? (
-        <p
-          className="apex-tipo-etiqueta"
-          style={{ padding: "0 var(--apex-space-5)", color: "var(--apex-texto-fraco)" }}
-        >
-          Cargas ajustadas onde reportaste desconforto no último check-in.
-        </p>
-      ) : null}
-
-      {fase === "serie" || fase === "rpe" ? (
-        <SerieAtual
-          nomeExercicio={exAtual.nome}
-          muscle={exAtual.muscle}
-          numero={cursor.set + 1}
-          total={exAtual.sets.length}
-          bw={exAtual.bw}
-          w={serieAtual.w}
-          repsAlvo={serieAtual.reps}
-          rpeAlvoTexto={serieAtual.rpeAlvo}
-          usaBarra={exAtual.usaBarra}
-          incrementoKg={exAtual.incrementoKg}
-          caution={exAtual.caution}
-          substituted={exAtual.substituted}
-          focusTag={exAtual.focusTag}
-          swap={exAtual.swap}
-          onAjustar={ajustarCarga}
-          onDefinir={definirCarga}
-          onFeito={() => setFase("rpe")}
-        />
-      ) : null}
-
-      {fase === "rpe" ? <PainelRpe onEscolher={registarRpe} /> : null}
-
-      {fase === "descanso" && descansoInfo ? (
-        <EcraDescanso
-          duracaoSeg={descansoInfo.duracaoSeg}
-          motivo={descansoInfo.motivo}
-          proximoNome={exs[descansoInfo.proximo.ex].nome}
-          proximoValor={valorAlvo(exs[descansoInfo.proximo.ex], exs[descansoInfo.proximo.ex].sets[descansoInfo.proximo.set])}
-          onFim={avancarDoDescanso}
-          onSaltar={avancarDoDescanso}
-        />
-      ) : null}
 
       {listaAberta ? (
         <ListaTreino
