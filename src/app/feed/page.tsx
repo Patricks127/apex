@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { carregarFeed, carregarFontesParaComposer, type Filtro } from "@/lib/social/feed-dados";
+import { BotaoVoltar } from "@/app/_ui/design/botao-voltar";
 import { FeedView } from "./feed-view";
 
 export const metadata: Metadata = {
@@ -31,6 +32,7 @@ export default async function FeedPage({
 
   return (
     <main className="apex-ecra-claro mx-auto flex min-h-dvh w-full max-w-lg flex-col gap-4 px-5 py-8">
+      <BotaoVoltar />
       <FeedView meId={user.id} filtroInicial={filtro} posts={posts} fontes={fontes} />
     </main>
   );

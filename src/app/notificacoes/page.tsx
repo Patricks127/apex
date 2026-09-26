@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { carregarNotificacoes, type Notificacao } from "@/lib/social/notificacoes-dados";
+import { BotaoVoltar } from "@/app/_ui/design/botao-voltar";
 import { MarcarVisiveisLidas } from "./marcar-visiveis-lidas";
 
 export const metadata: Metadata = {
@@ -51,6 +52,10 @@ export default async function NotificacoesPage() {
           mostrar o fundo azul nesta visualização (dados já carregados
           acima); só a próxima visita e o contador do sino refletem "lida". */}
       {temNaoLidas ? <MarcarVisiveisLidas /> : null}
+
+      <div className="px-5">
+        <BotaoVoltar />
+      </div>
 
       <h1 className="apex-tipo-titulo-ecra px-5" style={{ marginTop: 0, color: COR.tinta }}>
         Notificações

@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { carregarPlanoAtivo, treinoDeHojeFeito } from "@/lib/treino/perfil";
 import { indiceDiaSemanaHoje } from "@/lib/treino/linha-tempo";
 import { regenerarPlano, escolherPlano } from "@/app/actions/treino";
+import { BotaoVoltar } from "@/app/_ui/design/botao-voltar";
 import { VistaPlano } from "./vista-plano";
 
 export const metadata: Metadata = {
@@ -89,6 +90,7 @@ export default async function PlanoPage({
 
   return (
     <main className="apex-ecra-claro mx-auto flex w-full max-w-lg flex-col gap-4 px-5 py-8">
+      <BotaoVoltar />
       {treino === "gravado" ? (
         <p
           className="apex-tipo-corpo border-b pb-4"

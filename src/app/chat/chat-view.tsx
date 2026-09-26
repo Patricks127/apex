@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { BotaoVoltar } from "@/app/_ui/design/botao-voltar";
 import {
   assinarMedia,
   enviarMensagem,
@@ -174,13 +175,16 @@ export function ChatView({
   return (
     <div className="apex-chat">
       <div className="apex-chat-cabecalho">
-        <div>
-          <p className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
-            {perspetiva === "aluno" ? "O teu PT" : "Atleta"}
-          </p>
-          <h1 className="apex-tipo-nome-exercicio" style={{ color: COR.tinta }}>
-            {outroNome}
-          </h1>
+        <div className="flex items-center gap-3">
+          <BotaoVoltar />
+          <div>
+            <p className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
+              {perspetiva === "aluno" ? "O teu PT" : "Atleta"}
+            </p>
+            <h1 className="apex-tipo-nome-exercicio" style={{ color: COR.tinta }}>
+              {outroNome}
+            </h1>
+          </div>
         </div>
         <div className="apex-chat-abas">
           {(["conversa", "evolucao"] as const).map((t) => (

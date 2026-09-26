@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ESPECIALIDADES, labelEspecialidade } from "@/lib/perfil";
 import { buscarPessoas } from "@/lib/social/feed-dados";
+import { BotaoVoltar } from "@/app/_ui/design/botao-voltar";
 import { BotaoSeguir } from "./botao-seguir";
 
 export const metadata: Metadata = {
@@ -41,6 +42,7 @@ export default async function DescobrirPage({
   return (
     <main className="apex-ecra-claro mx-auto flex min-h-dvh w-full max-w-lg flex-col gap-5 px-5 py-8">
       <header>
+        <BotaoVoltar />
         <h1 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: COR.tinta }}>
           Descobrir
         </h1>

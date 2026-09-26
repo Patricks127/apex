@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { BotaoVoltar } from "@/app/_ui/design/botao-voltar";
 import {
   assinarVideos,
   enviarFeedback,
@@ -94,13 +95,20 @@ export function VideosView({
   return (
     <div className="flex flex-col gap-5">
       <header className="flex items-start justify-between gap-3">
-        <div>
-          <p className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
-            {perspetiva === "pt" ? `Vídeos de ${alunoNome}` : "Os teus vídeos"}
-          </p>
-          <h1 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: COR.tinta }}>
-            {videos.length} {videos.length === 1 ? "vídeo" : "vídeos"}
-          </h1>
+        <div className="flex items-start gap-3">
+          {/* Só do lado do aluno — o PT já tem "← Voltar aos alunos" fixo
+              (uma única origem sensata: a lista de alunos). Aqui, /videos
+              é alcançável de vários sítios (nav do painel, "O meu PT",
+              atividade recente), por isso router.back(), não um Link. */}
+          {perspetiva === "aluno" ? <BotaoVoltar /> : null}
+          <div>
+            <p className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
+              {perspetiva === "pt" ? `Vídeos de ${alunoNome}` : "Os teus vídeos"}
+            </p>
+            <h1 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: COR.tinta }}>
+              {videos.length} {videos.length === 1 ? "vídeo" : "vídeos"}
+            </h1>
+          </div>
         </div>
         {perspetiva === "pt" ? (
           <span className={semFeedback > 0 ? "apex-chip-alerta apex-tipo-etiqueta shrink-0" : "apex-tipo-etiqueta shrink-0"} style={semFeedback > 0 ? undefined : { color: COR.fraco }}>
