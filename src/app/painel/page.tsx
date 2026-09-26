@@ -63,17 +63,11 @@ export default async function PainelPage() {
   ]);
 
   return (
-    <main
-      className="apex-ecra-claro mx-auto flex w-full max-w-lg flex-col gap-8 px-5 py-8"
-      // Aditivo ao py-8 já existente — no iPhone instalado como PWA
-      // (standalone, sem chrome do Safari), o topo fica por baixo do
-      // notch/Dynamic Island sem isto. env() sem suporte cai para 0px,
-      // inofensivo em qualquer outro dispositivo/browser.
-      style={{
-        paddingTop: "calc(var(--apex-space-8) + env(safe-area-inset-top, 0px))",
-        paddingBottom: "calc(var(--apex-space-8) + env(safe-area-inset-bottom, 0px))",
-      }}
-    >
+    <main className="apex-ecra-claro mx-auto flex w-full max-w-lg flex-col gap-8 px-5 py-8">
+      {/* Safe area do topo (notch/Dynamic Island): agora tratada na
+          própria classe .apex-ecra-claro (design.css), partilhada por
+          TODOS os ecrãs claros — não só este. A de baixo já vem do
+          Rodape global, montado no layout.tsx. */}
       {perfil?.role === "atleta" ? (
         <CabecalhoAtleta nome={perfil.name} naoLidas={naoLidas} />
       ) : (

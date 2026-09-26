@@ -339,6 +339,17 @@
   min-height: 100dvh;
   background: var(--apex-branco);
   color: var(--apex-tinta);
+  /* iPhone com notch/Dynamic Island: sem isto, o cabeçalho de cada ecrã
+     (incluindo qualquer seta de voltar lá dentro) fica fisicamente por
+     baixo da zona física reservada — o Chromium, sem hardware nenhum a
+     simular, mostra-a "bem" num screenshot, mas num iPhone a sério fica
+     tapada. margin (não padding) para nunca colidir com o px-*/py-* que
+     cada ecrã já põe na mesma tag — soma-se por fora, nunca é sobreposto
+     pela ordem do CSS compilado. env() sem suporte cai para 0px.
+     Aplicado aqui (a UMA classe, partilhada por todos os ecrãs claros) em
+     vez de em cada página — a versão anterior só tinha isto no /painel,
+     que foi exatamente o que deixou os outros ecrãs por corrigir. */
+  margin-top: env(safe-area-inset-top, 0px);
 }
 
 /* ============================================================
@@ -448,6 +459,11 @@
   flex-direction: column;
   background: var(--apex-fundo-treino);
   color: var(--apex-texto-treino);
+  /* Mesmo problema e mesma solução do .apex-ecra-claro: sem isto, a seta
+     de voltar no apex-treino-cabecalho fica fisicamente por baixo do
+     notch/Dynamic Island num iPhone a sério — invisível ali, mesmo
+     "aparecendo bem" num Chromium sem hardware nenhum a simular. */
+  margin-top: env(safe-area-inset-top, 0px);
 }
 
 /* Barra de progresso das séries, no topo — fixa, não desloca o conteúdo. */
@@ -688,6 +704,11 @@
   overflow-y: auto;
   background: var(--apex-fundo-treino);
   padding: var(--apex-space-5);
+  /* position:fixed + inset:0 ignora margin-top (não há "por fora" para uma
+     caixa colada às 4 bordas do ecrã) — aqui tem de ser padding mesmo,
+     aditivo ao padding-top que a regra de cima já dá, para o botão "✕"
+     (bem em cima) não ficar por baixo do notch/Dynamic Island. */
+  padding-top: calc(var(--apex-space-5) + env(safe-area-inset-top, 0px));
 }
 
 .apex-treino-lista-item {
