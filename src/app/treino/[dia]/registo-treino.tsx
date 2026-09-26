@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { autoregulate, type DiaGerado } from "@/lib/motor";
 import { decidirDescanso, type InfoMotorExercicio } from "@/lib/treino/descanso";
 import { SerieAtual, formatarNumero } from "./serie-atual";
@@ -68,6 +69,7 @@ export function RegistoTreino({
   deload: boolean;
   checkinAtivo: boolean;
 }) {
+  const router = useRouter();
   const [exs, setExs] = useState<EstadoEx[]>(() =>
     dia.exercises!.map((e, i) => ({
       nome: e.name,
@@ -223,14 +225,28 @@ export function RegistoTreino({
       </div>
 
       <div className="apex-treino-cabecalho">
-        <div className="flex flex-col">
-          <span className="apex-tipo-etiqueta apex-tabular" style={{ color: "var(--apex-texto-fraco)" }}>
-            {dia.dayName} · semana {weekNumber}
-            {deload ? " · descarga" : ""}
-          </span>
-          <span className="apex-tipo-nome-exercicio" style={{ color: "var(--apex-texto-treino)" }}>
-            {dia.title}
-          </span>
+        <div className="flex items-center gap-3">
+          {/* router.back() — alcançável do /painel (cartão "Treino de
+              hoje") e do /plano; um destino fixo estaria errado sempre que
+              a origem real fosse a outra. Visível, não só o gesto do
+              telemóvel (o iOS instalado como PWA não tem gesto nenhum). */}
+          <button
+            type="button"
+            className="apex-treino-botao-lista"
+            onClick={() => router.back()}
+            aria-label="Voltar"
+          >
+            ←
+          </button>
+          <div className="flex flex-col">
+            <span className="apex-tipo-etiqueta apex-tabular" style={{ color: "var(--apex-texto-fraco)" }}>
+              {dia.dayName} · semana {weekNumber}
+              {deload ? " · descarga" : ""}
+            </span>
+            <span className="apex-tipo-nome-exercicio" style={{ color: "var(--apex-texto-treino)" }}>
+              {dia.title}
+            </span>
+          </div>
         </div>
         <button
           type="button"

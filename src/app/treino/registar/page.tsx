@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { BotaoVoltar } from "@/app/_ui/design/botao-voltar";
 import { RegistoLivre } from "./registo-livre";
 
 export const metadata: Metadata = {
@@ -28,13 +28,10 @@ export default async function RegistarTreinoPage() {
   return (
     <main className="apex-ecra-claro mx-auto flex w-full max-w-lg flex-col gap-5 px-5 py-8">
       <div>
-        <Link
-          href="/plano"
-          className="apex-tipo-secundario underline underline-offset-4"
-          style={{ color: "var(--apex-cinza-texto)" }}
-        >
-          ← Plano
-        </Link>
+        {/* router.back() — alcançável do /plano e do cartão do plano em
+            PDF no /painel; um Link fixo estaria errado sempre que a
+            origem real fosse a outra. */}
+        <BotaoVoltar cor="var(--apex-cinza-texto)" />
         <h1 className="apex-tipo-titulo-ecra" style={{ marginTop: 4, color: "var(--apex-tinta)" }}>
           Registar treino de hoje
         </h1>
