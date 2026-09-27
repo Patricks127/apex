@@ -4,10 +4,10 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { carregarPlanoAtivo, treinoDeHojeFeito } from "@/lib/treino/perfil";
 import { indiceDiaSemanaHoje } from "@/lib/treino/linha-tempo";
-import { formatarData } from "@/lib/fuso";
 import { regenerarPlano, escolherPlano } from "@/app/actions/treino";
 import { BotaoVoltar } from "@/app/_ui/design/botao-voltar";
 import { VistaPlano } from "./vista-plano";
+import { PlanoDocumentoDestaque } from "./plano-pdf";
 
 export const metadata: Metadata = {
   title: "Plano · APEX",
@@ -156,16 +156,16 @@ export default async function PlanoPage({
                 className="flex items-center justify-between gap-3 border-b py-3"
                 style={{ borderColor: "var(--apex-cinza-linha)" }}
               >
-                <div>
-                  <p className="apex-tipo-nome-exercicio" style={{ color: "var(--apex-tinta)" }}>{p.name}</p>
+                <div className="min-w-0">
+                  <p className="apex-tipo-nome-exercicio" style={{ color: "var(--apex-tinta)", overflowWrap: "anywhere" }}>{p.name}</p>
                   <p className="apex-tipo-etiqueta" style={{ color: "var(--apex-cinza-texto)" }}>{p.feito_por}</p>
                 </div>
-                <form action={escolherPlano}>
+                <form action={escolherPlano} className="shrink-0">
                   <input type="hidden" name="plan_id" value={p.id} />
                   <button
                     type="submit"
-                    className="apex-tipo-etiqueta shrink-0 border px-3 py-1.5"
-                    style={{ borderColor: "var(--apex-cinza-linha)", color: "var(--apex-tinta)" }}
+                    className="apex-tipo-etiqueta border px-3"
+                    style={{ minHeight: 44, borderColor: "var(--apex-cinza-linha)", color: "var(--apex-tinta)" }}
                   >
                     Seguir este
                   </button>
@@ -176,77 +176,5 @@ export default async function PlanoPage({
         </section>
       ) : null}
     </main>
-  );
-}
-
-// ---------------------------------------------------------------------------
-
-type DocumentoPlano = { id: string; nomeFicheiro: string; sizeBytes: number; createdAt: string; url: string | null };
-
-function formatarTamanho(bytes: number): string {
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-/**
- * O plano é o PDF — não compete com um plano estruturado (o /plano
- * principal já garante isso, escondendo VistaPlano/"Trocar de plano"
- * quando isto aparece). O mais recente em destaque; anteriores (se
- * houver) listados por baixo, mais discretos — nunca escondidos, só não
- * competem pelo destaque.
- */
-function PlanoDocumentoDestaque({ documentos }: { documentos: DocumentoPlano[] }) {
-  const [recente, ...anteriores] = documentos;
-
-  return (
-    <div className="flex flex-col gap-4">
-      <section
-        className="flex flex-col gap-2 border p-4"
-        style={{ borderColor: "var(--apex-cinza-linha)", background: "var(--apex-cinza-fundo)" }}
-      >
-        <span className="apex-tipo-etiqueta" style={{ color: "var(--apex-cinza-texto)" }}>
-          O teu plano (PDF do teu PT)
-        </span>
-        {recente.url ? (
-          <a href={recente.url} target="_blank" rel="noopener noreferrer" className="apex-botao apex-botao--claro">
-            Abrir {recente.nomeFicheiro}
-          </a>
-        ) : (
-          <p className="apex-tipo-corpo" style={{ color: "var(--apex-cinza-texto)" }}>
-            {recente.nomeFicheiro} — link indisponível de momento.
-          </p>
-        )}
-        <span className="apex-tipo-etiqueta apex-tabular" style={{ color: "var(--apex-cinza-texto)" }}>
-          {formatarData(recente.createdAt)} · {formatarTamanho(recente.sizeBytes)}
-        </span>
-
-        {anteriores.length > 0 ? (
-          <div className="mt-1 flex flex-col gap-1 border-t pt-2" style={{ borderColor: "var(--apex-cinza-linha)" }}>
-            {anteriores.map((d) =>
-              d.url ? (
-                <a
-                  key={d.id}
-                  href={d.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="apex-tipo-secundario underline underline-offset-4"
-                  style={{ color: "var(--apex-cinza-texto)" }}
-                >
-                  {d.nomeFicheiro} ({formatarData(d.createdAt)})
-                </a>
-              ) : null,
-            )}
-          </div>
-        ) : null}
-      </section>
-
-      <p className="apex-tipo-etiqueta" style={{ color: "var(--apex-cinza-texto)" }}>
-        Com um plano em PDF, o treino ao vivo e a progressão automática não estão disponíveis — regista os teus
-        treinos manualmente.
-      </p>
-      <Link href="/treino/registar" className="apex-botao apex-botao--claro">
-        Registar treino de hoje
-      </Link>
-    </div>
   );
 }

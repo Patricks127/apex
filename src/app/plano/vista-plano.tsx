@@ -44,7 +44,10 @@ export function VistaPlano({
           .join(" · ");
 
   return (
-    <div className="apex-ecra-claro flex flex-col gap-5">
+    // Sem apex-ecra-claro aqui: o <main> de /plano já é a moldura do ecrã.
+    // Repetida, somava a margem do notch duas vezes no iPhone e mais um
+    // ecrã inteiro de altura mínima (min-height: 100dvh) dentro do main.
+    <div className="flex flex-col gap-5">
       <CabecalhoEcra marca="APEX" direita={`semana ${meta.week ?? 1}${meta.deloadWeek ? " · descarga" : ""}`} />
 
       <div className="flex flex-col gap-1">
@@ -59,15 +62,19 @@ export function VistaPlano({
         </p>
       </div>
 
-      {/* Tira da semana */}
-      <div className="grid grid-cols-7 gap-1.5">
+      {/* Tira da semana — 7 colunas não chegam a 44px de largura num
+          iPhone SE (320px); a altura (48px) compensa o alvo de toque. */}
+      <div className="grid grid-cols-7 gap-1">
         {plano.days.map((d, i) => (
           <button
             key={i}
             type="button"
             onClick={() => setSel(i)}
-            className="apex-tipo-etiqueta flex flex-col items-center gap-1 border py-2"
+            aria-pressed={i === sel}
+            aria-label={d.dayName}
+            className="apex-tipo-etiqueta flex min-w-0 flex-col items-center justify-center gap-1 border"
             style={{
+              minHeight: 48,
               borderColor: i === sel ? "var(--apex-tinta)" : "var(--apex-cinza-linha)",
               color: i === sel ? "var(--apex-tinta)" : d.rest ? "var(--apex-cinza-texto)" : "var(--apex-tinta)",
               background: i === sel ? "var(--apex-cinza-fundo)" : "var(--apex-branco)",
@@ -231,7 +238,10 @@ function LinhaTempo({ itens }: { itens: ItemLinhaTempo[] }) {
   return (
     <div className="apex-linha-tempo">
       {itens.map((item, i) => (
-        <div key={i} className={`apex-linha-tempo__item apex-linha-tempo__item--${item.estado}`}>
+        <div
+          key={i}
+          className={`apex-linha-tempo__item apex-linha-tempo__item--${item.estado}${item.tipo === "exercicio" ? " apex-linha-tempo__item--cartao" : ""}`}
+        >
           <span className="apex-tipo-etiqueta apex-tabular apex-linha-tempo__hora">{item.inicioMin}′</span>
           <div className="apex-linha-tempo__marcador-col">
             <span className="apex-linha-tempo__marcador" />
@@ -299,16 +309,28 @@ function ConteudoExercicio({
   const carga = s.w != null ? `${s.w} kg` : exercicio.bw ? "peso corporal" : "—";
   const series = s.reps > 0 ? `${exercicio.sets.length} × ${s.reps}` : `${exercicio.sets.length} séries`;
 
+  // Cada exercício é um cartão (mesma linguagem de .apex-cartao: borda 1px,
+  // cantos vivos), dentro da linha do tempo. Nome em cima, a toda a largura;
+  // por baixo, UMA linha com a carga (o que se procura de relance) e as
+  // séries — e, no exercício a decorrer, os quadrados das séries. Igual em
+  // todos os tamanhos: num iPhone SE, pôr a carga ao lado do nome esmagava-o
+  // ou atirava as séries para um sítio solto do cartão.
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-baseline justify-between gap-3">
-        <span className="apex-tipo-nome-exercicio" style={{ color: "var(--apex-tinta)" }}>
-          {indice + 1}. {exercicio.name}
+    <div className="apex-cartao apex-cartao--compacto">
+      <span className="apex-tipo-nome-exercicio" style={{ color: "var(--apex-tinta)" }}>
+        {indice + 1}. {exercicio.name}
+      </span>
+
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-2">
+        <span className="apex-tabular apex-linha-exercicio__carga">{carga}</span>
+        <span className="apex-tipo-secundario apex-tabular" style={{ color: "var(--apex-cinza-texto)" }}>
+          {series}
         </span>
-        {!mostrarQuadrados ? (
-          <div className="apex-linha-exercicio__valores">
-            <span className="apex-tabular apex-linha-exercicio__carga">{carga}</span>
-            <span className="apex-tipo-secundario apex-tabular apex-linha-exercicio__series">{series}</span>
+        {mostrarQuadrados ? (
+          <div className="apex-quadrados-series self-center">
+            {exercicio.sets.map((_, i) => (
+              <span key={i} className="apex-quadrado-serie" />
+            ))}
           </div>
         ) : null}
       </div>
@@ -316,20 +338,6 @@ function ConteudoExercicio({
       <span className="apex-tipo-etiqueta" style={{ color: "var(--apex-cinza-texto)" }}>
         {[exercicio.muscle, `RPE ${s.rpe}`].filter(Boolean).join(" · ")}
       </span>
-
-      {mostrarQuadrados ? (
-        <div className="mt-1 flex items-center gap-3">
-          <span className="apex-tabular apex-linha-exercicio__carga">{carga}</span>
-          <span className="apex-tipo-secundario apex-tabular" style={{ color: "var(--apex-cinza-texto)" }}>
-            {series}
-          </span>
-          <div className="apex-quadrados-series">
-            {exercicio.sets.map((_, i) => (
-              <span key={i} className="apex-quadrado-serie" />
-            ))}
-          </div>
-        </div>
-      ) : null}
 
       {exercicio.substituted ? (
         <span className="apex-tipo-secundario" style={{ color: "var(--apex-azul)" }}>

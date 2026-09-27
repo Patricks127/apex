@@ -409,8 +409,38 @@
 
 .apex-linha-tempo__item {
   display: grid;
-  grid-template-columns: 44px 24px 1fr;
+  /* minmax(0, 1fr), não 1fr: com 1fr a coluna do conteúdo nunca encolhe
+     abaixo da palavra mais comprida lá dentro — e empurrava o ecrã. */
+  grid-template-columns: 44px 24px minmax(0, 1fr);
   column-gap: var(--apex-space-3);
+}
+
+/* iPhone SE: a hora e o marcador comiam 92px de 280 úteis — sobrava pouco
+   para o cartão do exercício. */
+@media (max-width: 379px) {
+  .apex-linha-tempo__item {
+    grid-template-columns: 34px 14px minmax(0, 1fr);
+    column-gap: var(--apex-space-2);
+  }
+}
+
+/* Blocos de exercício são cartões: a hora e o marcador descem para ficar
+   alinhados com o nome, não com a borda do cartão. */
+.apex-linha-tempo__item--cartao .apex-linha-tempo__hora {
+  padding-top: 14px;
+}
+
+.apex-linha-tempo__item--cartao .apex-linha-tempo__marcador {
+  margin-top: 16px;
+}
+
+.apex-linha-tempo__item--cartao.apex-linha-tempo__item--a_decorrer .apex-linha-tempo__marcador {
+  margin-top: 14px;
+}
+
+/* "Estás aqui": o cartão do exercício a decorrer ganha a borda a tinta. */
+.apex-linha-tempo__item--a_decorrer .apex-cartao {
+  border-color: var(--apex-tinta);
 }
 
 .apex-linha-tempo__hora {
@@ -1403,6 +1433,13 @@
 
 .apex-cartao--destaque {
   background: var(--apex-cinza-fundo);
+}
+
+/* Cartão dentro de listas densas (exercícios na linha do tempo do plano):
+   mesma borda e cantos, menos ar — num SE sobram ~210px de largura. */
+.apex-cartao--compacto {
+  gap: var(--apex-space-1);
+  padding: var(--apex-space-3);
 }
 
 .apex-grafico__vazio--compacto {

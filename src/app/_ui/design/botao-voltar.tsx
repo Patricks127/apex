@@ -16,8 +16,11 @@ export function BotaoVoltar({ cor = "var(--apex-tinta)" }: { cor?: string }) {
     <button
       type="button"
       onClick={() => router.back()}
-      className="apex-tipo-secundario self-start underline underline-offset-4"
-      style={{ color: cor, background: "none", border: "none", padding: 0, cursor: "pointer" }}
+      // apex-link-toque: alvo de toque de 44px (o texto tinha 20px de altura);
+      // a margem negativa devolve o espaço extra, para o layout de cada ecrã
+      // que o usa ficar exatamente onde estava.
+      className="apex-tipo-secundario apex-link-toque self-start underline underline-offset-4"
+      style={{ color: cor, background: "none", border: "none", padding: 0, margin: "-12px 0", cursor: "pointer" }}
     >
       ← Voltar
     </button>
