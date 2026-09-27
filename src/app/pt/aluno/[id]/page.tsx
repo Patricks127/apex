@@ -14,6 +14,7 @@ import { apagarPlanoDocumento } from "@/app/actions/plan-documents";
 import { EditorPlanoPt, type ExercicioPicker, type DiaEditorInicial } from "./editor-plano-pt";
 import { SeccaoAdesaoSemanal, SeccaoForcaLeitura, SeccaoVolumeLeitura, SeccaoMetricasLeitura } from "./graficos-aluno";
 import { AnexarPlanoForm } from "./anexar-plano-form";
+import { formatarKg, formatarNumero } from "@/lib/formato";
 
 const JANELAS_ADESAO_FICHA = 12; // mais história do que a linha do painel (6) — a ficha tem espaço
 
@@ -264,7 +265,7 @@ type PlanoDocumento = {
 
 function formatarTamanho(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${formatarNumero(bytes / (1024 * 1024), 1)} MB`;
 }
 
 /**
@@ -370,7 +371,7 @@ function Evolucao({
               {formatarData(e.created_at)}
             </span>
             <span className="apex-tipo-secundario apex-tabular" style={{ color: COR.tinta }}>
-              {[e.weight_kg != null ? `${e.weight_kg} kg` : null, e.measurement].filter(Boolean).join(" · ")}
+              {[e.weight_kg != null ? formatarKg(e.weight_kg) : null, e.measurement].filter(Boolean).join(" · ")}
             </span>
           </div>
         ))}
@@ -405,7 +406,7 @@ function Historico({
             </div>
             <span className="apex-tipo-secundario apex-tabular" style={{ color: COR.fraco }}>
               {s.completion != null ? `${Math.round(s.completion * 100)}%` : "—"}
-              {s.avgRpe != null ? ` · RPE ${s.avgRpe.toFixed(1)}` : ""}
+              {s.avgRpe != null ? ` · RPE médio ${formatarNumero(s.avgRpe, 1)}` : ""}
             </span>
           </div>
         ))}

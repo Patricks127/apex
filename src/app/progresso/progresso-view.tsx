@@ -13,6 +13,7 @@ import { METRICAS, type MetricaId } from "@/lib/treino/metricas";
 import type { RecordePessoal, MetricaCorporal, SessaoHistorico } from "@/lib/treino/progresso-dados";
 
 import { FUSO } from "@/lib/fuso";
+import { formatarKg, formatarNumero } from "@/lib/formato";
 const COR = {
   tinta: "var(--apex-tinta)",
   branco: "var(--apex-branco)",
@@ -140,7 +141,7 @@ function SeccaoForca({
 
       {ultimo ? (
         <p className="apex-tipo-corpo apex-tabular mt-2" style={{ color: COR.tinta }}>
-          Atual: {ultimo.valueKg} kg
+          Atual: {formatarKg(ultimo.valueKg)}
           {ultimo.source === "auto" ? (
             <span className="apex-tipo-secundario" style={{ color: COR.fraco }}>
               {" "}
@@ -246,7 +247,7 @@ function SeccaoMetricas({
 
       {ultimo ? (
         <p className="apex-tipo-corpo apex-tabular mt-2" style={{ color: COR.tinta }}>
-          Atual: {ultimo.value} {def.unidade}
+          Atual: {formatarNumero(ultimo.value)} {def.unidade}
         </p>
       ) : null}
 
@@ -405,9 +406,9 @@ function ItemHistorico({ sessao }: { sessao: SessaoHistorico }) {
       {aberto ? (
         <div className="apex-historico-item__detalhe">
           <p className="apex-tipo-secundario apex-tabular" style={{ color: COR.fraco }}>
-            {sessao.nSets} séries · {Math.round(sessao.volumeKg)} kg de volume
+            {sessao.nSets} séries · {formatarKg(Math.round(sessao.volumeKg))} de volume
             {sessao.completion != null ? ` · ${Math.round(sessao.completion * 100)}% completo` : ""}
-            {sessao.avgRpe != null ? ` · RPE médio ${sessao.avgRpe}` : ""}
+            {sessao.avgRpe != null ? ` · RPE médio ${formatarNumero(sessao.avgRpe, 1)}` : ""}
           </p>
           {sessao.checkin?.effort ? (
             <p className="apex-tipo-secundario" style={{ color: COR.fraco }}>

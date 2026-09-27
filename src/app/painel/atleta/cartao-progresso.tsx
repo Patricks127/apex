@@ -2,6 +2,7 @@ import Link from "next/link";
 import { GraficoMetrica } from "../../_ui/treino/graficos-progresso";
 import { METRICAS } from "@/lib/treino/metricas";
 import type { MetricaCorporal } from "@/lib/treino/progresso-dados";
+import { formatarNumero } from "@/lib/formato";
 
 const COR = {
   tinta: "var(--apex-tinta)",
@@ -42,7 +43,7 @@ export function CartaoProgresso({ metricas }: { metricas: MetricaCorporal[] }) {
           <GraficoMetrica pontos={pontosPeso} />
           {ultimo ? (
             <p className="apex-tipo-corpo apex-tabular" style={{ color: COR.tinta }}>
-              Atual: {ultimo.value} {DEF_PESO.unidade}
+              Atual: {formatarNumero(ultimo.value)} {DEF_PESO.unidade}
             </p>
           ) : null}
         </>

@@ -1,3 +1,4 @@
+import { rotuloMusculo } from "@/lib/formato";
 type ItemListaSerie = { done: boolean };
 type ItemListaExercicio = { nome: string; muscle: string | null; sets: ItemListaSerie[] };
 
@@ -40,7 +41,7 @@ export function ListaTreino({
                 {ei + 1}. {e.nome}
               </span>
               <span className="apex-tipo-etiqueta" style={{ color: "var(--apex-texto-fraco)" }}>
-                {e.muscle ?? ""}
+                {rotuloMusculo(e.muscle) ?? ""}
               </span>
             </div>
             <div className="flex flex-wrap gap-2">

@@ -9,6 +9,7 @@ import { escalarPontos, pathLinha, escalarBarras } from "@/lib/treino/grafico";
 import type { RecordePessoal, MetricaCorporal } from "@/lib/treino/progresso-dados";
 
 import { FUSO } from "@/lib/fuso";
+import { formatarKg, formatarNumero } from "@/lib/formato";
 const COR = {
   tinta: "var(--apex-tinta)",
   branco: "var(--apex-branco)",
@@ -50,7 +51,7 @@ export function GraficoForca({ pontos }: { pontos: (RecordePessoal & { novoRecor
         const p = pontos[i];
         const marco = p.novoRecorde;
         const cor = marco ? COR.azul : COR.tinta;
-        const titulo = `${p.valueKg} kg · ${p.source === "auto" ? "estimativa do treino" : "testado no ginásio"} · ${dataLonga(p.recordedAt)}${marco ? " · novo recorde" : ""}`;
+        const titulo = `${formatarKg(p.valueKg)} · ${p.source === "auto" ? "estimativa do treino" : "testado no ginásio"} · ${dataLonga(p.recordedAt)}${marco ? " · novo recorde" : ""}`;
         // aria-label, não <title> aninhado (o SVGProps do React não o tipa,
         // e um <title> dentro de <svg> é tratado como metadado do
         // documento, saindo vazio do lado do servidor — desalinha SSR).
@@ -108,7 +109,7 @@ export function GraficoMetrica({ pontos }: { pontos: MetricaCorporal[] }) {
           cy={c.y}
           r={3.5}
           fill={COR.tinta}
-          aria-label={`${pontos[i].value} · ${dataLonga(pontos[i].recordedAt)}`}
+          aria-label={`${formatarNumero(pontos[i].value)} · ${dataLonga(pontos[i].recordedAt)}`}
         />
       ))}
     </svg>
@@ -128,7 +129,7 @@ export function GraficoVolume({ barras }: { barras: { chave: string; valor: numb
       {barras.map((b, i) => (
         <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
           <div
-            title={`${b.chave}: ${Math.round(b.valor)} kg${b.marco ? " · descarga" : ""}`}
+            title={`${b.chave}: ${formatarKg(Math.round(b.valor))}${b.marco ? " · descarga" : ""}`}
             style={{
               width: "100%",
               height: Math.max(2, alturas[i]),

@@ -13,6 +13,7 @@ import {
 import type { PostFeed } from "@/lib/social/feed-dados";
 
 import { FUSO } from "@/lib/fuso";
+import { formatarKg } from "@/lib/formato";
 const COR = {
   tinta: "var(--apex-tinta)",
   fraco: "var(--apex-cinza-texto)",
@@ -142,7 +143,7 @@ function ConteudoPost({ post }: { post: PostFeed }) {
             {post.workoutTitle}
           </p>
           <p className="apex-tipo-secundario apex-tabular" style={{ color: COR.fraco }}>
-            {post.workoutSets} séries · {Math.round(post.workoutVolume ?? 0)} kg de volume
+            {post.workoutSets} séries · {formatarKg(Math.round(post.workoutVolume ?? 0))} de volume
           </p>
         </div>
       ) : post.kind === "recorde" ? (
@@ -151,7 +152,7 @@ function ConteudoPost({ post }: { post: PostFeed }) {
             Novo recorde
           </p>
           <p className="apex-tipo-titulo-seccao" style={{ marginTop: 0, color: "var(--apex-azul)" }}>
-            {LIFT_LABEL[post.recordLift as Lift] ?? post.recordLift} — {post.recordValue} kg
+            {LIFT_LABEL[post.recordLift as Lift] ?? post.recordLift} — {post.recordValue != null ? formatarKg(Number(post.recordValue)) : "—"}
           </p>
         </div>
       ) : post.kind === "video" && post.mediaPath ? (

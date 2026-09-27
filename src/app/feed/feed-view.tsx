@@ -17,6 +17,7 @@ import type {
 import type { PostKind } from "@/lib/social/sanitizar-post";
 
 import { FUSO } from "@/lib/fuso";
+import { formatarKg } from "@/lib/formato";
 const COR = {
   tinta: "var(--apex-tinta)",
   fraco: "var(--apex-cinza-texto)",
@@ -228,7 +229,7 @@ function Composer({
               : kind === "recorde"
                 ? (fontes.recordes as FontePickerRecorde[]).map((r) => (
                     <option key={r.id} value={r.id}>
-                      {LIFT_LABEL[r.lift as Lift] ?? r.lift} — {r.valueKg} kg · {dataCurta(r.recordedAt)}
+                      {LIFT_LABEL[r.lift as Lift] ?? r.lift} — {formatarKg(r.valueKg)} · {dataCurta(r.recordedAt)}
                     </option>
                   ))
                 : (fontes.videos as FontePickerVideo[]).map((v) => (

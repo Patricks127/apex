@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CalculadoraDiscos } from "./calculadora-discos";
 
-export function formatarNumero(n: number): string {
-  return Number.isInteger(n) ? String(n) : String(n).replace(".", ",");
-}
+import { formatarNumero, rotuloEsforco, rotuloMusculo } from "@/lib/formato";
+// Formato de Portugal ("57,5") — fonte única em src/lib/formato.ts;
+// re-exportado para quem já o importava daqui.
+export { formatarNumero };
 
 const ATRASO_INICIAL_MS = 400;
 const ATRASO_MIN_MS = 60;
@@ -104,7 +105,7 @@ export function SerieAtual({
     <div className="apex-treino-serie">
       <span className="apex-tipo-etiqueta apex-treino-nome">
         {nomeExercicio}
-        {muscle ? ` · ${muscle}` : ""}
+        {rotuloMusculo(muscle) ? ` · ${rotuloMusculo(muscle)}` : ""}
       </span>
       <span className="apex-tipo-secundario apex-tabular apex-treino-contagem">
         Série {numero} de {total}
@@ -142,7 +143,7 @@ export function SerieAtual({
       </div>
 
       <span className="apex-tipo-secundario apex-tabular apex-treino-alvo">
-        {ehCarga ? `${repsAlvo} reps · ${rpeAlvoTexto}` : rpeAlvoTexto}
+        {[ehCarga ? `${repsAlvo} reps` : null, rotuloEsforco(rpeAlvoTexto, ehCarga)].filter(Boolean).join(" · ")}
       </span>
 
       <div className="apex-stepper">

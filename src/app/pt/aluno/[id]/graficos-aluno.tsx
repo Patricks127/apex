@@ -21,6 +21,7 @@ import type { RecordePessoal, MetricaCorporal, SessaoHistorico } from "@/lib/tre
 import type { PontoAdesaoSemanal } from "@/lib/treino/adesao-semanal";
 
 import { FUSO } from "@/lib/fuso";
+import { formatarKg, formatarNumero } from "@/lib/formato";
 const COR = {
   tinta: "var(--apex-tinta)",
   fraco: "var(--apex-cinza-texto)",
@@ -144,7 +145,7 @@ export function SeccaoForcaLeitura({ recordes }: { recordes: RecordePessoal[] })
           <GraficoForca pontos={pontos} />
           {ultimo ? (
             <p className="apex-tipo-corpo apex-tabular" style={{ color: COR.tinta }}>
-              Atual: {ultimo.valueKg} kg
+              Atual: {formatarKg(ultimo.valueKg)}
               {ultimo.source === "auto" ? (
                 <span className="apex-tipo-secundario" style={{ color: COR.fraco }}>
                   {" "}
@@ -244,7 +245,7 @@ export function SeccaoMetricasLeitura({ metricas }: { metricas: MetricaCorporal[
           <GraficoMetrica pontos={pontos} />
           {ultimo && def ? (
             <p className="apex-tipo-corpo apex-tabular" style={{ color: COR.tinta }}>
-              Atual: {ultimo.value} {def.unidade}
+              Atual: {formatarNumero(ultimo.value)} {def.unidade}
             </p>
           ) : null}
         </>

@@ -25,6 +25,7 @@ import {
   type Zona,
 } from "./tipos.ts";
 import { calcularVolume } from "./volume.ts";
+import { formatarKg, formatarNumero } from "../formato.ts";
 import {
   semanaParaEntradaVolume,
   type ObjetivoV2,
@@ -285,7 +286,7 @@ export function avaliarHistorico(
             accao: "substituir",
             substitutoId: s.id,
             gatilho: "estagnacao",
-            motivo: `Troquei ${ex.nome} por ${s.nome}: ${JANELA} semanas sem subir a carga (${cargas[cargas.length - 1]} kg) nem baixar o esforço (RPE ${media(rpes).toFixed(1)}).`,
+            motivo: `Troquei ${ex.nome} por ${s.nome}: ${JANELA} semanas sem subir a carga (${formatarKg(cargas[cargas.length - 1])}) nem baixar o esforço (RPE médio ${formatarNumero(media(rpes), 1)}).`,
             sinais: [`carga ${cargas.join("/")}`, `rpe ${rpes.join("/")}`],
           };
       }
@@ -299,7 +300,7 @@ export function avaliarHistorico(
             accao: "substituir",
             substitutoId: s.id,
             gatilho: "rpe_alto",
-            motivo: `Troquei ${ex.nome} por ${s.nome}: o esforço andou sempre acima do alvo (RPE ${media(rpes).toFixed(1)}, alvo ≤ ${alvo.max}).`,
+            motivo: `Troquei ${ex.nome} por ${s.nome}: o esforço andou sempre acima do alvo (RPE médio ${formatarNumero(media(rpes), 1)}, alvo ≤ ${formatarNumero(alvo.max)}).`,
             sinais: [`rpe ${rpes.join("/")}`],
           };
       }

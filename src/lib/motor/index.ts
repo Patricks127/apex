@@ -257,7 +257,7 @@ export const FOCUS_MUSCLES: { id: FocusMuscle; label: string }[] = [
 
 export const SCIENCE: Record<Goal, string> = {
   hipertrofia:
-    "Hipertrofia responde a volume por grupo muscular com esforço próximo da falha: 6–12 reps a 65–80% 1RM, RPE 7–8. O split divide a semana para dar volume e recuperação a cada músculo, treinando-o pelo menos 2×/semana.",
+    "Hipertrofia responde a volume por grupo muscular com esforço próximo da falha: 6–12 reps a 65–80% 1RM, deixando 2–3 reps na reserva (RIR 2–3). O split divide a semana para dar volume e recuperação a cada músculo, treinando-o pelo menos 2×/semana.",
   powerlifting:
     "Força máxima é adaptação neural: cargas altas (85–92% 1RM), poucas reps, descanso longo. A semana roda os três levantamentos com dias pesados e dias de volume.",
   hyrox:

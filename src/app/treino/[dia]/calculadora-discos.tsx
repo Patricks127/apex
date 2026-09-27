@@ -1,12 +1,12 @@
 import { calcularDiscosPorLado, type Disco } from "@/lib/treino/discos";
+import { formatarNumero } from "@/lib/formato";
 
 // Diâmetro por denominação — maior peso, maior disco (como os físicos).
 const TAMANHO_PX: Record<number, number> = { 20: 68, 15: 60, 10: 52, 5: 44, 2.5: 34, 1.25: 26 };
 const BRANCO = "#F2F2F0";
 
-function formatarKg(kg: number): string {
-  return Number.isInteger(kg) ? String(kg) : String(kg).replace(".", ",");
-}
+// "1,25" — fonte única em src/lib/formato.ts
+const formatarKg = (kg: number) => formatarNumero(kg);
 
 /** Discos a pôr de um lado da barra — só aparece quando o exercício usa
  *  barra (ver usaBarraPorExercicio, resolvido no servidor). */

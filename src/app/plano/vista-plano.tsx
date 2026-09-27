@@ -11,6 +11,7 @@ import { BlocoDados } from "../_ui/design/bloco-dados";
 import { AvisoApp } from "../_ui/design/aviso-app";
 import { Botao } from "../_ui/design/botao";
 
+import { formatarKg, rotuloEsforco, rotuloMusculo } from "@/lib/formato";
 const LIFT_LABEL: Record<Lift, string> = {
   agachamento: "Agach.",
   terra: "Terra",
@@ -40,7 +41,7 @@ export function VistaPlano({
     meta.origem === "pt"
       ? null
       : (Object.keys(meta.maxes.used) as Lift[])
-          .map((k) => `${LIFT_LABEL[k]} ${meta.maxes.used[k]} kg${meta.maxes.real.includes(k) ? "" : "*"}`)
+          .map((k) => `${LIFT_LABEL[k]} ${formatarKg(meta.maxes.used[k])}${meta.maxes.real.includes(k) ? "" : "*"}`)
           .join(" · ");
 
   return (
@@ -152,9 +153,9 @@ function AvancarSemana() {
               {estado.cargas?.map((c) => (
                 <tr key={c.lift}>
                   <td className="py-0.5 pl-3 pr-3" style={{ color: "var(--apex-tinta)" }}>{c.lift}</td>
-                  <td className="py-0.5 pr-2" style={{ color: "var(--apex-cinza-texto)" }}>{c.antes} kg</td>
+                  <td className="py-0.5 pr-2" style={{ color: "var(--apex-cinza-texto)" }}>{formatarKg(c.antes)}</td>
                   <td className="py-0.5 pr-2" style={{ color: "var(--apex-cinza-texto)" }}>→</td>
-                  <td className="py-0.5 pr-3" style={{ color: "var(--apex-tinta)" }}>{c.depois} kg</td>
+                  <td className="py-0.5 pr-3" style={{ color: "var(--apex-tinta)" }}>{formatarKg(c.depois)}</td>
                 </tr>
               ))}
             </tbody>
@@ -306,7 +307,7 @@ function ConteudoExercicio({
   mostrarQuadrados: boolean;
 }) {
   const s = exercicio.sets[0];
-  const carga = s.w != null ? `${s.w} kg` : exercicio.bw ? "peso corporal" : "—";
+  const carga = s.w != null ? formatarKg(s.w) : exercicio.bw ? "peso corporal" : "—";
   const series = s.reps > 0 ? `${exercicio.sets.length} × ${s.reps}` : `${exercicio.sets.length} séries`;
 
   // Cada exercício é um cartão (mesma linguagem de .apex-cartao: borda 1px,
@@ -336,7 +337,7 @@ function ConteudoExercicio({
       </div>
 
       <span className="apex-tipo-etiqueta" style={{ color: "var(--apex-cinza-texto)" }}>
-        {[exercicio.muscle, `RPE ${s.rpe}`].filter(Boolean).join(" · ")}
+        {[rotuloMusculo(exercicio.muscle), rotuloEsforco(s.rpe, s.reps > 0)].filter(Boolean).join(" · ")}
       </span>
 
       {exercicio.substituted ? (

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { formatarData } from "@/lib/fuso";
+import { formatarNumero } from "@/lib/formato";
 
 const COR = {
   tinta: "var(--apex-tinta)",
@@ -17,7 +18,7 @@ export type DocumentoPlano = {
 
 function formatarTamanho(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${formatarNumero(bytes / (1024 * 1024), 1)} MB`;
 }
 
 /**

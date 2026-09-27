@@ -24,6 +24,7 @@ import {
 } from "@/lib/chat/media";
 
 import { FUSO, chaveDiaLisboa } from "@/lib/fuso";
+import { formatarKg } from "@/lib/formato";
 export type Mensagem = {
   id: string;
   sender_id: string;
@@ -307,7 +308,7 @@ function Bolha({
         {m.is_evolution ? (
           <span className="apex-chip-neutro apex-tipo-etiqueta apex-tabular">
             Evolução
-            {m.weight_kg != null ? ` · ${m.weight_kg} kg` : ""}
+            {m.weight_kg != null ? ` · ${formatarKg(m.weight_kg)}` : ""}
             {m.measurement ? ` · ${m.measurement}` : ""}
           </span>
         ) : null}
@@ -396,7 +397,7 @@ function TimelineEvolucao({
                   })}
                 </span>
                 <span className="apex-tipo-secundario apex-tabular" style={{ color: COR.fraco }}>
-                  {m.weight_kg != null ? `${m.weight_kg} kg` : ""}
+                  {m.weight_kg != null ? formatarKg(m.weight_kg) : ""}
                   {m.weight_kg != null && m.measurement ? " · " : ""}
                   {m.measurement ?? ""}
                 </span>
