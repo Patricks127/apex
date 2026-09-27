@@ -66,9 +66,21 @@ export function FeedView({
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: COR.tinta }}>
-        Feed
-      </h1>
+      <header className="flex items-center justify-between gap-3">
+        <h1 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: COR.tinta }}>
+          Feed
+        </h1>
+        {/* Descobrir (procurar atletas/PTs para seguir) vive dentro do Feed,
+            não como separador próprio da barra inferior — a fila de links do
+            painel que lá levava saiu na Fase 2 e deixou-o órfão. Mesmo ecrã
+            para atleta e PT. */}
+        <Link href="/descobrir" className="apex-botao-icone" aria-label="Descobrir pessoas">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.5-3.5" />
+          </svg>
+        </Link>
+      </header>
 
       <Composer fontes={fontes} aoPublicado={aoMudar} />
 
@@ -82,9 +94,15 @@ export function FeedView({
 
       {posts.length === 0 ? (
         <p className="apex-tipo-corpo py-10 text-center" style={{ color: COR.fraco }}>
-          {filtroInicial === "seguindo"
-            ? "Ainda não segues ninguém — vai a Descobrir para encontrar atletas e PTs."
-            : filtroInicial === "meus"
+          {filtroInicial === "seguindo" ? (
+            <>
+              Ainda não segues ninguém —{" "}
+              <Link href="/descobrir" className="underline underline-offset-4" style={{ color: COR.tinta }}>
+                descobre atletas e PTs
+              </Link>
+              .
+            </>
+          ) : filtroInicial === "meus"
               ? "Ainda não publicaste nada."
               : "Ainda não há publicações."}
         </p>

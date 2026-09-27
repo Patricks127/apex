@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useActionState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CabecalhoEcra } from "@/app/_ui/design/cabecalho-ecra";
 import { LIFT_LABEL, INJURIES, type Lift } from "@/lib/motor";
@@ -56,9 +57,20 @@ export function ProgressoView({
   return (
     <div className="flex flex-col gap-4">
       <CabecalhoEcra marca="APEX" direita="progresso" />
-      <h1 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: COR.tinta }}>
-        Progresso
-      </h1>
+      {/* flex-wrap: num SE de 320px o link desce para baixo do título em vez
+          de o apertar (o título tem overflow-wrap: anywhere — partia a palavra). */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3">
+        <h1 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: COR.tinta }}>
+          Progresso
+        </h1>
+        {/* Único acesso garantido a /videos para quem NÃO tem PT (o cartão
+            do PT no painel só existe com PT ligado; a atividade só mostra o
+            link com feedback novo). O separador Progresso já fica ativo em
+            /videos. */}
+        <Link href="/videos" className="apex-tipo-secundario apex-link-toque shrink-0 underline underline-offset-4" style={{ color: COR.tinta }}>
+          Vídeos de treino
+        </Link>
+      </div>
 
       <SeccaoForca recordes={recordes} aoGravado={aoGravado} />
       <SeccaoMetricas metricas={metricas} aoGravado={aoGravado} />

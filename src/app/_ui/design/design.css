@@ -1120,6 +1120,10 @@
 .apex-form-registo select,
 .apex-form-registo input[type="number"] {
   flex: 1;
+  /* sem isto, um <input> não encolhe abaixo da largura intrínseca dele
+     (~20 carateres) e, lado a lado com o <select>, saía ~70px para fora
+     do ecrã num iPhone SE. */
+  min-width: 0;
   border: 1px solid var(--apex-cinza-linha);
   border-radius: 2px;
   background: var(--apex-branco);
@@ -1550,4 +1554,24 @@ body:has(.apex-nav):not(:has(.apex-treino, .apex-chat)) .apex-rodape {
   .apex-nav__etiqueta {
     font-size: 11px;
   }
+}
+
+/* Botão só de ícone (modo claro) — mesma caixa que o sino: 44px, borda
+   1px, cantos 2px. Só onde o ícone é convenção universal (lupa = procurar);
+   em tudo o resto, uma palavra. */
+.apex-botao-icone {
+  display: flex;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--apex-cinza-linha);
+  border-radius: 2px;
+  color: var(--apex-tinta);
+}
+
+.apex-botao-icone:focus-visible {
+  outline: 2px solid var(--apex-azul);
+  outline-offset: 2px;
 }
