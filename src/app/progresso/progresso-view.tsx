@@ -181,7 +181,9 @@ function FormRecorde({ liftInicial, aoGravado }: { liftInicial: Lift; aoGravado:
             </option>
           ))}
         </select>
-        <input name="value_kg" type="number" step="0.5" min={0} max={500} placeholder="kg" required />
+        {/* texto + teclado decimal, não type="number": com vírgula ("142,5"), o
+            Safari pode dar o campo como vazio. O servidor lê vírgula ou ponto. */}
+        <input name="value_kg" type="text" inputMode="decimal" autoComplete="off" placeholder="kg, ex.: 42,5" aria-label="Carga em kg" required />
       </div>
       {estado.erro ? (
         <p className="apex-tipo-secundario" style={{ color: COR.erro }}>

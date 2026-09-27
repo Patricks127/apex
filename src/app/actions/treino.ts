@@ -34,6 +34,7 @@ import {
   decidirProgressaoManual,
   type Equipamento,
 } from "@/lib/motor2";
+import { lerDecimal } from "@/lib/formato";
 
 const EXERCICIO_POR_ID = new Map(EXERCICIOS.map((e) => [e.id, e]));
 
@@ -567,7 +568,7 @@ function validarPlanoPt(bruto: unknown): { dias: DiaEditorJSON[] } | { erro: str
       }
       let carga: number | null = null;
       if (e.carga !== null && e.carga !== undefined && e.carga !== "") {
-        const n = Number(e.carga);
+        const n = lerDecimal(String(e.carga)); // "72,5" ou "72.5"
         if (!Number.isFinite(n) || n < 0 || n > 500) {
           return { erro: `${exercicio.nome}: carga inválida.` };
         }

@@ -110,3 +110,13 @@ export function formatarReservaMedia(rpeMedio: number): string {
   const texto = formatarNumero(rirDeRpe(rpeMedio), 1);
   return `${texto} ${texto === "1" ? "rep" : "reps"} na reserva (média)`;
 }
+
+/** Lê um número escrito por uma pessoa — vírgula (Portugal) OU ponto, tanto
+ *  faz: "72,5" e "72.5" → 72.5. Estrito de propósito: parseFloat("72,5")
+ *  dá 72 (corta na vírgula) e parseFloat("7a") dá 7 — aqui, o que não for
+ *  um número limpo e positivo dá NaN, e quem chama mostra um erro em vez de
+ *  gravar um valor adivinhado. Usado no cliente E no servidor. */
+export function lerDecimal(texto: string | null | undefined): number {
+  const t = String(texto ?? "").trim().replace(",", ".");
+  return /^(\d+\.?\d*|\.\d+)$/.test(t) ? Number(t) : Number.NaN;
+}

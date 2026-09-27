@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { linkPertenceAoUtilizador } from "@/lib/chat/link";
 import { notificar } from "@/lib/social/notificar";
+import { lerDecimal } from "@/lib/formato";
 
 const BLOQUEIO_RLS =
   "Não foi possível enviar. As políticas de segurança da base de dados podem estar a bloquear esta operação.";
@@ -78,7 +79,7 @@ export async function registarMedia(
 
   let weightKg: number | null = null;
   if (weightRaw) {
-    weightKg = Number.parseFloat(weightRaw.replace(",", "."));
+    weightKg = lerDecimal(weightRaw);
     if (!isFinite(weightKg) || weightKg < 20 || weightKg > 400) {
       return { erro: "Peso fora do intervalo (20–400 kg)." };
     }

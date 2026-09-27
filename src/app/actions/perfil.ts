@@ -7,6 +7,7 @@ import {
   SERVICOS,
   MAX_ESPECIALIDADES,
 } from "@/lib/perfil";
+import { lerDecimal } from "@/lib/formato";
 
 const BLOQUEIO_RLS =
   "Não foi possível guardar. As políticas de segurança da base de dados podem estar a bloquear esta operação.";
@@ -91,7 +92,9 @@ export async function guardarPerfil(
 
   let price: number | null = null;
   if (priceRaw) {
-    price = Number.parseFloat(priceRaw);
+    // "40,5" gravava 40 (parseFloat corta na vírgula) — lerDecimal aceita
+    // vírgula e ponto e recusa o resto
+    price = lerDecimal(priceRaw);
     if (!isFinite(price) || price < 0 || price > 100000) {
       return { erro: "Preço inválido." };
     }

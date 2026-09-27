@@ -6,6 +6,7 @@ import {
   formatarKg,
   formatarNumero,
   formatarReservaMedia,
+  lerDecimal,
   rirDeRpe,
   rotuloEsforco,
   rotuloMusculo,
@@ -79,5 +80,22 @@ test("textos do esforço reportado nunca dizem RPE", () => {
   for (const r of [6, 7, 8, 9, 10, 7.5]) {
     assert.doesNotMatch(textoReserva(r), /RPE/);
     assert.doesNotMatch(formatarReservaMedia(r), /RPE/);
+  }
+});
+
+test("lerDecimal: aceita vírgula E ponto, e dá o número certo (nunca 72 nem 725)", () => {
+  assert.equal(lerDecimal("72,5"), 72.5);
+  assert.equal(lerDecimal("72.5"), 72.5);
+  assert.equal(lerDecimal("72"), 72);
+  assert.equal(lerDecimal(" 72,5 "), 72.5);
+  assert.equal(lerDecimal("0,75"), 0.75);
+  assert.equal(lerDecimal(",5"), 0.5);
+  // o erro clássico: parseFloat("72,5") dá 72 — aqui nunca
+  assert.notEqual(lerDecimal("72,5"), 72);
+});
+
+test("lerDecimal: rejeita o que não é um número limpo (em vez de adivinhar)", () => {
+  for (const mau of ["", "  ", "abc", "72,5kg", "7a", "72,5,1", "1.072,5", "72..5", "-5", "1e3"]) {
+    assert.ok(Number.isNaN(lerDecimal(mau)), `devia rejeitar "${mau}"`);
   }
 });

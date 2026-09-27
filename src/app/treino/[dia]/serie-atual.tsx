@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CalculadoraDiscos } from "./calculadora-discos";
 
-import { formatarNumero, rotuloEsforco, rotuloMusculo } from "@/lib/formato";
+import { formatarNumero, lerDecimal, rotuloEsforco, rotuloMusculo } from "@/lib/formato";
 // Formato de Portugal ("57,5") — fonte única em src/lib/formato.ts;
 // re-exportado para quem já o importava daqui.
 export { formatarNumero };
@@ -96,7 +96,9 @@ export function SerieAtual({
   }, [aEditar]);
 
   function confirmarEdicao(valorTexto: string) {
-    const valor = Number.parseFloat(valorTexto.replace(",", "."));
+    // "57,5" ou "57.5" — lerDecimal; um valor que não seja número é
+    // ignorado (fica a carga que estava), nunca gravado meio-lido
+    const valor = lerDecimal(valorTexto);
     if (Number.isFinite(valor)) onDefinir(valor);
     setAEditar(false);
   }
@@ -115,10 +117,12 @@ export function SerieAtual({
         {aEditar ? (
           <input
             ref={inputRef}
-            type="number"
+            // texto + teclado decimal: com type="number", "57,5" podia chegar
+            // vazio e a edição perdia-se em silêncio
+            type="text"
             inputMode="decimal"
-            step={passo}
-            defaultValue={bigNumero}
+            autoComplete="off"
+            defaultValue={formatarNumero(bigNumero)}
             autoFocus
             className="apex-tipo-carga-treino apex-tabular apex-treino-input-carga"
             onBlur={(e) => confirmarEdicao(e.currentTarget.value)}

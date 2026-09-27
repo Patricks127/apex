@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { LIFT_LABEL, type Lift } from "@/lib/motor";
 import { METRICAS, type MetricaId } from "@/lib/treino/metricas";
 import { notificar } from "@/lib/social/notificar";
+import { lerDecimal } from "@/lib/formato";
 
 const BLOQUEIO_RLS =
   "Não foi possível guardar. As políticas de segurança da base de dados podem estar a bloquear esta operação.";
@@ -25,8 +26,8 @@ export async function registarRecorde(
   formData: FormData,
 ): Promise<EstadoProgresso> {
   const lift = String(formData.get("lift") ?? "");
-  const valueRaw = String(formData.get("value_kg") ?? "").trim().replace(",", ".");
-  const value = Number.parseFloat(valueRaw);
+  // vírgula ou ponto ("142,5" / "142.5") — lerDecimal, nunca parseFloat
+  const value = lerDecimal(String(formData.get("value_kg") ?? ""));
 
   if (!LIFTS.includes(lift as Lift)) return { erro: "Levantamento inválido." };
   if (!Number.isFinite(value) || value <= 0 || value > 500) {
@@ -74,8 +75,9 @@ export async function registarMetrica(
   formData: FormData,
 ): Promise<EstadoProgresso> {
   const metric = String(formData.get("metric") ?? "");
-  const valueRaw = String(formData.get("value") ?? "").trim().replace(",", ".");
-  const value = Number.parseFloat(valueRaw);
+  // vírgula ou ponto ("72,5" / "72.5") — lerDecimal, nunca parseFloat
+  // (parseFloat("72,5") dá 72)
+  const value = lerDecimal(String(formData.get("value") ?? ""));
 
   const def = METRICAS[metric as MetricaId];
   if (!def) return { erro: "Métrica inválida." };

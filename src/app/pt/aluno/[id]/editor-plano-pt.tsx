@@ -75,7 +75,10 @@ export function EditorPlanoPt({
             exercicioId: e.exercicioId,
             series: Number(e.series) || 0,
             reps: Number(e.reps) || 0,
-            carga: e.carga.trim() === "" ? null : Number(e.carga),
+            // o texto tal como escrito ("72,5") — o servidor lê vírgula ou
+            // ponto e recusa o resto. Antes: Number("72,5") = NaN → null no
+            // JSON → a carga desaparecia sem aviso.
+            carga: e.carga.trim() === "" ? null : e.carga.trim(),
             nota: e.nota,
           })),
         })),
@@ -247,6 +250,7 @@ function DiaCard({
               <NumField label="reps" value={e.reps} onChange={(v) => onAtualizarExercicio(e.chave, { reps: v })} />
               <NumField
                 label="carga (kg)"
+                decimal
                 value={e.carga}
                 onChange={(v) => onAtualizarExercicio(e.chave, { carga: v })}
                 opcional
@@ -297,11 +301,14 @@ function NumField({
   value,
   onChange,
   opcional,
+  decimal,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   opcional?: boolean;
+  /** carga (kg) aceita "72,5"; séries/reps são inteiros */
+  decimal?: boolean;
 }) {
   return (
     <label className="flex flex-col gap-0.5">
@@ -310,9 +317,9 @@ function NumField({
         {opcional ? " (opc.)" : ""}
       </span>
       <input
-        type="number"
-        inputMode="decimal"
-        min={0}
+        type="text"
+        inputMode={decimal ? "decimal" : "numeric"}
+        autoComplete="off"
         value={value}
         onChange={(e) => onChange(e.currentTarget.value)}
         className="apex-tipo-secundario apex-tabular border px-2 py-1.5 outline-none"
