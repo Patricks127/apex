@@ -55,3 +55,20 @@ cláusula `pt_has_scope(auth.uid(), student_id, 'treinos')` nunca referencia
 diferente do PT (o do próprio aluno) — um `owner_id` de um PT antigo passa
 pelo mesmo código, sem distinção possível. Aceite pelo utilizador em vez de
 criar uma segunda conta de PT só para este caso.
+
+## /onboarding e /ligar ficam ESCUROS de propósito (Fase 2, 2026-09-27)
+
+Na Fase 2, /entrar e /registar passaram a modo claro (`_ui/auth-claro.tsx`,
+commit `8cbe6fc`). **/onboarding e /ligar ficaram escuros de propósito** —
+não é um esquecimento nem uma dívida a corrigir. Não os passar a claro.
+
+Porquê: está previsto passar a app toda a tema escuro depois do teste com a
+Daniela; converter estes dois ecrãs agora seria trabalho deitado fora daqui
+a semanas. A testadora foi avisada do salto de tema temporário (registo
+claro → onboarding escuro).
+
+Consequência no código: `_ui/cartao-auth.tsx` e `_ui/campos.tsx` (escuros)
+continuam vivos só para estes dois ecrãs — não os apagar como "código
+morto", e não os trocar pelos componentes claros de `_ui/auth-claro.tsx`.
+
+A reavaliar quando se decidir o tema da app depois do teste.
