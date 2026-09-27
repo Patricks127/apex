@@ -50,7 +50,7 @@ test("isolamento com RPE baixo não é afetado pelo teto (fica bem abaixo dele)"
 test("motivo descreve o ajuste REAL (depois dos limites), não o ajuste bruto do RPE", () => {
   // sem o limite seria "+45s"; com o limite de isolamento fica "+30s"
   const d = decidirDescanso(90, 10, "isolamento");
-  assert.equal(d.motivo, "Mais 30s — a última série custou-te 10.");
+  assert.equal(d.motivo, "Mais 30s — a última série foi até à falha (0 reps na reserva).");
 });
 
 test("motivo em falta (0) quando um limite anula o ajuste do RPE", () => {
@@ -62,5 +62,14 @@ test("motivo em falta (0) quando um limite anula o ajuste do RPE", () => {
 
 test("motivo de redução usa a frase de RPE baixo", () => {
   const d = decidirDescanso(90, 6, "normal");
-  assert.equal(d.motivo, "Menos 15s — a última série esteve fácil (RPE 6).");
+  assert.equal(d.motivo, "Menos 15s — a última série esteve fácil (4 ou mais reps na reserva).");
+});
+
+test("decidirDescanso: o motivo mostrado nunca fala em RPE", () => {
+  for (const rpe of [6, 7, 8, 9, 10]) {
+    for (const tipo of ["composto_pesado", "normal", "isolamento"] as const) {
+      const { motivo } = decidirDescanso(90, rpe, tipo);
+      if (motivo) assert.doesNotMatch(motivo, /RPE|custou-te \d/, `${rpe}/${tipo}: ${motivo}`);
+    }
+  }
 });

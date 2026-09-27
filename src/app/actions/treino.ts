@@ -316,7 +316,7 @@ export async function gravarTreino(
 
   const avgRpe = avgRpeRaw ? Number.parseFloat(avgRpeRaw) : null;
   if (avgRpe != null && (!isFinite(avgRpe) || avgRpe < 6 || avgRpe > 10)) {
-    return { erro: "RPE médio fora do intervalo 6–10." };
+    return { erro: "Esforço médio inválido — volta a registar as séries." };
   }
   const completion =
     Number.isInteger(setsTotal) && setsTotal > 0

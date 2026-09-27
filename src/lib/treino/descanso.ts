@@ -12,6 +12,8 @@
  *
  * Puro — não sabe nada de temporizadores nem de UI, só a aritmética.
  */
+import { textoReserva } from "../formato.ts";
+
 
 export type TipoDescanso = "composto_pesado" | "normal" | "isolamento";
 
@@ -59,13 +61,15 @@ export function decidirDescanso(baseSeg: number, rpe: number, tipo: TipoDescanso
     seg = Math.min(CEIL_ISOLAMENTO, seg);
   }
 
+  // O motivo é mostrado ao atleta — em reps na reserva (RIR = 10 − RPE),
+  // a escala do alvo e do painel pós-série; o RPE fica só aqui dentro.
   const ajusteSeg = seg - baseSeg;
   const motivo =
     ajusteSeg === 0
       ? null
       : ajusteSeg > 0
-        ? `Mais ${ajusteSeg}s — a última série custou-te ${rpe}.`
-        : `Menos ${Math.abs(ajusteSeg)}s — a última série esteve fácil (RPE ${rpe}).`;
+        ? `Mais ${ajusteSeg}s — ${rpe >= 10 ? "a última série foi até à falha (0 reps na reserva)" : `a última série ficou só com ${textoReserva(rpe)}`}.`
+        : `Menos ${Math.abs(ajusteSeg)}s — a última série esteve fácil (${textoReserva(rpe)}).`;
 
   return { seg, ajusteSeg, motivo };
 }

@@ -37,27 +37,12 @@ import {
 } from "./seletor.ts";
 import { gerarPlanoValidado } from "./validador.ts";
 import type { Musculo } from "./tipos.ts";
+import { MUSCULO_LABEL } from "./rotulos.ts";
 
-export const MUSCULO_LABEL: Record<Musculo, string> = {
-  peito: "Peito",
-  dorsais: "Costas",
-  trapezio_medio: "Trapézio médio",
-  trapezio_superior: "Trapézio superior",
-  deltoide_anterior: "Deltoide anterior",
-  deltoide_lateral: "Deltoide lateral",
-  deltoide_posterior: "Deltoide posterior",
-  biceps: "Bíceps",
-  triceps: "Tríceps",
-  antebraco: "Antebraço",
-  quadriceps: "Quadríceps",
-  isquiotibiais: "Isquiotibiais",
-  gluteo: "Glúteo",
-  adutores: "Adutores",
-  gemeos: "Gémeos",
-  lombar: "Lombar",
-  core: "Core",
-  cardio: "Cardio",
-};
+// Mapa de nomes num ficheiro próprio, SEM dependências (rotulos.ts): é
+// usado no treino ao vivo, no cliente — importá-lo daqui arrastava o motor
+// inteiro (e a base de 128 exercícios) para o código que vai ao telemóvel.
+export { MUSCULO_LABEL } from "./rotulos.ts";
 
 // ---------------------------------------------------------------------------
 // perfil do v1 → perfil do seletor v2

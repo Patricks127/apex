@@ -127,7 +127,7 @@ function AvancarSemana() {
       <div>
         <p className="apex-tipo-nome-exercicio" style={{ color: "var(--apex-tinta)" }}>Fechar a semana</p>
         <p className="apex-tipo-secundario" style={{ color: "var(--apex-cinza-texto)" }}>
-          Junta o RPE e o volume das sessões desta semana e decide a próxima: progride, mantém ou descarga.
+          Junta o esforço (reps na reserva) e o volume das sessões desta semana e decide a próxima: progride, mantém ou descarga.
         </p>
       </div>
 

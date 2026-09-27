@@ -13,7 +13,7 @@ import { METRICAS, type MetricaId } from "@/lib/treino/metricas";
 import type { RecordePessoal, MetricaCorporal, SessaoHistorico } from "@/lib/treino/progresso-dados";
 
 import { FUSO } from "@/lib/fuso";
-import { formatarKg, formatarNumero } from "@/lib/formato";
+import { formatarKg, formatarNumero, formatarReservaMedia } from "@/lib/formato";
 const COR = {
   tinta: "var(--apex-tinta)",
   branco: "var(--apex-branco)",
@@ -408,7 +408,7 @@ function ItemHistorico({ sessao }: { sessao: SessaoHistorico }) {
           <p className="apex-tipo-secundario apex-tabular" style={{ color: COR.fraco }}>
             {sessao.nSets} séries · {formatarKg(Math.round(sessao.volumeKg))} de volume
             {sessao.completion != null ? ` · ${Math.round(sessao.completion * 100)}% completo` : ""}
-            {sessao.avgRpe != null ? ` · RPE médio ${formatarNumero(sessao.avgRpe, 1)}` : ""}
+            {sessao.avgRpe != null ? ` · ${formatarReservaMedia(sessao.avgRpe)}` : ""}
           </p>
           {sessao.checkin?.effort ? (
             <p className="apex-tipo-secundario" style={{ color: COR.fraco }}>

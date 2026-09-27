@@ -14,7 +14,7 @@ import { apagarPlanoDocumento } from "@/app/actions/plan-documents";
 import { EditorPlanoPt, type ExercicioPicker, type DiaEditorInicial } from "./editor-plano-pt";
 import { SeccaoAdesaoSemanal, SeccaoForcaLeitura, SeccaoVolumeLeitura, SeccaoMetricasLeitura } from "./graficos-aluno";
 import { AnexarPlanoForm } from "./anexar-plano-form";
-import { formatarKg, formatarNumero } from "@/lib/formato";
+import { formatarKg, formatarNumero, formatarReservaMedia } from "@/lib/formato";
 
 const JANELAS_ADESAO_FICHA = 12; // mais história do que a linha do painel (6) — a ficha tem espaço
 
@@ -406,7 +406,7 @@ function Historico({
             </div>
             <span className="apex-tipo-secundario apex-tabular" style={{ color: COR.fraco }}>
               {s.completion != null ? `${Math.round(s.completion * 100)}%` : "—"}
-              {s.avgRpe != null ? ` · RPE médio ${formatarNumero(s.avgRpe, 1)}` : ""}
+              {s.avgRpe != null ? ` · ${formatarReservaMedia(s.avgRpe)}` : ""}
             </span>
           </div>
         ))}

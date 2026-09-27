@@ -1,7 +1,16 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { MUSCULO_LABEL } from "./motor2/plano.ts";
-import { formatarKg, formatarNumero, rotuloEsforco, rotuloMusculo } from "./formato.ts";
+import { MUSCULO_LABEL } from "./motor2/rotulos.ts";
+import {
+  OPCOES_RESERVA,
+  formatarKg,
+  formatarNumero,
+  formatarReservaMedia,
+  rirDeRpe,
+  rotuloEsforco,
+  rotuloMusculo,
+  textoReserva,
+} from "./formato.ts";
 
 test("formatarNumero/formatarKg: vírgula decimal, formato de Portugal", () => {
   assert.equal(formatarKg(32.5), "32,5 kg");
@@ -48,4 +57,27 @@ test("rotuloEsforco: sem alvo (planos do PT) → nada", () => {
   assert.equal(rotuloEsforco("—", true), null);
   assert.equal(rotuloEsforco("", true), null);
   assert.equal(rotuloEsforco(null, true), null);
+});
+
+test("reporte em reps na reserva: conversão exata para o RPE que a lógica usa", () => {
+  assert.deepEqual(
+    OPCOES_RESERVA.map((o) => [o.rotulo, o.rpe]),
+    [["4+", 6], ["3", 7], ["2", 8], ["1", 9], ["0", 10]],
+  );
+  for (const o of OPCOES_RESERVA) assert.equal(rirDeRpe(o.rpe), o.rotulo === "4+" ? 4 : Number(o.rotulo));
+});
+
+test("textos do esforço reportado nunca dizem RPE", () => {
+  assert.equal(textoReserva(8), "2 reps na reserva");
+  assert.equal(textoReserva(9), "1 rep na reserva");
+  assert.equal(textoReserva(6), "4 ou mais reps na reserva");
+  assert.equal(textoReserva(10), "0 reps na reserva (até à falha)");
+  assert.equal(formatarReservaMedia(7.5), "2,5 reps na reserva (média)");
+  assert.equal(formatarReservaMedia(9), "1 rep na reserva (média)");
+  assert.equal(formatarReservaMedia(9.04), "1 rep na reserva (média)"); // arredonda para "1"
+  assert.equal(formatarReservaMedia(8.5), "1,5 reps na reserva (média)");
+  for (const r of [6, 7, 8, 9, 10, 7.5]) {
+    assert.doesNotMatch(textoReserva(r), /RPE/);
+    assert.doesNotMatch(formatarReservaMedia(r), /RPE/);
+  }
 });

@@ -61,7 +61,7 @@ export function decidirProgressaoManual(
     if (p.repBonus < 2) {
       p.repBonus += 1;
       p.streak += 1;
-      p.reason = "Semana passada esteve fácil (RPE baixo) — +1 rep por série (progressão dupla).";
+      p.reason = "Semana passada esteve fácil (sobraram muitas reps na reserva) — +1 rep por série (progressão dupla).";
     } else {
       p.repBonus = 0;
       p.loadBonus += PASSO_CARGA;
@@ -74,7 +74,7 @@ export function decidirProgressaoManual(
     p.reason = `Na zona ideal de esforço — progressão de +${Math.round(PASSO_CARGA * 100)}%.`;
   } else {
     p.streak = 0;
-    p.reason = "Semana exigente (RPE alto) — mantenho a carga para a dominares antes de subir.";
+    p.reason = "Semana exigente (quase sem reps na reserva) — mantenho a carga para a dominares antes de subir.";
   }
   p.week += 1;
   p.lastRpe = avgRpe;

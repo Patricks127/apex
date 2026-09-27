@@ -3,7 +3,7 @@
 import { useState, useActionState } from "react";
 import { BotaoVoltar } from "@/app/_ui/design/botao-voltar";
 import { gravarTreino, type EstadoRegisto } from "@/app/actions/treino";
-import { formatarKg, formatarNumero } from "@/lib/formato";
+import { formatarKg, formatarReservaMedia } from "@/lib/formato";
 
 const EFFORTS = [
   { id: "abaixo", label: "Abaixo do esperado" },
@@ -56,7 +56,7 @@ export function CheckIn({
           </h1>
           <p className="apex-tipo-secundario apex-tabular" style={{ color: "var(--apex-texto-fraco)" }}>
             {agg.done}/{agg.total} séries · {formatarKg(agg.volume)} movimentados
-            {agg.avgRpe != null ? ` · RPE médio ${formatarNumero(agg.avgRpe, 1)}` : ""}
+            {agg.avgRpe != null ? ` · ${formatarReservaMedia(agg.avgRpe)}` : ""}
           </p>
         </div>
 

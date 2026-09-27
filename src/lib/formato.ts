@@ -14,7 +14,7 @@
    Puro, testável com `npm run test:formato`.
    ============================================================ */
 
-import { MUSCULO_LABEL } from "./motor2/plano.ts";
+import { MUSCULO_LABEL } from "./motor2/rotulos.ts";
 
 const NUMERO = new Intl.NumberFormat("pt-PT", { maximumFractionDigits: 2 });
 const NUMERO_1_CASA = new Intl.NumberFormat("pt-PT", { maximumFractionDigits: 1 });
@@ -72,4 +72,41 @@ export function rotuloEsforco(alvo: string | null | undefined, comRepeticoes: bo
   }
 
   return t;
+}
+
+/* ------------------------------------------------------------
+   Esforço REPORTADO — a app guarda RPE (6–10) por dentro (autorregulação,
+   descanso, progressão semanal, alertas do PT: tudo igual), mas ao
+   utilizador fala SEMPRE em reps na reserva (RIR = 10 − RPE), a mesma
+   escala do alvo. O RPE nunca aparece no ecrã.
+   ------------------------------------------------------------ */
+
+/** Botões do painel pós-série: "quantas reps ainda conseguias fazer?" →
+ *  o RPE que a lógica já usa. Conversão exata, inteiros 6–10 como antes. */
+export const OPCOES_RESERVA: { rotulo: string; descricao: string; rpe: number }[] = [
+  { rotulo: "4+", descricao: "4 ou mais reps na reserva", rpe: 6 },
+  { rotulo: "3", descricao: "3 reps na reserva", rpe: 7 },
+  { rotulo: "2", descricao: "2 reps na reserva", rpe: 8 },
+  { rotulo: "1", descricao: "1 rep na reserva", rpe: 9 },
+  { rotulo: "0", descricao: "até à falha, 0 reps na reserva", rpe: 10 },
+];
+
+/** Reps na reserva a partir de um RPE (pode ser média, com decimais). */
+export function rirDeRpe(rpe: number): number {
+  return Math.max(0, 10 - rpe);
+}
+
+/** "2 reps na reserva", "1 rep na reserva", "4 ou mais reps na reserva",
+ *  "0 reps na reserva (até à falha)". */
+export function textoReserva(rpe: number): string {
+  const rir = rirDeRpe(rpe);
+  if (rir >= 4) return "4 ou mais reps na reserva";
+  if (rir === 0) return "0 reps na reserva (até à falha)";
+  return `${formatarNumero(rir, 1)} ${rir === 1 ? "rep" : "reps"} na reserva`;
+}
+
+/** Média de uma sessão/semana: "2,5 reps na reserva (média)". */
+export function formatarReservaMedia(rpeMedio: number): string {
+  const texto = formatarNumero(rirDeRpe(rpeMedio), 1);
+  return `${texto} ${texto === "1" ? "rep" : "reps"} na reserva (média)`;
 }

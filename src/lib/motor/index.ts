@@ -1674,7 +1674,7 @@ export function advanceWeek(
     if (p.repBonus < 2) {
       p.repBonus += 1;
       p.streak += 1;
-      p.reason = "Semana passada esteve fácil (RPE baixo) — +1 rep por série (progressão dupla).";
+      p.reason = "Semana passada esteve fácil (sobraram muitas reps na reserva) — +1 rep por série (progressão dupla).";
     } else {
       p.repBonus = 0;
       p.loadBonus += step;
@@ -1687,7 +1687,7 @@ export function advanceWeek(
     p.reason = `Na zona ideal de esforço — progressão de +${step} kg nos compostos.`;
   } else {
     p.streak = 0;
-    p.reason = "Semana exigente (RPE alto) — mantenho a carga para a dominares antes de subir.";
+    p.reason = "Semana exigente (quase sem reps na reserva) — mantenho a carga para a dominares antes de subir.";
   }
   p.week += 1;
   p.lastRpe = avgRpe;
@@ -1743,12 +1743,12 @@ export function autoregulate(
   rpe: number,
 ): { w?: number | null; reps?: number; msg: string } {
   if (set.w == null) {
-    if (rpe >= 9.5) return { reps: Math.max(3, set.reps - 3), msg: "RPE 10 — próximas séries −3 reps." };
+    if (rpe >= 9.5) return { reps: Math.max(3, set.reps - 3), msg: "Até à falha — próximas séries −3 reps." };
     if (rpe >= 9) return { reps: Math.max(3, set.reps - 2), msg: "Perto do limite — −2 reps." };
     if (rpe <= 6) return { reps: set.reps + 2, msg: "Fácil demais — +2 reps." };
     return { reps: set.reps, msg: "Na zona certa. Mantém." };
   }
-  if (rpe >= 9.5) return { w: round25(set.w * 0.93), msg: "RPE 10 — próxima série −7%." };
+  if (rpe >= 9.5) return { w: round25(set.w * 0.93), msg: "Até à falha — próxima série −7%." };
   if (rpe >= 9) return { w: round25(set.w * 0.96), msg: "Perto do limite — próxima −4%." };
   if (rpe <= 6) return { w: round25(set.w + 2.5), msg: "Estava leve — +2,5 kg." };
   return { w: set.w, msg: "Na zona certa. Mantém." };
@@ -1935,7 +1935,7 @@ export function buildDay(
     );
   } else if (STRENGTH_LIFT_GOALS.includes(profile.goal)) {
     why.push(
-      "Cargas estimadas pelo teu nível e sexo — ajusta nas primeiras séries pelo esforço (RPE).",
+      "Cargas estimadas pelo teu nível e sexo — ajusta nas primeiras séries pelas reps que te sobram na reserva.",
     );
   }
   if (eventWeeks != null && phase) {
