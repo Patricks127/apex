@@ -49,21 +49,21 @@ export function CodigoPt({ codigoInicial }: { codigoInicial: string | null }) {
             <button
               type="button"
               onClick={() => copiar(codigo, "codigo")}
-              className="apex-tipo-etiqueta border px-2.5 py-1"
-              style={{ borderColor: "var(--apex-cinza-linha)", color: "var(--apex-tinta)" }}
+              className="apex-tipo-etiqueta border px-3"
+              style={{ minHeight: 44, borderColor: "var(--apex-cinza-linha)", color: "var(--apex-tinta)" }}
             >
               {copiado === "codigo" ? "Copiado" : "Copiar"}
             </button>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="apex-tipo-secundario apex-tabular" style={{ color: "var(--apex-cinza-texto)" }}>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="apex-tipo-secundario apex-tabular min-w-0" style={{ color: "var(--apex-cinza-texto)" }}>
               apex.fit/pt/{codigo}
             </span>
             <button
               type="button"
               onClick={() => copiar(`apex.fit/pt/${codigo}`, "link")}
-              className="apex-tipo-etiqueta border px-2 py-0.5"
-              style={{ borderColor: "var(--apex-cinza-linha)", color: "var(--apex-cinza-texto)" }}
+              className="apex-tipo-etiqueta border px-3"
+              style={{ minHeight: 44, borderColor: "var(--apex-cinza-linha)", color: "var(--apex-cinza-texto)" }}
             >
               {copiado === "link" ? "Copiado" : "Copiar link"}
             </button>

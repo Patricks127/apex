@@ -24,11 +24,6 @@ export const metadata: Metadata = {
   title: "Painel · APEX",
 };
 
-const NOME_PAPEL: Record<string, string> = {
-  atleta: "Atleta",
-  pt: "Personal Trainer",
-};
-
 const COR = {
   tinta: "var(--apex-tinta)",
   fraco: "var(--apex-cinza-texto)",
@@ -62,34 +57,44 @@ export default async function PainelPage() {
     contarNaoLidas(supabase, user.id),
   ]);
 
+  // Fuso fixo, como o resto da app (ver commit do fuso Europe/Lisbon) —
+  // perto da meia-noite, o servidor em UTC mostrava o dia errado.
+  const hoje = new Date().toLocaleDateString("pt-PT", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone: "Europe/Lisbon",
+  });
+
   return (
-    <main className="apex-ecra-claro mx-auto flex w-full max-w-lg flex-col gap-8 px-5 py-8">
-      {/* Safe area do topo (notch/Dynamic Island): agora tratada na
-          própria classe .apex-ecra-claro (design.css), partilhada por
-          TODOS os ecrãs claros — não só este. A de baixo já vem do
-          Rodape global, montado no layout.tsx. */}
-      {perfil?.role === "atleta" ? (
-        <CabecalhoAtleta nome={perfil.name} naoLidas={naoLidas} />
+    <main className="apex-ecra-claro mx-auto flex w-full max-w-lg flex-col gap-6 px-5 pt-6 pb-8">
+      {/* Safe area do topo (notch/Dynamic Island): tratada na própria
+          classe .apex-ecra-claro (design.css). A de baixo: a barra de
+          navegação inferior (_ui/navegacao), montada no layout.tsx. */}
+      {perfil?.role === "atleta" || perfil?.role === "pt" ? (
+        <CabecalhoAtleta
+          nome={perfil.name}
+          naoLidas={naoLidas}
+          papel={perfil.role}
+          etiqueta={perfil.role === "pt" ? hoje.charAt(0).toUpperCase() + hoje.slice(1) : undefined}
+        />
       ) : (
-        <header className="flex items-start justify-between">
-          <div>
+        <header className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
             <p className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
               APEX
             </p>
-            <h1 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: COR.tinta }}>
-              {perfil?.name ?? "—"}
+            <h1 className="apex-tipo-saudacao" style={{ color: COR.tinta }}>
+              Perfil incompleto
             </h1>
-            <p className="apex-tipo-secundario" style={{ color: COR.fraco }}>
-              {perfil?.role ? (NOME_PAPEL[perfil.role] ?? perfil.role) : "Perfil incompleto"}
-            </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <Sino naoLidas={naoLidas} />
             <form action={sair}>
               <button
                 type="submit"
-                className="apex-tipo-etiqueta border px-3 py-1.5"
-                style={{ borderColor: COR.linha, color: COR.fraco }}
+                className="apex-tipo-etiqueta border px-3"
+                style={{ minHeight: 44, borderColor: COR.linha, color: COR.fraco }}
               >
                 Terminar sessão
               </button>
@@ -99,7 +104,7 @@ export default async function PainelPage() {
       )}
 
       {perfil?.role === "pt" ? (
-        <SeccaoPt userId={user.id} nome={perfil.name} ptCode={perfil.pt_code ?? null} />
+        <SeccaoPt userId={user.id} ptCode={perfil.pt_code ?? null} />
       ) : perfil?.role === "atleta" ? (
         <SeccaoAtleta userId={user.id} />
       ) : (
@@ -107,20 +112,9 @@ export default async function PainelPage() {
           O teu perfil ainda não está completo. Contacta o suporte.
         </p>
       )}
-
-      <section className="mt-auto flex flex-col gap-1.5 border-t pt-4" style={{ borderColor: COR.linha }}>
-        <h2 className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
-          Definições
-        </h2>
-        <div className="flex gap-4">
-          <Link href="/termos" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.fraco }}>
-            Termos de Utilização
-          </Link>
-          <Link href="/privacidade" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.fraco }}>
-            Política de Privacidade
-          </Link>
-        </div>
-      </section>
+      {/* Termos/privacidade: só no rodapé global (ponto 22) — a secção
+          "Definições" que os repetia aqui saiu; as definições a sério
+          chegam com o perfil (Fase 3). */}
     </main>
   );
 }
@@ -139,34 +133,15 @@ async function SeccaoAtleta({ userId }: { userId: string }) {
   ]);
 
   return (
-    <div className="flex flex-col gap-6">
+    // A fila de links (Plano · Chat · Vídeos · …) que servia de navegação
+    // saiu: a navegação é a barra inferior (_ui/navegacao). Vídeos continua
+    // no cartão do PT e na atividade; notificações, no sino; descobrir, no
+    // separador Feed.
+    <div className="flex flex-col gap-4">
       <CartaoTreinoHoje userId={userId} />
       <BlocoPtDoAtleta userId={userId} />
       <CartaoProgresso metricas={metricas} />
       <CartaoAtividade sessoes={sessoes} feedbackRecente={feedbackRecente} />
-      <nav className="flex flex-wrap gap-4 border-t pt-4" style={{ borderColor: COR.linha }}>
-        <Link href="/plano" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.tinta }}>
-          Plano
-        </Link>
-        <Link href="/chat" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.tinta }}>
-          Chat
-        </Link>
-        <Link href="/videos" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.tinta }}>
-          Vídeos
-        </Link>
-        <Link href="/progresso" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.tinta }}>
-          Progresso
-        </Link>
-        <Link href="/feed" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.tinta }}>
-          Feed
-        </Link>
-        <Link href="/descobrir" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.tinta }}>
-          Descobrir
-        </Link>
-        <Link href="/notificacoes" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.tinta }}>
-          Notificações
-        </Link>
-      </nav>
     </div>
   );
 }
@@ -186,23 +161,28 @@ async function BlocoPtDoAtleta({ userId }: { userId: string }) {
 
   if (!ligacao) {
     return (
-      <p className="apex-tipo-secundario" style={{ color: COR.fraco }}>
-        Ainda não tens um PT ligado.{" "}
-        <Link href="/ligar" className="underline underline-offset-4" style={{ color: COR.tinta }}>
-          Ligar a um PT
-        </Link>{" "}
-        ou{" "}
-        <Link href="/descobrir" className="underline underline-offset-4" style={{ color: COR.tinta }}>
-          descobrir
-        </Link>
-        .
-      </p>
+      <section className="apex-cartao">
+        <h2 className="apex-tipo-titulo-seccao" style={{ marginTop: 0, color: COR.tinta }}>
+          O teu PT
+        </h2>
+        <p className="apex-tipo-corpo" style={{ color: COR.fraco }}>
+          Ainda não tens um PT ligado.
+        </p>
+        <div className="flex flex-wrap gap-x-5">
+          <Link href="/ligar" className="apex-tipo-secundario apex-link-toque underline underline-offset-4" style={{ color: COR.tinta }}>
+            Ligar a um PT
+          </Link>
+          <Link href="/descobrir" className="apex-tipo-secundario apex-link-toque underline underline-offset-4" style={{ color: COR.tinta }}>
+            Descobrir PTs
+          </Link>
+        </div>
+      </section>
     );
   }
 
   if (ligacao.status === "pendente") {
     return (
-      <div className="flex flex-col gap-2">
+      <section className="apex-cartao">
         <span className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
           Pedido enviado
         </span>
@@ -213,13 +193,13 @@ async function BlocoPtDoAtleta({ userId }: { userId: string }) {
           <input type="hidden" name="link_id" value={ligacao.id} />
           <button
             type="submit"
-            className="apex-tipo-secundario underline underline-offset-4"
+            className="apex-tipo-secundario apex-link-toque underline underline-offset-4"
             style={{ color: COR.fraco }}
           >
             Cancelar pedido
           </button>
         </form>
-      </div>
+      </section>
     );
   }
 
@@ -270,7 +250,7 @@ async function contarFeedbackRecente(
 // ---------------------------------------------------------------------------
 
 
-async function SeccaoPt({ userId, nome, ptCode }: { userId: string; nome: string | null; ptCode: string | null }) {
+async function SeccaoPt({ userId, ptCode }: { userId: string; ptCode: string | null }) {
   const supabase = await createClient();
 
   const { data: pedidos } = await supabase
@@ -340,20 +320,11 @@ async function SeccaoPt({ userId, nome, ptCode }: { userId: string; nome: string
     treinosConcluidosSemana = (sessoesJanela ?? []).filter((s) => chaveSemanaIso(s.performed_at) === semanaAtualChave).length;
   }
 
-  const primeiroNome = (nome ?? "").trim().split(/\s+/)[0] || "PT";
-  const hoje = new Date().toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" });
-
+  // Cabeçalho (data + "Olá, <nome>") é o CabecalhoAtleta partilhado, lá
+  // em cima — antes, o PT tinha o NOME COMPLETO a 44px e logo a seguir um
+  // segundo "Olá, <nome>" a 44px: dois títulos gigantes seguidos.
   return (
     <div className="flex flex-col gap-8">
-      <div>
-        <p className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
-          {hoje.charAt(0).toUpperCase() + hoje.slice(1)}
-        </p>
-        <h2 className="apex-tipo-titulo-ecra" style={{ marginTop: 0, color: COR.tinta }}>
-          Olá, {primeiroNome}
-        </h2>
-      </div>
-
       {pedidos && pedidos.length > 0 ? <BlocoPedidosPendentes pedidos={pedidos} /> : null}
 
       <KpisNegocio
@@ -374,21 +345,8 @@ async function SeccaoPt({ userId, nome, ptCode }: { userId: string; nome: string
         </h2>
         <CodigoPt codigoInicial={ptCode} />
       </div>
-
-      <nav className="flex flex-wrap gap-4" style={{ color: COR.tinta }}>
-        <Link href="/perfil/editar" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.tinta }}>
-          Editar o meu perfil público
-        </Link>
-        <Link href="/feed" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.tinta }}>
-          Feed
-        </Link>
-        <Link href="/descobrir" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.tinta }}>
-          Descobrir
-        </Link>
-        <Link href="/notificacoes" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.tinta }}>
-          Notificações
-        </Link>
-      </nav>
+      {/* Feed/descobrir: separador Feed da barra inferior; notificações:
+          sino; editar perfil público: menu do avatar no cabeçalho. */}
     </div>
   );
 }
@@ -415,16 +373,16 @@ function BlocoPedidosPendentes({ pedidos }: { pedidos: Ligacao[] }) {
               <button
                 name="accao"
                 value="aceitar"
-                className="apex-tipo-etiqueta border px-2.5 py-1.5"
-                style={{ borderColor: COR.tinta, color: COR.tinta }}
+                className="apex-tipo-etiqueta border px-3"
+                style={{ minHeight: 44, borderColor: COR.tinta, color: COR.tinta }}
               >
                 Aceitar
               </button>
               <button
                 name="accao"
                 value="recusar"
-                className="apex-tipo-etiqueta border px-2.5 py-1.5"
-                style={{ borderColor: COR.linha, color: COR.fraco }}
+                className="apex-tipo-etiqueta border px-3"
+                style={{ minHeight: 44, borderColor: COR.linha, color: COR.fraco }}
               >
                 Recusar
               </button>
@@ -623,11 +581,11 @@ function ListaAlunos({
 
   return (
     <section className="flex flex-col gap-2">
-      <div className="flex items-baseline justify-between">
+      <div className="flex items-center justify-between gap-3">
         <h2 className="apex-tipo-titulo-seccao" style={{ marginTop: 0, color: COR.tinta }}>
           Os meus alunos
         </h2>
-        <Link href="/pt/alunos" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.tinta }}>
+        <Link href="/pt/alunos" className="apex-tipo-secundario apex-link-toque shrink-0 underline underline-offset-4" style={{ color: COR.tinta }}>
           Ver todos
         </Link>
       </div>

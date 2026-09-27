@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Archivo, Barlow_Condensed, Geist, Geist_Mono } from "next/font/google";
 import { Rodape } from "./_ui/rodape";
+import { BarraNavegacao } from "./_ui/navegacao/barra-navegacao";
 import { GestorHistoricoAndroid } from "./_ui/pwa/gestor-historico-android";
 import "./globals.css";
 
@@ -75,6 +76,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <GestorHistoricoAndroid />
         <div className="flex flex-1 flex-col">{children}</div>
         <Rodape />
+        <BarraNavegacao />
       </body>
     </html>
   );

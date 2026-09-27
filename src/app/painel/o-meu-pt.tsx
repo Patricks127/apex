@@ -28,13 +28,15 @@ export function OMeuPt({
   const [permissoesAbertas, setPermissoesAbertas] = useState(false);
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-baseline justify-between">
-        <span className="apex-tipo-titulo-seccao" style={{ marginTop: 0, color: "var(--apex-tinta)" }}>
+    // Cartão, como os outros do painel (treino de hoje, progresso,
+    // atividade) — antes flutuava sem moldura entre dois cartões.
+    <section className="apex-cartao">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="apex-tipo-titulo-seccao min-w-0" style={{ marginTop: 0, color: "var(--apex-tinta)" }}>
           {ptNome}
-        </span>
+        </h2>
         {ptCode ? (
-          <span className="apex-tipo-etiqueta apex-tabular" style={{ color: "var(--apex-cinza-texto)" }}>
+          <span className="apex-tipo-etiqueta apex-tabular shrink-0" style={{ color: "var(--apex-cinza-texto)" }}>
             {ptCode}
           </span>
         ) : null}
@@ -42,14 +44,14 @@ export function OMeuPt({
 
       <Link href="/chat" className="apex-linha-exercicio" style={{ textDecoration: "none" }}>
         <span className="apex-tipo-nome-exercicio" style={{ color: "var(--apex-tinta)" }}>Mensagens</span>
-        <span className="apex-tabular" style={{ color: mensagensPorLer > 0 ? "var(--apex-tinta)" : "var(--apex-cinza-texto)" }}>
+        <span className="apex-tipo-secundario apex-tabular text-right" style={{ color: mensagensPorLer > 0 ? "var(--apex-tinta)" : "var(--apex-cinza-texto)" }}>
           {mensagensPorLer > 0 ? `${mensagensPorLer} por ler` : "Tudo lido"}
         </span>
       </Link>
 
       <Link href="/videos" className="apex-linha-exercicio" style={{ textDecoration: "none" }}>
         <span className="apex-tipo-nome-exercicio" style={{ color: "var(--apex-tinta)" }}>Vídeos</span>
-        <span className="apex-tabular" style={{ color: feedbackRecente > 0 ? "var(--apex-tinta)" : "var(--apex-cinza-texto)" }}>
+        <span className="apex-tipo-secundario apex-tabular text-right" style={{ color: feedbackRecente > 0 ? "var(--apex-tinta)" : "var(--apex-cinza-texto)" }}>
           {feedbackRecente > 0 ? `${feedbackRecente} com feedback recente` : "Sem feedback recente"}
         </span>
       </Link>
@@ -57,7 +59,7 @@ export function OMeuPt({
       <button
         type="button"
         onClick={() => setPermissoesAbertas((v) => !v)}
-        className="apex-tipo-secundario self-start"
+        className="apex-tipo-secundario apex-link-toque self-start"
         style={{ color: "var(--apex-cinza-texto)" }}
       >
         {permissoesAbertas ? "Esconder permissões" : "Gerir permissões"}
@@ -74,7 +76,7 @@ export function OMeuPt({
                 type="submit"
                 disabled={pendente}
                 className="apex-botao apex-botao--claro"
-                style={{ width: "auto", padding: "10px 20px" }}
+                style={{ width: "auto" }}
               >
                 {pendente ? "A guardar…" : "Guardar permissões"}
               </button>
@@ -92,7 +94,7 @@ export function OMeuPt({
                   e.preventDefault();
                 }
               }}
-              className="apex-tipo-secundario"
+              className="apex-tipo-secundario apex-link-toque"
               style={{ color: "var(--apex-erro)" }}
             >
               Revogar acesso
@@ -100,6 +102,6 @@ export function OMeuPt({
           </form>
         </div>
       ) : null}
-    </div>
+    </section>
   );
 }

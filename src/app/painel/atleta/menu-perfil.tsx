@@ -7,6 +7,7 @@
  * ecrã: terminar sessão (ponto 19 do plano — não fica um botão gigante a
  * competir com o treino de hoje).
  */
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { sair } from "@/app/actions/auth";
 
@@ -17,7 +18,7 @@ const COR = {
   linha: "var(--apex-cinza-linha)",
 } as const;
 
-export function MenuPerfil({ nome }: { nome: string | null }) {
+export function MenuPerfil({ nome, papel = "atleta" }: { nome: string | null; papel?: "atleta" | "pt" }) {
   const [aberto, setAberto] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const inicial = (nome ?? "?").trim().charAt(0).toUpperCase() || "?";
@@ -46,8 +47,10 @@ export function MenuPerfil({ nome }: { nome: string | null }) {
         aria-expanded={aberto}
         aria-label="Perfil e definições"
         onClick={() => setAberto((v) => !v)}
-        className="apex-avatar apex-avatar--pequeno"
-        style={{ border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+        // 44px (alvo de toque mínimo) — o --pequeno (32px) era difícil de
+        // acertar com o polegar ao lado do sino.
+        className="apex-avatar"
+        style={{ cursor: "pointer" }}
       >
         <span className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
           {inicial}
@@ -60,17 +63,27 @@ export function MenuPerfil({ nome }: { nome: string | null }) {
           className="absolute right-0 z-10 flex flex-col"
           style={{
             top: "calc(100% + 8px)",
-            minWidth: 180,
+            minWidth: 200,
             background: COR.branco,
             border: `1px solid ${COR.linha}`,
           }}
         >
+          {papel === "pt" ? (
+            <Link
+              href="/perfil/editar"
+              role="menuitem"
+              className="apex-tipo-secundario flex items-center"
+              style={{ minHeight: 44, padding: "0 var(--apex-space-4)", color: COR.tinta, borderBottom: `1px solid ${COR.linha}` }}
+            >
+              Editar perfil público
+            </Link>
+          ) : null}
           <form action={sair}>
             <button
               type="submit"
               role="menuitem"
               className="apex-tipo-secundario w-full text-left"
-              style={{ padding: "var(--apex-space-3) var(--apex-space-4)", color: COR.tinta, background: "none", border: "none", cursor: "pointer" }}
+              style={{ minHeight: 44, padding: "0 var(--apex-space-4)", color: COR.tinta, background: "none", border: "none", cursor: "pointer" }}
             >
               Terminar sessão
             </button>

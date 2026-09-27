@@ -24,11 +24,11 @@ export function CartaoProgresso({ metricas }: { metricas: MetricaCorporal[] }) {
 
   return (
     <section className="apex-cartao">
-      <div className="flex items-baseline justify-between">
+      <div className="flex items-center justify-between gap-3">
         <h2 className="apex-tipo-titulo-seccao" style={{ marginTop: 0, color: COR.tinta }}>
           Progresso
         </h2>
-        <Link href="/progresso" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.tinta }}>
+        <Link href="/progresso" className="apex-tipo-secundario apex-link-toque shrink-0 underline underline-offset-4" style={{ color: COR.tinta }}>
           Ver tudo
         </Link>
       </div>

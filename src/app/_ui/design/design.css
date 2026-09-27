@@ -75,10 +75,27 @@
 
 .apex-tipo-titulo-ecra {
   font-family: var(--apex-sans);
-  font-size: 44px;
+  /* Era 44px fixos — no telemóvel, um nome ("Daniela Paulino") ou um
+     título de treino partia em 2-3 linhas e ocupava meio ecrã. Fase 2
+     (pontos 13/14): 24px no iPhone SE de 1.ª geração (320px), ~28px num
+     SE 2/3 (375px), 32px a partir de ~430px (Pro Max) — nunca mais. */
+  font-size: clamp(24px, 7.5vw, 32px);
   font-weight: 900;
-  letter-spacing: -0.045em;
-  line-height: 1.05;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+  /* nome/título comprido sem espaços nunca empurra o ecrã para o lado */
+  overflow-wrap: anywhere;
+}
+
+/* Saudação do painel ("Olá, Daniela") — um degrau abaixo do título de
+   ecrã: cumprimenta, não é o herói (o herói é o treino de hoje). */
+.apex-tipo-saudacao {
+  font-family: var(--apex-sans);
+  font-size: clamp(24px, 7vw, 28px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
 }
 
 /* Título de secção carrega a sua própria margem superior — a app é um
@@ -86,10 +103,14 @@
 .apex-tipo-titulo-seccao {
   margin-top: var(--apex-space-8);
   font-family: var(--apex-sans);
-  font-size: 24px;
+  /* Título de cartão/secção: 18px no iPhone pequeno, 20px nos outros.
+     Era 24px — ao lado de corpo a 15px, cada cartão gritava tanto como o
+     título do ecrã, e a hierarquia desaparecia. */
+  font-size: clamp(18px, 5vw, 20px);
   font-weight: 800;
-  letter-spacing: -0.03em;
-  line-height: 1.15;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 
 .apex-tipo-nome-exercicio {
@@ -162,10 +183,13 @@
   opacity: 0.45;
 }
 
-/* Alvo de toque ≥44px (§Acessibilidade) */
+/* Alvo de toque ≥44px (§Acessibilidade). Fase 2 (ponto 17): o padding
+   vertical de 20px dava um botão de ~62px de altura a toda a largura — o
+   CTA engolia o cartão. 48px de altura mantém-no o elemento mais forte do
+   cartão (fundo preto, peso 800) sem dominar o ecrã. */
 .apex-botao--claro {
-  min-height: 44px;
-  padding: 20px 24px;
+  min-height: 48px;
+  padding: 12px 20px;
   border-radius: 2px;
   background: var(--apex-tinta);
   color: var(--apex-branco);
@@ -336,7 +360,10 @@
    ============================================================ */
 
 .apex-ecra-claro {
-  min-height: 100dvh;
+  /* 100dvh MENOS a safe area de cima: a margem de baixo (margin-top) soma-
+     -se por fora, e sem isto cada ecrã curto ficava ~47px mais alto que o
+     próprio ecrã do iPhone — scroll vertical sem conteúdo nenhum. */
+  min-height: calc(100dvh - env(safe-area-inset-top, 0px));
   background: var(--apex-branco);
   color: var(--apex-tinta);
   /* iPhone com notch/Dynamic Island: sem isto, o cabeçalho de cada ecrã
@@ -942,7 +969,9 @@
   background: transparent;
   padding: 10px 14px;
   font-family: var(--apex-sans);
-  font-size: 15px;
+  /* 16px, não 15: abaixo de 16px o Safari do iPhone faz zoom à página ao
+     focar o campo, e ela fica ampliada depois de fechar o teclado. */
+  font-size: 16px;
   color: var(--apex-tinta);
   outline: none;
 }
@@ -1096,7 +1125,7 @@
   background: var(--apex-branco);
   padding: 10px 12px;
   font-family: var(--apex-sans);
-  font-size: 15px;
+  font-size: 16px; /* ≥16px: sem zoom do iOS ao focar (ver .apex-composer__campo) */
   color: var(--apex-tinta);
 }
 
@@ -1267,11 +1296,12 @@
 
 .apex-sino {
   position: relative;
-  width: 38px;
-  height: 38px;
+  /* alvo de toque ≥44px (era 38px); cantos 2px como o resto do modo claro */
+  width: 44px;
+  height: 44px;
   flex: none;
   border: 1px solid var(--apex-cinza-linha);
-  border-radius: 8px;
+  border-radius: 2px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1395,4 +1425,129 @@
   font-size: 15px;
   font-weight: 800;
   letter-spacing: -0.02em;
+}
+
+/* ============================================================
+   Navegação inferior (Fase 2, pontos 12/22) — barra própria da app, fixa
+   em baixo, ícone + etiqueta + estado ativo. NÃO é o rodapé: o rodapé
+   (termos/privacidade) continua a ser só isso.
+   ============================================================ */
+
+.apex-nav {
+  --apex-nav-altura: 56px;
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 30;
+  background: var(--apex-branco);
+  border-top: 1px solid var(--apex-cinza-linha);
+  /* barra de gestos do iPhone: os ícones ficam por cima dela, o fundo
+     branco estende-se por baixo (como numa app nativa). */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+.apex-nav__lista {
+  display: flex;
+  max-width: 32rem; /* = max-w-lg dos ecrãs — alinha com o conteúdo */
+  margin: 0 auto;
+  padding: 0;
+  list-style: none;
+}
+
+.apex-nav__item {
+  flex: 1;
+  min-width: 0;
+}
+
+.apex-nav__link {
+  position: relative;
+  display: flex;
+  height: var(--apex-nav-altura);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: var(--apex-cinza-texto);
+  text-decoration: none;
+}
+
+.apex-nav__link:focus-visible {
+  outline: 2px solid var(--apex-azul);
+  outline-offset: -2px;
+}
+
+/* Ativo: tinta + traço de 2px em cima (angular, como o resto do modo
+   claro) — nunca só a cor a dizer "estás aqui". */
+.apex-nav__link[data-ativo="true"] {
+  color: var(--apex-tinta);
+}
+
+.apex-nav__link[data-ativo="true"]::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 50%;
+  width: 28px;
+  height: 2px;
+  margin-left: -14px;
+  background: var(--apex-tinta);
+}
+
+.apex-nav__etiqueta {
+  max-width: 100%;
+  overflow: hidden;
+  font-family: var(--apex-sans);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.apex-nav__link[data-ativo="true"] .apex-nav__etiqueta {
+  font-weight: 800;
+}
+
+.apex-nav-espaco {
+  height: calc(56px + env(safe-area-inset-bottom, 0px));
+  flex: none;
+}
+
+/* Ecrãs imersivos — treino ao vivo (escuro) e conversa de chat (tem o
+   seu próprio campo de escrita em baixo): sem barra, ecrã inteiro. */
+body:has(.apex-treino) :is(.apex-nav, .apex-nav-espaco),
+body:has(.apex-chat) :is(.apex-nav, .apex-nav-espaco) {
+  display: none;
+}
+
+/* Com a barra visível, é ELA que já afasta o conteúdo da barra de gestos
+   — o rodapé deixa de somar a safe area outra vez por cima. */
+.apex-rodape {
+  /* Último elemento visível quando NÃO há barra de navegação — no iPhone
+     instalado como PWA, a barra de gestos fica por cima sem isto. Aditivo,
+     nunca max() (encolheria o rodapé em ecrãs sem safe area). */
+  padding-bottom: calc(var(--apex-space-6) + env(safe-area-inset-bottom, 0px));
+}
+
+body:has(.apex-nav):not(:has(.apex-treino, .apex-chat)) .apex-rodape {
+  padding-bottom: var(--apex-space-6);
+}
+
+/* Link/botão de texto (sublinhado, sem moldura) com alvo de toque ≥44px
+   — o texto fica do mesmo tamanho, só a zona tocável cresce. */
+.apex-link-toque {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+}
+
+/* iPhone SE de 1.ª geração (320px): 5 separadores de 64px — "Progresso"
+   a 12px não cabe e ficava "Progres…". Um degrau abaixo só aqui. */
+@media (max-width: 340px) {
+  .apex-nav__etiqueta {
+    font-size: 11px;
+  }
 }

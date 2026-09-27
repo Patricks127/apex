@@ -33,3 +33,47 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ------------------------------------------------------------------
+   Fase 2 — base mobile (pontos 13/14 do plano de execução).
+   ------------------------------------------------------------------ */
+
+html {
+  /* iPhone em horizontal: sem isto o Safari "infla" o texto por conta
+     própria, e a escala tipográfica deixa de ser a nossa. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+html,
+body {
+  /* Rede de segurança contra scroll horizontal: um elemento que ainda
+     transborde fica cortado em vez de arrastar o ecrã inteiro para o lado
+     (o efeito "app improvisada" no iPhone). `clip`, não `hidden` — não
+     cria um contentor de scroll, por isso não parte position: sticky.
+     Não substitui corrigir a causa em cada ecrã; só impede o pior. */
+  overflow-x: clip;
+}
+
+body {
+  /* palavra comprida (email, URL, nome) parte em vez de sair do ecrã */
+  overflow-wrap: break-word;
+  /* flash cinzento do WebKit ao tocar em links/botões — não é nativo */
+  -webkit-tap-highlight-color: transparent;
+}
+
+img,
+video,
+svg,
+canvas {
+  max-width: 100%;
+}
+
+/* Qualquer campo abaixo de 16px faz o Safari do iPhone ampliar a página
+   ao focar — e ela fica ampliada depois. Regra fora de @layer: ganha às
+   utilidades do Tailwind (text-sm e afins) sem precisar de !important.
+   :where() = especificidade zero, para NUNCA ganhar a uma classe apex-
+   (ex.: o campo de carga do treino ao vivo, a 120px). */
+:where(input:not([type="checkbox"], [type="radio"], [type="range"]), select, textarea) {
+  font-size: max(16px, 1em);
+}

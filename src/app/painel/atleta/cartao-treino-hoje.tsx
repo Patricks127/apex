@@ -109,7 +109,7 @@ function CartaoPlanoPdf({ nomeFicheiro, url }: { nomeFicheiro: string; url: stri
       </p>
       <div className="flex flex-col gap-2 min-[380px]:flex-row">
         {url ? (
-          <a href={url} target="_blank" rel="noopener noreferrer" className="apex-botao apex-botao--claro">
+          <a href={url} target="_blank" rel="noopener noreferrer" className="apex-botao apex-botao--claro min-[380px]:flex-1">
             Abrir plano
           </a>
         ) : (
@@ -119,8 +119,10 @@ function CartaoPlanoPdf({ nomeFicheiro, url }: { nomeFicheiro: string; url: stri
         )}
         <Link
           href="/treino/registar"
-          className="apex-tipo-secundario flex items-center justify-center border px-4 py-2.5"
-          style={{ borderColor: "var(--apex-cinza-linha)", color: COR.tinta }}
+          // Mesma altura que o botão principal ao lado (48px) — antes ~40px,
+          // abaixo do alvo de toque mínimo e desalinhado do "Abrir plano".
+          className="apex-tipo-secundario flex items-center justify-center border px-4 text-center min-[380px]:flex-1"
+          style={{ minHeight: 48, borderColor: "var(--apex-cinza-linha)", color: COR.tinta }}
         >
           Registar treino de hoje
         </Link>

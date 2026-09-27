@@ -43,7 +43,7 @@ export function CartaoAtividade({
             <Link
               href="/videos"
               className="flex items-center justify-between gap-3 border-b py-2.5"
-              style={{ borderColor: COR.linha }}
+              style={{ minHeight: 44, borderColor: COR.linha }}
             >
               <span className="apex-tipo-secundario" style={{ color: COR.tinta }}>
                 {feedbackRecente} comentário{feedbackRecente > 1 ? "s" : ""} novo{feedbackRecente > 1 ? "s" : ""} do teu
