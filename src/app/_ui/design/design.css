@@ -1175,7 +1175,8 @@ html:has(.apex-treino) body {
 }
 
 .apex-form-registo select,
-.apex-form-registo input[type="number"] {
+.apex-form-registo input[type="number"],
+.apex-form-registo input[type="text"] {
   flex: 1;
   /* sem isto, um <input> não encolhe abaixo da largura intrínseca dele
      (~20 carateres) e, lado a lado com o <select>, saía ~70px para fora

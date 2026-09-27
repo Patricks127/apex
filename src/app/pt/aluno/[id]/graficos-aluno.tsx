@@ -21,6 +21,7 @@ import type { RecordePessoal, MetricaCorporal, SessaoHistorico } from "@/lib/tre
 import type { PontoAdesaoSemanal } from "@/lib/treino/adesao-semanal";
 
 import { FUSO } from "@/lib/fuso";
+import { BlocoImc } from "@/app/_ui/treino/bloco-imc";
 import { formatarKg, formatarNumero } from "@/lib/formato";
 const COR = {
   tinta: "var(--apex-tinta)",
@@ -135,7 +136,7 @@ export function SeccaoForcaLeitura({ recordes }: { recordes: RecordePessoal[] })
           <p className="apex-tipo-secundario" style={{ color: COR.fraco }}>
             Evolução do 1RM. ▪ testado no ginásio · ○ estimado a partir do treino ao vivo.
           </p>
-          <div className="apex-abas">
+          <div className="apex-abas apex-abas--scroll">
             {liftsComDados.map((l) => (
               <button key={l} type="button" className="apex-aba" data-ativa={l === lift} onClick={() => setLift(l)}>
                 {LIFT_LABEL[l]}
@@ -231,6 +232,7 @@ export function SeccaoMetricasLeitura({ metricas }: { metricas: MetricaCorporal[
       <h2 className="apex-tipo-titulo-seccao" style={{ marginTop: 0, color: COR.tinta }}>
         Peso e medidas
       </h2>
+      <BlocoImc metricas={metricas} perspetiva="pt" />
       {idsComDados.length === 0 ? (
         <div className="apex-grafico__vazio apex-tipo-secundario">Ainda sem peso ou medidas registadas.</div>
       ) : (
