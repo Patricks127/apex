@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { CartaoAuth } from "@/app/_ui/cartao-auth";
+import { PaginaAuth } from "@/app/_ui/auth-claro";
 import { FormularioEntrada } from "./formulario-entrada";
 
 export const metadata: Metadata = {
@@ -16,8 +16,8 @@ export default async function EntrarPage() {
   if (user) redirect("/painel");
 
   return (
-    <CartaoAuth>
+    <PaginaAuth>
       <FormularioEntrada />
-    </CartaoAuth>
+    </PaginaAuth>
   );
 }

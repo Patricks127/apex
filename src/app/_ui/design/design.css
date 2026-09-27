@@ -1575,3 +1575,103 @@ body:has(.apex-nav):not(:has(.apex-treino, .apex-chat)) .apex-rodape {
   outline: 2px solid var(--apex-azul);
   outline-offset: 2px;
 }
+
+/* ============================================================
+   Formulários claros (entrar/registar) — campo, aviso de erro, opções
+   (caixas de seleção e escolha de papel). Cantos 2px, borda 1px, foco a
+   tinta; alvos de toque ≥44px; texto do campo a 16px (sem zoom do iOS).
+   ============================================================ */
+
+.apex-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.apex-campo__etiqueta {
+  color: var(--apex-tinta);
+  font-weight: 600;
+}
+
+.apex-campo__entrada {
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 1px solid var(--apex-cinza-linha);
+  border-radius: 2px;
+  background: var(--apex-branco);
+  color: var(--apex-tinta);
+  font-family: var(--apex-sans);
+  font-size: 16px;
+  outline: none;
+}
+
+.apex-campo__entrada:focus {
+  border-color: var(--apex-tinta);
+  box-shadow: 0 0 0 1px var(--apex-tinta);
+}
+
+.apex-campo__entrada[aria-invalid="true"] {
+  border-color: var(--apex-erro);
+}
+
+.apex-campo__hint {
+  color: var(--apex-cinza-texto);
+  font-weight: 500;
+}
+
+.apex-campo__erro {
+  color: var(--apex-erro);
+}
+
+.apex-aviso-erro {
+  padding: var(--apex-space-3) var(--apex-space-4);
+  border-left: 3px solid var(--apex-erro);
+  background: var(--apex-erro-fundo);
+  color: var(--apex-tinta);
+}
+
+/* Linha com caixa de seleção (aceitar termos, aviso de saúde) — a linha
+   inteira é tocável, não só o quadradinho. */
+.apex-opcao {
+  display: flex;
+  min-height: 44px;
+  align-items: flex-start;
+  gap: var(--apex-space-3);
+  padding: var(--apex-space-3);
+  border: 1px solid var(--apex-cinza-linha);
+  border-radius: 2px;
+  color: var(--apex-tinta);
+  cursor: pointer;
+}
+
+.apex-opcao:has(:checked) {
+  border-color: var(--apex-tinta);
+}
+
+.apex-opcao input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  margin-top: 1px;
+  accent-color: var(--apex-tinta);
+}
+
+.apex-opcao:has(:focus-visible) {
+  outline: 2px solid var(--apex-azul);
+  outline-offset: 2px;
+}
+
+/* Escolha de papel (atleta / PT) — rádio escondido, o cartão é o alvo. */
+.apex-opcao--papel {
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--apex-space-3) var(--apex-space-4);
+}
+
+.apex-opcao--papel:has(:checked) {
+  border-color: var(--apex-tinta);
+  box-shadow: inset 0 0 0 1px var(--apex-tinta);
+  background: var(--apex-cinza-fundo);
+}
