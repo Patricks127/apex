@@ -62,7 +62,7 @@ export function RegistoLivre() {
           maxLength={80}
           placeholder='Ex.: "Dia 1 — Pernas"'
           className="apex-tipo-corpo border px-3 py-2 outline-none"
-          style={{ borderColor: COR.linha, borderRadius: 14, background: "transparent", color: COR.tinta }}
+          style={{ borderColor: COR.linha, borderRadius: 2, background: "transparent", color: COR.tinta }}
         />
       </label>
 
@@ -74,8 +74,9 @@ export function RegistoLivre() {
           {EFFORTS.map((ef, i) => (
             <label
               key={ef.id}
-              className="apex-tipo-secundario cursor-pointer border px-3 py-2.5 transition"
-              style={{ borderColor: COR.linha, borderRadius: 14, color: COR.tinta }}
+              // escolhido VÊ-SE (borda a tinta + fundo) — antes, rádio escondido
+              // sem estado visível: tocava-se e não se via o que ficou
+              className="apex-opcao apex-opcao--papel apex-tipo-secundario"
             >
               <input type="radio" name="effort" value={ef.id} defaultChecked={i === 1} className="sr-only" />
               {ef.label}
@@ -89,14 +90,13 @@ export function RegistoLivre() {
           Sentiste desconforto?
         </legend>
         <label
-          className="apex-tipo-secundario flex cursor-pointer items-center gap-2 border px-3 py-2"
-          style={{ borderColor: COR.linha, borderRadius: 10, color: COR.tinta }}
+          className="apex-opcao apex-tipo-secundario"
         >
           <input
             type="checkbox"
             checked={semDesconforto}
             onChange={(e) => setSemDesconforto(e.currentTarget.checked)}
-            className="size-4"
+           
           />
           Nenhum
         </label>
@@ -105,10 +105,9 @@ export function RegistoLivre() {
             {ZONES.map((z) => (
               <label
                 key={z}
-                className="apex-tipo-secundario flex cursor-pointer items-center gap-2 border px-2 py-2"
-                style={{ borderColor: COR.linha, borderRadius: 10, color: COR.tinta }}
+                className="apex-opcao apex-tipo-secundario"
               >
-                <input type="checkbox" name="discomfort_zones" value={z} className="size-3.5" />
+                <input type="checkbox" name="discomfort_zones" value={z} />
                 {ZONE_LABEL[z]}
               </label>
             ))}
@@ -126,7 +125,7 @@ export function RegistoLivre() {
           maxLength={500}
           placeholder="Algo a registar sobre este treino"
           className="apex-tipo-corpo border px-3 py-2 outline-none"
-          style={{ borderColor: COR.linha, borderRadius: 14, background: "transparent", color: COR.tinta }}
+          style={{ borderColor: COR.linha, borderRadius: 2, background: "transparent", color: COR.tinta }}
         />
       </label>
 

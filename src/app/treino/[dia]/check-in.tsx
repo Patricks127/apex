@@ -86,11 +86,7 @@ export function CheckIn({
             </legend>
             <div className="grid grid-cols-2 gap-2">
               {EFFORTS.map((ef, i) => (
-                <label
-                  key={ef.id}
-                  className="apex-tipo-secundario cursor-pointer border px-3 py-2.5 transition"
-                  style={{ borderColor: "var(--apex-linha-treino)", borderRadius: 14, color: "var(--apex-texto-treino)" }}
-                >
+                <label key={ef.id} className="apex-opcao-treino apex-tipo-secundario">
                   <input type="radio" name="effort" value={ef.id} defaultChecked={i === 1} className="sr-only" />
                   {ef.label}
                 </label>
@@ -133,27 +129,15 @@ function ZonasDesconforto({
       <legend className="apex-tipo-secundario" style={{ color: "var(--apex-texto-fraco)" }}>
         Sentiste desconforto?
       </legend>
-      <label
-        className="apex-tipo-secundario flex cursor-pointer items-center gap-2 border px-3 py-2"
-        style={{ borderColor: "var(--apex-linha-treino)", borderRadius: 10, color: "var(--apex-texto-treino)" }}
-      >
-        <input
-          type="checkbox"
-          checked={semDesconforto}
-          onChange={(e) => onMudar(e.currentTarget.checked)}
-          className="size-4"
-        />
+      <label className="apex-opcao-treino apex-tipo-secundario">
+        <input type="checkbox" checked={semDesconforto} onChange={(e) => onMudar(e.currentTarget.checked)} />
         Nenhum
       </label>
       {!semDesconforto ? (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {ZONES.map((z) => (
-            <label
-              key={z}
-              className="apex-tipo-secundario flex cursor-pointer items-center gap-2 border px-2 py-2"
-              style={{ borderColor: "var(--apex-linha-treino)", borderRadius: 10, color: "var(--apex-texto-treino)" }}
-            >
-              <input type="checkbox" name="discomfort_zones" value={z} className="size-3.5" />
+            <label key={z} className="apex-opcao-treino apex-tipo-secundario">
+              <input type="checkbox" name="discomfort_zones" value={z} />
               {ZONE_LABEL[z]}
             </label>
           ))}

@@ -141,7 +141,11 @@
 /* Único caso com maiúsculas: números condensados do modo treino. */
 .apex-tipo-carga-treino {
   font-family: var(--apex-cond);
-  font-size: 120px;
+  /* Era 120px fixos: "102,5 kg" não cabia num iPhone SE (5 algarismos
+     condensados + unidade > 280px úteis). 28vw: ~90px no SE de 320px,
+     ~105px num SE 2/3 de 375px, 120px a partir de ~430px (Pro Max) — nunca
+     abaixo de 84px: lê-se de relance à distância de um braço. */
+  font-size: clamp(84px, 28vw, 120px);
   font-weight: 700;
   letter-spacing: -0.04em;
   line-height: 1;
@@ -533,11 +537,21 @@
   flex-direction: column;
   background: var(--apex-fundo-treino);
   color: var(--apex-texto-treino);
-  /* Mesmo problema e mesma solução do .apex-ecra-claro: sem isto, a seta
-     de voltar no apex-treino-cabecalho fica fisicamente por baixo do
-     notch/Dynamic Island num iPhone a sério — invisível ali, mesmo
-     "aparecendo bem" num Chromium sem hardware nenhum a simular. */
-  margin-top: env(safe-area-inset-top, 0px);
+  /* Safe area do topo: PADDING, não margin (Fase 2). Com margin, a zona
+     do notch/Dynamic Island ficava FORA da caixa escura e via-se o fundo
+     branco da página por cima — a faixa branca. Com padding, o fundo
+     escuro desce até ao topo físico do ecrã e a seta/cabeçalho continuam
+     abaixo do notch. Seguro: .apex-treino não recebe padding de mais
+     lado nenhum (os ecrãs põem o padding no contentor de dentro). */
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* O resto da página por trás do treino (html/body, e o "elástico" do iOS
+   ao puxar para lá do topo/fundo) também escuro — nunca um clarão branco
+   a espreitar à volta do ecrã de treino. */
+html:has(.apex-treino),
+html:has(.apex-treino) body {
+  background: var(--apex-fundo-treino);
 }
 
 /* Barra de progresso das séries, no topo — fixa, não desloca o conteúdo. */
@@ -675,6 +689,11 @@
 
 .apex-discos {
   display: flex;
+  max-width: 100%;
+  /* cargas altas (ex.: 4×20 + 10 por lado) passavam os 280px úteis de um
+     iPhone SE — os discos quebram para uma segunda fila em vez de sair do
+     ecrã. */
+  flex-wrap: wrap;
   align-items: flex-end;
   justify-content: center;
   gap: 3px;
@@ -688,7 +707,7 @@
   border-radius: 50%;
   font-family: var(--apex-sans);
   font-weight: 700;
-  font-size: 10px;
+  font-size: 11px;
   /* cor do texto vem inline por disco — depende do disco ser claro ou escuro */
 }
 
@@ -708,6 +727,9 @@
   border-top-right-radius: 16px;
   background: var(--apex-superficie);
   padding: var(--apex-space-6) var(--apex-space-5) var(--apex-space-7);
+  /* os botões 6–10 ficam ACIMA da barra de gestos; o fundo do painel
+     estende-se por baixo dela */
+  padding-bottom: calc(var(--apex-space-7) + env(safe-area-inset-bottom, 0px));
   transform: translateY(0);
   transition: transform var(--apex-mov-duracao) ease;
 }
@@ -748,6 +770,10 @@
   gap: var(--apex-space-5);
   background: var(--apex-fundo-treino);
   text-align: center;
+  /* ecrã cheio: nem o texto de cima sob o notch, nem "Saltar descanso"
+     sob a barra de gestos */
+  padding: calc(var(--apex-space-5) + env(safe-area-inset-top, 0px)) var(--apex-space-5)
+    calc(var(--apex-space-5) + env(safe-area-inset-bottom, 0px));
 }
 
 .apex-descanso-anel {
@@ -783,6 +809,7 @@
      aditivo ao padding-top que a regra de cima já dá, para o botão "✕"
      (bem em cima) não ficar por baixo do notch/Dynamic Island. */
   padding-top: calc(var(--apex-space-5) + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(var(--apex-space-5) + env(safe-area-inset-bottom, 0px));
 }
 
 .apex-treino-lista-item {
@@ -1711,4 +1738,54 @@ body:has(.apex-nav):not(:has(.apex-treino, .apex-chat)) .apex-rodape {
   border-color: var(--apex-tinta);
   box-shadow: inset 0 0 0 1px var(--apex-tinta);
   background: var(--apex-cinza-fundo);
+}
+
+
+/* ============================================================
+   Campos a 16px, mesmo com uma classe de texto mais pequena — a regra
+   global de globals.css tem especificidade zero de propósito e perde para
+   .apex-tipo-corpo (15px) e afins; esta ganha-lhes, só em campos. Abaixo
+   de 16px o Safari do iPhone amplia a página ao tocar no campo (e ela
+   fica ampliada). Caixas de seleção e rádios não contam (não têm texto).
+   ============================================================ */
+:is(input:not([type="checkbox"], [type="radio"], [type="range"]), textarea, select):is(
+    .apex-tipo-corpo,
+    .apex-tipo-secundario,
+    .apex-tipo-etiqueta
+  ) {
+  font-size: 16px;
+}
+
+/* Opção tocável no modo treino (check-in: esforço, zonas de desconforto)
+   — a linha inteira é o alvo (≥44px) e a escolhida VÊ-SE: borda clara +
+   superfície. Antes, o rádio do esforço estava escondido (sr-only) sem
+   estilo nenhum de "escolhido" — tocava-se e não se via o que ficou. */
+.apex-opcao-treino {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: var(--apex-space-2);
+  padding: var(--apex-space-2) var(--apex-space-3);
+  border: 1px solid var(--apex-linha-treino);
+  border-radius: 14px;
+  color: var(--apex-texto-treino);
+  cursor: pointer;
+}
+
+.apex-opcao-treino:has(:checked) {
+  border-color: var(--apex-texto-treino);
+  background: var(--apex-superficie);
+  font-weight: 700;
+}
+
+.apex-opcao-treino:has(:focus-visible) {
+  outline: 2px solid var(--apex-azul);
+  outline-offset: 2px;
+}
+
+.apex-opcao-treino input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  accent-color: var(--apex-verde);
 }
