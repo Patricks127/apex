@@ -20,6 +20,7 @@ import { LIMIAR_ADESAO_BAIXA } from "@/lib/treino/atencao";
 import type { RecordePessoal, MetricaCorporal, SessaoHistorico } from "@/lib/treino/progresso-dados";
 import type { PontoAdesaoSemanal } from "@/lib/treino/adesao-semanal";
 
+import { FUSO } from "@/lib/fuso";
 const COR = {
   tinta: "var(--apex-tinta)",
   fraco: "var(--apex-cinza-texto)",
@@ -30,7 +31,7 @@ const COR = {
 // Fuso FIXO — mesmo raciocínio de chat-view.tsx: sem timeZone explícito,
 // esta data (rótulo do gráfico de volume, na ficha do aluno) divergia
 // entre o servidor (UTC) e o telemóvel do PT (Portugal) perto da meia-noite.
-const FUSO = "Europe/Lisbon";
+// FUSO: fonte única em src/lib/fuso.ts
 
 const LIFTS = Object.keys(LIFT_LABEL) as Lift[];
 const METRICA_IDS = Object.keys(METRICAS) as MetricaId[];

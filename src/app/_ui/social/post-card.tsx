@@ -12,6 +12,7 @@ import {
 } from "@/app/actions/social";
 import type { PostFeed } from "@/lib/social/feed-dados";
 
+import { FUSO } from "@/lib/fuso";
 const COR = {
   tinta: "var(--apex-tinta)",
   fraco: "var(--apex-cinza-texto)",
@@ -24,7 +25,7 @@ const COR = {
 // no primeiro render) divergia entre o servidor (Vercel, UTC) e o
 // telemóvel de quem usa a app (Portugal) perto da meia-noite — a causa
 // mais provável do erro de hidratação (#418) visto no /feed.
-const FUSO = "Europe/Lisbon";
+// FUSO: fonte única em src/lib/fuso.ts
 
 const dataLonga = (iso: string) =>
   new Date(iso).toLocaleDateString("pt-PT", {

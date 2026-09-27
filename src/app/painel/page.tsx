@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { formatarData } from "@/lib/fuso";
 import { janelaRecente } from "@/lib/treino/perfil";
 import { carregarProgresso } from "@/lib/treino/progresso-dados";
 import { MOTIVO_LABEL, type MotivoAtencao } from "@/lib/treino/atencao";
@@ -57,14 +58,8 @@ export default async function PainelPage() {
     contarNaoLidas(supabase, user.id),
   ]);
 
-  // Fuso fixo, como o resto da app (ver commit do fuso Europe/Lisbon) —
-  // perto da meia-noite, o servidor em UTC mostrava o dia errado.
-  const hoje = new Date().toLocaleDateString("pt-PT", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    timeZone: "Europe/Lisbon",
-  });
+  // Dia de Lisboa (src/lib/fuso.ts) — o servidor corre em UTC.
+  const hoje = formatarData(new Date(), { weekday: "long", day: "numeric", month: "long" });
 
   return (
     <main className="apex-ecra-claro mx-auto flex w-full max-w-lg flex-col gap-6 px-5 pt-6 pb-8">

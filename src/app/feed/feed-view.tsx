@@ -16,6 +16,7 @@ import type {
 } from "@/lib/social/feed-dados";
 import type { PostKind } from "@/lib/social/sanitizar-post";
 
+import { FUSO } from "@/lib/fuso";
 const COR = {
   tinta: "var(--apex-tinta)",
   fraco: "var(--apex-cinza-texto)",
@@ -44,7 +45,7 @@ const KIND_LABEL: Record<PostKind, string> = {
 // (Vercel, UTC) discorda do telemóvel de quem usa a app (Portugal) sobre
 // que dia é uma data perto da meia-noite — o React acusa isso como erro de
 // hidratação (#418) ao comparar o HTML do servidor com o do cliente.
-const FUSO = "Europe/Lisbon";
+// FUSO: fonte única em src/lib/fuso.ts
 
 const dataCurta = (iso: string) =>
   new Date(iso).toLocaleDateString("pt-PT", { day: "numeric", month: "short", timeZone: FUSO });

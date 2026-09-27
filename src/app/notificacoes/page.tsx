@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { chaveDiaLisboa, formatarData, formatarHora } from "@/lib/fuso";
 import { carregarNotificacoes, type Notificacao } from "@/lib/social/notificacoes-dados";
 import { BotaoVoltar } from "@/app/_ui/design/botao-voltar";
 import { MarcarVisiveisLidas } from "./marcar-visiveis-lidas";
@@ -14,19 +15,21 @@ const COR = {
   fraco: "var(--apex-cinza-texto)",
 } as const;
 
-function chaveDoDia(iso: string): string {
-  return new Date(iso).toISOString().slice(0, 10);
-}
+// Agrupar e rotular pelo dia de LISBOA (era o dia UTC: uma notificação da
+// 00:30 caía no grupo de "ontem", e a hora mostrada vinha 1h atrasada no
+// verão — o servidor corre em UTC).
+const chaveDoDia = (iso: string) => chaveDiaLisboa(iso);
 
 function rotuloDoDia(chave: string): string {
-  const hoje = chaveDoDia(new Date().toISOString());
-  const ontem = chaveDoDia(new Date(Date.now() - 86_400_000).toISOString());
+  const hoje = chaveDiaLisboa(new Date());
+  const ontem = chaveDiaLisboa(Date.now() - 86_400_000);
   if (chave === hoje) return "HOJE";
   if (chave === ontem) return "ONTEM";
-  return new Date(chave).toLocaleDateString("pt-PT", { day: "numeric", month: "long", year: "numeric" }).toUpperCase();
+  // meio-dia UTC: nunca muda de dia seja qual for o fuso de quem formata
+  return formatarData(`${chave}T12:00:00Z`, { day: "numeric", month: "long", year: "numeric" }).toUpperCase();
 }
 
-const hora = (iso: string) => new Date(iso).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
+const hora = (iso: string) => formatarHora(iso);
 
 export default async function NotificacoesPage() {
   const supabase = await createClient();

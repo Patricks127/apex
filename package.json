@@ -12,7 +12,8 @@
     "test:treino": "node --test \"src/lib/treino/**/*.test.ts\"",
     "test:social": "node --test \"src/lib/social/**/*.test.ts\"",
     "test:pwa": "node --test \"src/lib/pwa/**/*.test.ts\"",
-    "test:painel": "node --test \"src/lib/painel/**/*.test.ts\""
+    "test:painel": "node --test \"src/lib/painel/**/*.test.ts\"",
+    "test:fuso": "node --test \"src/lib/fuso.test.ts\""
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.5",

@@ -5,6 +5,7 @@ import { useState, useActionState } from "react";
 import type { PlanoGerado, DiaGerado, ExercicioGerado, Movimento, Lift } from "@/lib/motor";
 import { regenerarPlano, avancarSemana, type EstadoAvanco } from "@/app/actions/treino";
 import { construirLinhaTempo, type ItemLinhaTempo } from "@/lib/treino/linha-tempo";
+import { formatarHora } from "@/lib/fuso";
 import { CabecalhoEcra } from "../_ui/design/cabecalho-ecra";
 import { BlocoDados } from "../_ui/design/bloco-dados";
 import { AvisoApp } from "../_ui/design/aviso-app";
@@ -221,11 +222,9 @@ function DiaDetalhe({ dia, ehHoje, hojeFeito }: { dia: DiaGerado; ehHoje: boolea
   );
 }
 
+// Hora de Lisboa, não a do fuso do aparelho (src/lib/fuso.ts).
 function horaSaida(minutosRestantes: number): string {
-  const agora = new Date(Date.now() + minutosRestantes * 60_000);
-  const hh = String(agora.getHours()).padStart(2, "0");
-  const mm = String(agora.getMinutes()).padStart(2, "0");
-  return `${hh}:${mm}`;
+  return formatarHora(Date.now() + minutosRestantes * 60_000);
 }
 
 function LinhaTempo({ itens }: { itens: ItemLinhaTempo[] }) {

@@ -1,3 +1,5 @@
+import { partesLisboa } from "../fuso.ts";
+
 /**
  * Linha curta motivadora do cabeçalho do atleta — puro (sem Date() lido
  * espalhado pelo componente), testável. Escolha determinística pelo dia do
@@ -14,9 +16,11 @@ const FRASES = [
   "Fica-te pelo processo — os números seguem.",
 ] as const;
 
+// Dia do ano de LISBOA — a frase muda à meia-noite de Lisboa, não à de UTC.
 function diaDoAno(data: Date): number {
-  const inicio = Date.UTC(data.getUTCFullYear(), 0, 1);
-  const agora = Date.UTC(data.getUTCFullYear(), data.getUTCMonth(), data.getUTCDate());
+  const { ano, mes, dia } = partesLisboa(data);
+  const inicio = Date.UTC(ano, 0, 1);
+  const agora = Date.UTC(ano, mes - 1, dia);
   return Math.floor((agora - inicio) / 86_400_000);
 }
 

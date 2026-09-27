@@ -7,6 +7,7 @@ import { type PlanoGerado } from "@/lib/motor";
 import { atencaoDosAlunos } from "@/lib/treino/atencao-dados";
 import { MOTIVO_LABEL } from "@/lib/treino/atencao";
 import { carregarPlanoAtivo } from "@/lib/treino/perfil";
+import { formatarData } from "@/lib/fuso";
 import { carregarProgresso } from "@/lib/treino/progresso-dados";
 import { pontosAdesaoComFallback } from "@/lib/treino/adesao-semanal";
 import { apagarPlanoDocumento } from "@/app/actions/plan-documents";
@@ -308,7 +309,7 @@ function SeccaoPlanosDocumento({ alunoId, documentos }: { alunoId: string; docum
                   </span>
                 )}
                 <span className="apex-tipo-etiqueta apex-tabular" style={{ color: COR.fraco }}>
-                  {new Date(d.createdAt).toLocaleDateString("pt-PT")} · {formatarTamanho(d.sizeBytes)}
+                  {formatarData(d.createdAt)} · {formatarTamanho(d.sizeBytes)}
                 </span>
               </div>
               {d.souEuQueAnexei ? (
@@ -366,7 +367,7 @@ function Evolucao({
         {evolucao.map((e, i) => (
           <div key={i} className="flex items-center justify-between border-b py-1.5" style={{ borderColor: COR.linha }}>
             <span className="apex-tipo-secundario apex-tabular" style={{ color: COR.fraco }}>
-              {new Date(e.created_at).toLocaleDateString("pt-PT")}
+              {formatarData(e.created_at)}
             </span>
             <span className="apex-tipo-secundario apex-tabular" style={{ color: COR.tinta }}>
               {[e.weight_kg != null ? `${e.weight_kg} kg` : null, e.measurement].filter(Boolean).join(" · ")}
@@ -398,7 +399,7 @@ function Historico({
                 {s.title}
               </span>
               <span className="apex-tipo-etiqueta apex-tabular" style={{ color: COR.fraco }}>
-                {new Date(s.performedAt).toLocaleDateString("pt-PT")}
+                {formatarData(s.performedAt)}
                 {s.weekNumber != null ? ` · semana ${s.weekNumber}` : ""}
               </span>
             </div>

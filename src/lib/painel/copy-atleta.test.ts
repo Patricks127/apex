@@ -1,3 +1,7 @@
+// O servidor da Vercel corre em UTC — os testes também, para que um bug de
+// fuso NÃO fique escondido por esta máquina estar em Lisboa.
+process.env.TZ = "UTC";
+
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { linhaMotivadora } from "./copy-atleta.ts";
@@ -26,4 +30,8 @@ test("linhaMotivadora: nunca rebenta em nenhum dia do ano (365/366 dias)", () =>
     assert.equal(typeof frase, "string");
     assert.ok(frase.length > 0);
   }
+});
+
+test("linhaMotivadora: à 00:30 de Lisboa já é a frase do dia novo (dia de Lisboa, não de UTC)", () => {
+  assert.equal(linhaMotivadora(new Date("2026-09-27T23:30:00Z")), linhaMotivadora(new Date("2026-09-28T12:00:00Z")));
 });

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { SessaoHistorico } from "@/lib/treino/progresso-dados";
+import { formatarData } from "@/lib/fuso";
 
 const COR = {
   tinta: "var(--apex-tinta)",
@@ -9,7 +10,7 @@ const COR = {
 
 const MAX_SESSOES = 3;
 
-const dataCurta = (iso: string) => new Date(iso).toLocaleDateString("pt-PT", { day: "numeric", month: "short" });
+const dataCurta = (iso: string) => formatarData(iso, { day: "numeric", month: "short" });
 
 /**
  * Atividade recente — últimos treinos registados e feedback do PT, de

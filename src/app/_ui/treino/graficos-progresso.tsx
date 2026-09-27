@@ -8,6 +8,7 @@
 import { escalarPontos, pathLinha, escalarBarras } from "@/lib/treino/grafico";
 import type { RecordePessoal, MetricaCorporal } from "@/lib/treino/progresso-dados";
 
+import { FUSO } from "@/lib/fuso";
 const COR = {
   tinta: "var(--apex-tinta)",
   branco: "var(--apex-branco)",
@@ -18,7 +19,7 @@ const COR = {
 // componentes cliente (progresso-view.tsx, graficos-aluno.tsx). Sem
 // timeZone explícito, o servidor (UTC) e o telemóvel (Portugal) podiam
 // discordar sobre que dia é perto da meia-noite — hidratação a menos.
-const FUSO = "Europe/Lisbon";
+// FUSO: fonte única em src/lib/fuso.ts
 
 const dataLonga = (iso: string) =>
   new Date(iso).toLocaleDateString("pt-PT", { day: "numeric", month: "long", year: "numeric", timeZone: FUSO });

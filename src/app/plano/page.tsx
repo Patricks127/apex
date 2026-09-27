@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { carregarPlanoAtivo, treinoDeHojeFeito } from "@/lib/treino/perfil";
 import { indiceDiaSemanaHoje } from "@/lib/treino/linha-tempo";
+import { formatarData } from "@/lib/fuso";
 import { regenerarPlano, escolherPlano } from "@/app/actions/treino";
 import { BotaoVoltar } from "@/app/_ui/design/botao-voltar";
 import { VistaPlano } from "./vista-plano";
@@ -216,7 +217,7 @@ function PlanoDocumentoDestaque({ documentos }: { documentos: DocumentoPlano[] }
           </p>
         )}
         <span className="apex-tipo-etiqueta apex-tabular" style={{ color: "var(--apex-cinza-texto)" }}>
-          {new Date(recente.createdAt).toLocaleDateString("pt-PT")} · {formatarTamanho(recente.sizeBytes)}
+          {formatarData(recente.createdAt)} · {formatarTamanho(recente.sizeBytes)}
         </span>
 
         {anteriores.length > 0 ? (
@@ -231,7 +232,7 @@ function PlanoDocumentoDestaque({ documentos }: { documentos: DocumentoPlano[] }
                   className="apex-tipo-secundario underline underline-offset-4"
                   style={{ color: "var(--apex-cinza-texto)" }}
                 >
-                  {d.nomeFicheiro} ({new Date(d.createdAt).toLocaleDateString("pt-PT")})
+                  {d.nomeFicheiro} ({formatarData(d.createdAt)})
                 </a>
               ) : null,
             )}

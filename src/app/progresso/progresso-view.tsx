@@ -11,6 +11,7 @@ import { registarRecorde, registarMetrica, type EstadoProgresso } from "@/app/ac
 import { METRICAS, type MetricaId } from "@/lib/treino/metricas";
 import type { RecordePessoal, MetricaCorporal, SessaoHistorico } from "@/lib/treino/progresso-dados";
 
+import { FUSO } from "@/lib/fuso";
 const COR = {
   tinta: "var(--apex-tinta)",
   branco: "var(--apex-branco)",
@@ -35,7 +36,7 @@ const EFFORT_LABEL: Record<string, string> = {
 // visível logo no primeiro render) divergia entre o servidor (Vercel, UTC)
 // e o telemóvel de quem usa a app (Portugal) perto da meia-noite, e o
 // React acusava isso como erro de hidratação (#418).
-const FUSO = "Europe/Lisbon";
+// FUSO: fonte única em src/lib/fuso.ts
 
 const dataCurta = (iso: string) =>
   new Date(iso).toLocaleDateString("pt-PT", { day: "numeric", month: "short", timeZone: FUSO });

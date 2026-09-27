@@ -1,3 +1,4 @@
+import { partesLisboa } from "../fuso.ts";
 import type { DiaGerado, ExercicioGerado, Movimento } from "@/lib/motor";
 
 /**
@@ -94,9 +95,11 @@ function segundosDoBloco(bloco: BlocoLinhaTempo): number {
 }
 
 /** Índice de hoje no formato do plano: 0 = Segunda … 6 = Domingo (DAY_NAMES
- *  do motor). `Date#getDay()` é 0 = Domingo, por isso o desvio de 6. */
+ *  do motor) — o dia de LISBOA, nunca o do processo. Com `getDay()`, o
+ *  servidor (UTC) achava que ainda era domingo à 00:30 de segunda em
+ *  Lisboa e mostrava o treino de ontem como "o treino de hoje". */
 export function indiceDiaSemanaHoje(agora: Date = new Date()): number {
-  return (agora.getDay() + 6) % 7;
+  return partesLisboa(agora).diaSemana;
 }
 
 export function construirLinhaTempo(dia: DiaGerado, opcoes: { estadoDia: EstadoDia }): LinhaTempoDia {

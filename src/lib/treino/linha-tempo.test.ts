@@ -1,3 +1,7 @@
+// O servidor da Vercel corre em UTC — os testes também, para que um bug de
+// fuso NÃO fique escondido por esta máquina estar em Lisboa.
+process.env.TZ = "UTC";
+
 import test from "node:test";
 import assert from "node:assert/strict";
 import { construirLinhaTempo, indiceDiaSemanaHoje, proximoDiaDeTreino } from "./linha-tempo.ts";
@@ -156,4 +160,11 @@ test("proximoDiaDeTreino: nunca devolve o próprio hoje, mesmo sendo treino", ()
   const r = proximoDiaDeTreino(dias, 0); // hoje já é o único dia de treino
   assert.equal(r?.offset, 7); // só volta a acontecer daqui a 7 dias
   assert.equal(r?.dia.dayIndex, 0);
+});
+
+test("indiceDiaSemanaHoje: 23:30 UTC de domingo já é SEGUNDA em Lisboa — o treino de hoje é o de segunda", () => {
+  // 27/09/2026 é domingo; 23:30 UTC = 00:30 de segunda, 28/09, em Lisboa (verão)
+  assert.equal(indiceDiaSemanaHoje(new Date("2026-09-27T23:30:00Z")), 0);
+  // inverno (UTC+0): 23:30 UTC de domingo ainda é domingo em Lisboa
+  assert.equal(indiceDiaSemanaHoje(new Date("2026-01-11T23:30:00Z")), 6);
 });

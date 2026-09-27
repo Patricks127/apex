@@ -17,11 +17,14 @@
    real (por omissão usa o momento da chamada).
    ============================================================ */
 import { LIMIAR_ADESAO_BAIXA } from "./atencao.ts";
+import { partesLisboa } from "../fuso.ts";
 
-/** Chave ISO "AAAA-Www" da semana de calendário de uma data. */
+/** Chave ISO "AAAA-Www" da semana de calendário de uma data — a semana do
+ *  dia em LISBOA (um treino à 00:30 de segunda conta na semana nova, não
+ *  na anterior como contava com o dia UTC). */
 export function chaveSemanaIso(iso: string): string {
-  const d = new Date(iso);
-  const alvo = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const { ano, mes, dia } = partesLisboa(iso);
+  const alvo = new Date(Date.UTC(ano, mes - 1, dia));
   const diaSemana = (alvo.getUTCDay() + 6) % 7; // 0 = segunda
   alvo.setUTCDate(alvo.getUTCDate() - diaSemana + 3); // quinta-feira da mesma semana ISO
   const primeiraQuinta = new Date(Date.UTC(alvo.getUTCFullYear(), 0, 4));

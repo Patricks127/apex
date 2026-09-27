@@ -17,6 +17,7 @@ import {
   MAX_VIDEO_BYTES,
 } from "@/lib/chat/media";
 
+import { FUSO } from "@/lib/fuso";
 export type VideoRow = {
   id: string;
   user_id: string;
@@ -43,7 +44,7 @@ const COR = {
 // Fuso FIXO — sem timeZone explícito, a data de cada vídeo divergia entre
 // o servidor (Vercel, UTC) e o telemóvel de quem usa a app (Portugal)
 // perto da meia-noite — erro de hidratação (#418).
-const FUSO = "Europe/Lisbon";
+// FUSO: fonte única em src/lib/fuso.ts
 
 const data = (iso: string) =>
   new Date(iso).toLocaleDateString("pt-PT", { day: "numeric", month: "long", year: "numeric", timeZone: FUSO });

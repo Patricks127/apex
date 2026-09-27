@@ -1,3 +1,7 @@
+// O servidor da Vercel corre em UTC — os testes também, para que um bug de
+// fuso NÃO fique escondido por esta máquina estar em Lisboa.
+process.env.TZ = "UTC";
+
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
@@ -193,4 +197,9 @@ test("pontosAdesaoComFallback: sem plano, 2 semanas com treino → sinal real (n
   ];
   const pontos = pontosAdesaoComFallback(sessoes, null, 6, AGORA);
   assert.notEqual(direcaoAdesao(pontos), "sem_dados");
+});
+
+test("chaveSemanaIso: treino à 00:30 de segunda em Lisboa (23:30 UTC de domingo) conta na semana NOVA", () => {
+  assert.equal(chaveSemanaIso("2026-09-27T23:30:00Z"), chaveSemanaIso("2026-09-28T12:00:00Z"));
+  assert.notEqual(chaveSemanaIso("2026-09-27T23:30:00Z"), chaveSemanaIso("2026-09-27T12:00:00Z"));
 });

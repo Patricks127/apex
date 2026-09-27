@@ -23,6 +23,7 @@ import {
   MAX_VIDEO_BYTES,
 } from "@/lib/chat/media";
 
+import { FUSO, chaveDiaLisboa } from "@/lib/fuso";
 export type Mensagem = {
   id: string;
   sender_id: string;
@@ -56,15 +57,10 @@ const MS_DIA = 86_400_000;
 // diferença perto da meia-noite. Um fuso explícito, IGUAL dos dois lados,
 // elimina a divergência pela raiz — não é "o fuso de ninguém", é o fuso de
 // quem usa a app hoje.
-const FUSO = "Europe/Lisbon";
+// FUSO: fonte única em src/lib/fuso.ts
 
-/** "YYYY-MM-DD" no FUSO fixo — comparável como string, correto mesmo à
- *  volta da mudança de hora (DST), sem matemática de milissegundos à mão. */
-function chaveDia(d: Date): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: FUSO, year: "numeric", month: "2-digit", day: "2-digit" }).format(
-    d,
-  );
-}
+/** "YYYY-MM-DD" no dia de Lisboa — o helper único de src/lib/fuso.ts. */
+const chaveDia = (d: Date) => chaveDiaLisboa(d);
 
 function rotuloDia(iso: string): string {
   const d = new Date(iso);
