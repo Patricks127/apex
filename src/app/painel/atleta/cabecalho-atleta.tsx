@@ -16,11 +16,13 @@ const COR = {
  */
 export function CabecalhoAtleta({
   nome,
+  avatarUrl = null,
   naoLidas,
   papel = "atleta",
   etiqueta,
 }: {
   nome: string | null;
+  avatarUrl?: string | null;
   naoLidas: number;
   papel?: "atleta" | "pt";
   /** linha pequena por cima da saudação (ex.: a data, no painel do PT) */
@@ -47,7 +49,7 @@ export function CabecalhoAtleta({
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <Sino naoLidas={naoLidas} />
-        <MenuPerfil nome={nome} papel={papel} />
+        <MenuPerfil nome={nome} avatarUrl={avatarUrl} papel={papel} />
       </div>
     </header>
   );

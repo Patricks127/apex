@@ -91,3 +91,20 @@ export function completude(p: {
     falta: itens.filter((i) => !i.ok).map((i) => i.label),
   };
 }
+
+/** Limites do perfil do atleta — partilhados pelo formulário (contadores,
+ *  maxLength) e pela Server Action (validação). Fora do ficheiro "use
+ *  server": aí só se podem exportar funções async. */
+export const LIMITES_PERFIL_ATLETA = { nome: 60, objetivo: 120, bio: 300, cidade: 60 } as const;
+
+/** O avatar tem de ser um ficheiro DO PRÓPRIO no bucket público `avatars`
+ *  deste projeto: `<supabaseUrl>/storage/v1/object/public/avatars/<id>/…`.
+ *  Antes só se verificava se o URL CONTINHA ".../public/avatars/" —
+ *  aceitava o avatar de outra pessoa ou um domínio externo com esse texto.
+ *  (O upload em si já só é permitido na pasta do próprio — policy do
+ *  storage.) */
+export function avatarDoProprio(url: string, userId: string, supabaseUrl: string): boolean {
+  const prefixo = `${supabaseUrl}/storage/v1/object/public/avatars/${userId}/`;
+  const resto = url.slice(prefixo.length);
+  return url.startsWith(prefixo) && resto.length > 0 && !resto.includes("..") && !resto.includes("?") && !resto.includes("#");
+}

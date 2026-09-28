@@ -52,6 +52,9 @@ export default async function PerfilAtletaPage({
   }
 
   const meuPerfil = perfil.id === user.id;
+  // O próprio atleta tem o seu perfil completo (estatísticas, marcas,
+  // Editar/Definições) em /perfil — uma só página "o meu perfil".
+  if (meuPerfil && perfil.role === "atleta") redirect("/perfil");
   const posts = await carregarPostsDoUtilizador(supabase, perfil.id, user.id);
 
   return (
@@ -69,7 +72,7 @@ export default async function PerfilAtletaPage({
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <h1 className="apex-tipo-titulo-ecra truncate" style={{ marginTop: 0, color: COR.tinta }}>
+          <h1 className="apex-tipo-saudacao" style={{ color: COR.tinta }}>
             {perfil.name ?? "Utilizador"}
           </h1>
           {perfil.city ? (
@@ -79,6 +82,26 @@ export default async function PerfilAtletaPage({
           ) : null}
         </div>
       </header>
+
+      {perfil.headline || perfil.bio ? (
+        <section className="flex flex-col gap-2">
+          {perfil.headline ? (
+            <div className="apex-cartao apex-cartao--compacto">
+              <span className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
+                Objetivo
+              </span>
+              <p className="apex-tipo-corpo" style={{ color: COR.tinta, fontWeight: 600 }}>
+                {perfil.headline}
+              </p>
+            </div>
+          ) : null}
+          {perfil.bio ? (
+            <p className="apex-tipo-corpo whitespace-pre-line" style={{ color: COR.tinta }}>
+              {perfil.bio}
+            </p>
+          ) : null}
+        </section>
+      ) : null}
 
       <div className="flex items-center justify-between">
         <div className="flex gap-6">

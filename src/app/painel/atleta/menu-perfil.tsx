@@ -8,7 +8,7 @@
  * competir com o treino de hoje).
  */
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { sair } from "@/app/actions/auth";
 
 const COR = {
@@ -18,7 +18,15 @@ const COR = {
   linha: "var(--apex-cinza-linha)",
 } as const;
 
-export function MenuPerfil({ nome, papel = "atleta" }: { nome: string | null; papel?: "atleta" | "pt" }) {
+export function MenuPerfil({
+  nome,
+  avatarUrl = null,
+  papel = "atleta",
+}: {
+  nome: string | null;
+  avatarUrl?: string | null;
+  papel?: "atleta" | "pt";
+}) {
   const [aberto, setAberto] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const inicial = (nome ?? "?").trim().charAt(0).toUpperCase() || "?";
@@ -52,9 +60,14 @@ export function MenuPerfil({ nome, papel = "atleta" }: { nome: string | null; pa
         className="apex-avatar"
         style={{ cursor: "pointer" }}
       >
-        <span className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
-          {inicial}
-        </span>
+        {avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={avatarUrl} alt="" />
+        ) : (
+          <span className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
+            {inicial}
+          </span>
+        )}
       </button>
 
       {aberto ? (
@@ -68,16 +81,10 @@ export function MenuPerfil({ nome, papel = "atleta" }: { nome: string | null; pa
             border: `1px solid ${COR.linha}`,
           }}
         >
-          {papel === "pt" ? (
-            <Link
-              href="/perfil/editar"
-              role="menuitem"
-              className="apex-tipo-secundario flex items-center"
-              style={{ minHeight: 44, padding: "0 var(--apex-space-4)", color: COR.tinta, borderBottom: `1px solid ${COR.linha}` }}
-            >
-              Editar perfil público
-            </Link>
-          ) : null}
+          {/* Perfil e Definições (Fase 3). Atleta: o perfil dele; PT: o
+              currículo público (o /perfil já o reencaminha para lá). */}
+          <ItemMenu href="/perfil">{papel === "pt" ? "O meu perfil público" : "O meu perfil"}</ItemMenu>
+          <ItemMenu href="/perfil/definicoes">Definições</ItemMenu>
           <form action={sair}>
             <button
               type="submit"
@@ -91,5 +98,18 @@ export function MenuPerfil({ nome, papel = "atleta" }: { nome: string | null; pa
         </div>
       ) : null}
     </div>
+  );
+}
+
+function ItemMenu({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <Link
+      href={href}
+      role="menuitem"
+      className="apex-tipo-secundario flex items-center"
+      style={{ minHeight: 44, padding: "0 var(--apex-space-4)", color: COR.tinta, borderBottom: `1px solid ${COR.linha}` }}
+    >
+      {children}
+    </Link>
   );
 }

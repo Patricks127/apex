@@ -54,7 +54,7 @@ export default async function PainelPage() {
   if (!user) redirect("/entrar");
 
   const [{ data: perfil }, naoLidas] = await Promise.all([
-    supabase.from("profiles").select("name, role, pt_code").eq("id", user.id).single(),
+    supabase.from("profiles").select("name, role, pt_code, avatar_url").eq("id", user.id).single(),
     contarNaoLidas(supabase, user.id),
   ]);
 
@@ -69,6 +69,7 @@ export default async function PainelPage() {
       {perfil?.role === "atleta" || perfil?.role === "pt" ? (
         <CabecalhoAtleta
           nome={perfil.name}
+          avatarUrl={perfil.avatar_url ?? null}
           naoLidas={naoLidas}
           papel={perfil.role}
           etiqueta={perfil.role === "pt" ? hoje.charAt(0).toUpperCase() + hoje.slice(1) : undefined}
@@ -210,12 +211,8 @@ async function BlocoPtDoAtleta({ userId }: { userId: string }) {
 
   return (
     <OMeuPt
-      linkId={ligacao.id}
       ptNome={ligacao.pt?.name ?? "PT"}
       ptCode={ligacao.pt?.pt_code ?? null}
-      evolucao={ligacao.scope_evolucao}
-      videos={ligacao.scope_videos}
-      metricas={ligacao.scope_metricas}
       mensagensPorLer={mensagensPorLer ?? 0}
       feedbackRecente={feedbackRecente}
     />

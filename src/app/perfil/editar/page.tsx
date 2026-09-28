@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { FormPerfil } from "./form-perfil";
+import { FormPerfilAtleta } from "./form-perfil-atleta";
+import { BotaoVoltar } from "@/app/_ui/design/botao-voltar";
 
 export const metadata: Metadata = {
   title: "Editar perfil · APEX",
@@ -22,6 +24,29 @@ export default async function EditarPerfilPage() {
     .eq("id", user.id)
     .single();
 
+  // Atleta: o formulário dele (claro, só nome/foto/objetivo/bio/cidade).
+  // O PT continua com o currículo completo, abaixo — nada muda para ele.
+  if (p?.role === "atleta") {
+    return (
+      <main className="apex-ecra-claro mx-auto flex w-full max-w-lg flex-col gap-5 px-5 pt-6 pb-8">
+        <BotaoVoltar />
+        <h1 className="apex-tipo-titulo-ecra" style={{ color: "var(--apex-tinta)" }}>
+          Editar perfil
+        </h1>
+        <FormPerfilAtleta
+          inicial={{
+            name: p.name ?? "",
+            objetivo: p.headline ?? "",
+            bio: p.bio ?? "",
+            city: p.city ?? "",
+            avatar_url: p.avatar_url ?? "",
+          }}
+          supabaseUrl={process.env.NEXT_PUBLIC_SUPABASE_URL!}
+          anonKey={process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}
+        />
+      </main>
+    );
+  }
   if (p?.role !== "pt") redirect("/painel");
 
   return (

@@ -14,7 +14,8 @@
     "test:pwa": "node --test \"src/lib/pwa/**/*.test.ts\"",
     "test:painel": "node --test \"src/lib/painel/**/*.test.ts\"",
     "test:fuso": "node --test \"src/lib/fuso.test.ts\"",
-    "test:formato": "node --test \"src/lib/formato.test.ts\""
+    "test:formato": "node --test \"src/lib/formato.test.ts\"",
+    "test:perfil": "node --test \"src/lib/perfil.test.ts\""
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.5",

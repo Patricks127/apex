@@ -241,6 +241,10 @@ export type PerfilPublico = {
   role: "atleta" | "pt";
   ptCode: string | null;
   city: string | null;
+  /** atleta: o objetivo (coluna headline); PT: o título do currículo */
+  headline: string | null;
+  bio: string | null;
+  createdAt: string | null;
   seguidoresCount: number;
   seguindoCount: number;
   souEuASeguir: boolean;
@@ -253,7 +257,7 @@ export async function carregarPerfilPublico(
 ): Promise<PerfilPublico | null> {
   const { data: perfil } = await supabase
     .from("profiles")
-    .select("id, name, avatar_url, role, pt_code, city")
+    .select("id, name, avatar_url, role, pt_code, city, headline, bio, created_at")
     .eq("id", targetId)
     .maybeSingle();
   if (!perfil) return null;
@@ -271,6 +275,9 @@ export async function carregarPerfilPublico(
     role: perfil.role,
     ptCode: perfil.pt_code,
     city: perfil.city,
+    headline: perfil.headline ?? null,
+    bio: perfil.bio ?? null,
+    createdAt: perfil.created_at ?? null,
     seguidoresCount: seguidoresCount ?? 0,
     seguindoCount: seguindoCount ?? 0,
     souEuASeguir: Boolean(jaSigo),

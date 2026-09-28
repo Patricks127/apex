@@ -363,6 +363,7 @@ export async function atualizarScopes(
   if (error) return { erro: BLOQUEIO_RLS };
 
   revalidatePath("/painel");
+  revalidatePath("/perfil/definicoes"); // as permissões vivem lá (Fase 3)
   return { ok: true };
 }
 
@@ -397,4 +398,5 @@ export async function revogarAcesso(formData: FormData): Promise<void> {
     .eq("student_id", perfil.id);
 
   revalidatePath("/painel");
+  revalidatePath("/perfil/definicoes");
 }
