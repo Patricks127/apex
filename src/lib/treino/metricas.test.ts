@@ -21,3 +21,10 @@ test("METRICAS: limites válidos e o exemplo de cada uma cabe nos próprios limi
     assert.ok(ex >= m.min && ex <= m.max, `${id}: exemplo ${m.exemplo}`);
   }
 });
+
+test("METRICAS = a lista da CHECK de body_metrics (migração 022) — nunca divergem", async () => {
+  const { readFileSync } = await import("node:fs");
+  const sql = readFileSync(new URL("../../../supabase/migrations/022_body_metrics_metric_check.sql", import.meta.url), "utf8");
+  const naCheck = [...sql.slice(sql.indexOf("add constraint")).matchAll(/'([a-z_]+)'::text/g)].map((m) => m[1]);
+  assert.deepEqual(naCheck.sort(), Object.keys(METRICAS).sort());
+});

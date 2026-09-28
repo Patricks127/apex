@@ -65,9 +65,9 @@ export async function registarRecorde(
 }
 
 // ---------------------------------------------------------------------------
-// Registo manual de peso/medida corporal — insert-only. body_metrics é
-// chave-valor livre na BD; o vocabulário fixo (METRICAS) é definido aqui,
-// não na base de dados.
+// Registo manual de peso/medida corporal — insert-only. O vocabulário
+// (METRICAS) é validado aqui E, desde a migração 022, pela CHECK de
+// body_metrics.metric na base de dados (as duas listas são testadas iguais).
 // ---------------------------------------------------------------------------
 
 export async function registarMetrica(
