@@ -121,9 +121,13 @@ export async function guardarOnboarding(
   } = await supabase.auth.getUser();
   if (!user) return { mensagem: "Sessão inválida. Inicia sessão outra vez." };
 
+  // Dados de onboarding vivem em perfil_privado (migração 023 — só o dono
+  // lê/escreve). upsert: a linha existe sempre (migração + registo), mas
+  // nunca se perde um onboarding se, por algum motivo, faltar.
   const { error: erroPerfil } = await supabase
-    .from("profiles")
-    .update({
+    .from("perfil_privado")
+    .upsert({
+      id: user.id,
       goal,
       sex,
       level,
@@ -138,8 +142,7 @@ export async function guardarOnboarding(
       // com days_per_week). home_equipment também serve "casa" sozinho.
       gym_days_per_week: location === "hibrido" ? gymDays : null,
       home_equipment: location === "hibrido" || location === "casa" ? homeEquipment : [],
-    })
-    .eq("id", user.id);
+    });
 
   if (erroPerfil) return { mensagem: BLOQUEIO_RLS };
 

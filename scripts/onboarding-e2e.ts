@@ -3,7 +3,7 @@
  * e de "Confirm email" DESLIGADO no Supabase Auth.
  *
  * Reproduz, com um token real, exatamente o que a Server Action faz:
- *   1. grava os campos do onboarding em profiles (sob RLS);
+ *   1. grava os campos do onboarding em perfil_privado (sob RLS; migração 023);
  *   2. os CHECK da migração 004 rejeitam valores inválidos;
  *   3. lê o perfil, corre o motor e grava o plano em training_plans;
  *   4. a regra crítica (hipertrofia ≥2×/semana) mantém-se na cópia da BD.
@@ -70,7 +70,7 @@ async function main() {
   };
 
   const patchProfile = (body: unknown) =>
-    fetch(`${REST}/profiles?id=eq.${uid}`, {
+    fetch(`${REST}/perfil_privado?id=eq.${uid}`, {
       method: "PATCH",
       headers: { ...h, prefer: "return=representation" },
       body: JSON.stringify(body),
@@ -105,7 +105,7 @@ async function main() {
   const save = await patchProfile(onboarding);
   const saveBody = await save.json();
   if (save.ok && Array.isArray(saveBody) && saveBody[0]?.goal === "hipertrofia") {
-    ok("RLS: utilizador grava o SEU onboarding em profiles");
+    ok("RLS: utilizador grava o SEU onboarding em perfil_privado");
   } else {
     ko("gravar onboarding falhou", saveBody);
   }
@@ -124,7 +124,7 @@ async function main() {
   // --- 3. reproduzir criarPlano: ler perfil → motor → gravar plano ---
   const perfil = (
     await fetch(
-      `${REST}/profiles?id=eq.${uid}&select=goal,sex,level,days_per_week,location,location_note,injuries,injury_note,focus_muscles`,
+      `${REST}/perfil_privado?id=eq.${uid}&select=goal,sex,level,days_per_week,location,location_note,injuries,injury_note,focus_muscles`,
       { headers: h },
     ).then((r) => r.json())
   )[0];

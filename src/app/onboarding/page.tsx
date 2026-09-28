@@ -15,13 +15,14 @@ export default async function OnboardingPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/entrar");
 
+  // perfil_privado (migração 023): só o próprio lê estes dados.
   const { data: perfil } = await supabase
-    .from("profiles")
+    .from("perfil_privado")
     .select(
       "goal, sex, level, days_per_week, location, location_note, injuries, injury_note, focus_muscles, split_format, gym_days_per_week, home_equipment",
     )
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col gap-5 px-4 py-10">

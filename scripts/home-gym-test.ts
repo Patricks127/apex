@@ -60,7 +60,7 @@ async function main() {
   console.log(`Setup — A=${A.id.slice(0, 8)}  B=${B.id.slice(0, 8)}\n`);
 
   // 1. omissão
-  const inicial = await get(A, `profiles?id=eq.${A.id}&select=${COLS}`);
+  const inicial = await get(A, `perfil_privado?id=eq.${A.id}&select=${COLS}`);
   const l0 = Array.isArray(inicial) ? inicial[0] : null;
   if (l0 && l0.gym_days_per_week === null && Array.isArray(l0.home_equipment) && l0.home_equipment.length === 0) {
     ok("omissão: gym_days_per_week NULL, home_equipment '{}'");
@@ -69,13 +69,13 @@ async function main() {
   }
 
   // 2. o dono grava o que o onboarding grava (as duas colunas juntas)
-  await patch(A, `profiles?id=eq.${A.id}`, {
+  await patch(A, `perfil_privado?id=eq.${A.id}`, {
     location: "hibrido",
     days_per_week: 5,
     gym_days_per_week: 3,
     home_equipment: ["halteres", "banda", "peso_corporal", "barra_fixa"],
   });
-  const gravado = await get(A, `profiles?id=eq.${A.id}&select=${COLS}`);
+  const gravado = await get(A, `perfil_privado?id=eq.${A.id}&select=${COLS}`);
   const l1 = Array.isArray(gravado) ? gravado[0] : null;
   if (l1?.gym_days_per_week === 3 && l1?.home_equipment?.length === 4) {
     ok("dono grava 3 dias de ginásio em 5 + equipamento de casa");
@@ -84,8 +84,8 @@ async function main() {
   }
 
   // 3. CHECK: mais dias de ginásio do que dias de treino
-  const demais = await patch(A, `profiles?id=eq.${A.id}`, { gym_days_per_week: 6 });
-  const aposDemais = await get(A, `profiles?id=eq.${A.id}&select=${COLS}`);
+  const demais = await patch(A, `perfil_privado?id=eq.${A.id}`, { gym_days_per_week: 6 });
+  const aposDemais = await get(A, `perfil_privado?id=eq.${A.id}&select=${COLS}`);
   if (demais.status >= 400 || aposDemais?.[0]?.gym_days_per_week === 3) {
     ok("CHECK rejeita gym_days_per_week > days_per_week");
   } else {
@@ -93,8 +93,8 @@ async function main() {
   }
 
   // 4. CHECK: equipamento fora do vocabulário
-  const lixo = await patch(A, `profiles?id=eq.${A.id}`, { home_equipment: ["nave_espacial"] });
-  const aposLixo = await get(A, `profiles?id=eq.${A.id}&select=${COLS}`);
+  const lixo = await patch(A, `perfil_privado?id=eq.${A.id}`, { home_equipment: ["nave_espacial"] });
+  const aposLixo = await get(A, `perfil_privado?id=eq.${A.id}&select=${COLS}`);
   if (lixo.status >= 400 || aposLixo?.[0]?.home_equipment?.length === 4) {
     ok("CHECK rejeita equipamento fora do vocabulário do motor");
   } else {
@@ -102,8 +102,8 @@ async function main() {
   }
 
   // 5. NULL/{} continua a ser aceite (quem não treina em híbrido)
-  const limpar = await patch(A, `profiles?id=eq.${A.id}`, { gym_days_per_week: null, home_equipment: [] });
-  const aposLimpar = await get(A, `profiles?id=eq.${A.id}&select=${COLS}`);
+  const limpar = await patch(A, `perfil_privado?id=eq.${A.id}`, { gym_days_per_week: null, home_equipment: [] });
+  const aposLimpar = await get(A, `perfil_privado?id=eq.${A.id}&select=${COLS}`);
   if (limpar.status < 400 && aposLimpar?.[0]?.gym_days_per_week === null) {
     ok("mudar de local limpa as colunas (NULL / '{}')");
   } else {
@@ -111,9 +111,9 @@ async function main() {
   }
 
   // 6. terceiro não mexe
-  await patch(A, `profiles?id=eq.${A.id}`, { gym_days_per_week: 2 });
-  await patch(B, `profiles?id=eq.${A.id}`, { gym_days_per_week: 5, home_equipment: ["barra"] });
-  const aposB = await get(A, `profiles?id=eq.${A.id}&select=${COLS}`);
+  await patch(A, `perfil_privado?id=eq.${A.id}`, { gym_days_per_week: 2 });
+  await patch(B, `perfil_privado?id=eq.${A.id}`, { gym_days_per_week: 5, home_equipment: ["barra"] });
+  const aposB = await get(A, `perfil_privado?id=eq.${A.id}&select=${COLS}`);
   if (aposB?.[0]?.gym_days_per_week === 2 && aposB?.[0]?.home_equipment?.length === 0) {
     ok("terceiro NÃO altera gym_days_per_week/home_equipment de outro perfil");
   } else {

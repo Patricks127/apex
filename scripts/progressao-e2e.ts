@@ -62,7 +62,7 @@ async function main() {
   console.log(`Setup — ${email}\n`);
 
   // --- onboarding (colunas da 004) ---
-  await patch(`profiles?id=eq.${uid}`, {
+  await patch(`perfil_privado?id=eq.${uid}`, {
     goal: "hipertrofia",
     sex: "homem",
     level: "intermedio",

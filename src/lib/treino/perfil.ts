@@ -50,8 +50,9 @@ export async function carregarPerfilMotor(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<{ motorProfile: MotorProfile; maxes: Partial<Record<Lift, number>> } | null> {
+  // Dados de onboarding: tabela PRIVADA (migração 023) — só o dono os lê.
   const { data: perfil } = await supabase
-    .from("profiles")
+    .from("perfil_privado")
     .select(
       "goal, sex, level, days_per_week, location, location_note, injuries, injury_note, focus_muscles, split_format, gym_days_per_week, home_equipment",
     )

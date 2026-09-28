@@ -33,7 +33,7 @@ export default async function PlanoPage({
   if (!user) redirect("/entrar");
 
   const [{ data: perfil }, planoAtivo, { data: todos }, { data: documentos }] = await Promise.all([
-    supabase.from("profiles").select("goal").eq("id", user.id).single(),
+    supabase.from("perfil_privado").select("goal").eq("id", user.id).maybeSingle(),
     carregarPlanoAtivo(supabase, user.id),
     supabase
       .from("training_plans")

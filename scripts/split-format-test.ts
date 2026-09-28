@@ -57,25 +57,25 @@ async function main() {
   console.log(`Setup — A=${A.id.slice(0, 8)}  B=${B.id.slice(0, 8)}\n`);
 
   // 1. omissão 'auto'
-  const aInicial = await get(A, `profiles?id=eq.${A.id}&select=split_format`);
+  const aInicial = await get(A, `perfil_privado?id=eq.${A.id}&select=split_format`);
   if (Array.isArray(aInicial) && aInicial[0]?.split_format === "auto") ok("omissão é 'auto'");
   else ko("omissão não é 'auto'", aInicial);
 
   // 2. dono define 'muscular'
-  await patch(A, `profiles?id=eq.${A.id}`, { split_format: "muscular" });
-  const aMusc = await get(A, `profiles?id=eq.${A.id}&select=split_format`);
+  await patch(A, `perfil_privado?id=eq.${A.id}`, { split_format: "muscular" });
+  const aMusc = await get(A, `perfil_privado?id=eq.${A.id}&select=split_format`);
   if (Array.isArray(aMusc) && aMusc[0]?.split_format === "muscular") ok("dono define 'muscular'");
   else ko("não ficou 'muscular'", aMusc);
 
   // 3. dono define 'frequencia'
-  await patch(A, `profiles?id=eq.${A.id}`, { split_format: "frequencia" });
-  const aFreq = await get(A, `profiles?id=eq.${A.id}&select=split_format`);
+  await patch(A, `perfil_privado?id=eq.${A.id}`, { split_format: "frequencia" });
+  const aFreq = await get(A, `perfil_privado?id=eq.${A.id}&select=split_format`);
   if (Array.isArray(aFreq) && aFreq[0]?.split_format === "frequencia") ok("dono define 'frequencia'");
   else ko("não ficou 'frequencia'", aFreq);
 
   // 4. CHECK rejeita valor inválido
-  const mau = await patch(A, `profiles?id=eq.${A.id}`, { split_format: "bro_split" });
-  const aAposMau = await get(A, `profiles?id=eq.${A.id}&select=split_format`);
+  const mau = await patch(A, `perfil_privado?id=eq.${A.id}`, { split_format: "bro_split" });
+  const aAposMau = await get(A, `perfil_privado?id=eq.${A.id}&select=split_format`);
   if (mau.status >= 400 || (Array.isArray(aAposMau) && aAposMau[0]?.split_format === "frequencia")) {
     ok("CHECK rejeita valor fora da lista (fica 'frequencia')");
   } else {
@@ -83,8 +83,8 @@ async function main() {
   }
 
   // 5. terceiro não altera o split_format de A
-  await patch(B, `profiles?id=eq.${A.id}`, { split_format: "muscular" });
-  const aAposB = await get(A, `profiles?id=eq.${A.id}&select=split_format`);
+  await patch(B, `perfil_privado?id=eq.${A.id}`, { split_format: "muscular" });
+  const aAposB = await get(A, `perfil_privado?id=eq.${A.id}&select=split_format`);
   if (Array.isArray(aAposB) && aAposB[0]?.split_format === "frequencia") {
     ok("terceiro NÃO altera o split_format de outro perfil");
   } else {
