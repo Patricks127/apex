@@ -17,7 +17,13 @@
 import { formatarNumero } from "../formato.ts";
 import { METRICAS, type MetricaId } from "./metricas.ts";
 import { LIMIAR_ADESAO_BAIXA } from "./atencao.ts";
-import { LIMIAR_DESCIDA_ADESAO, LIMIAR_SUBIDA_ADESAO, MIN_SEMANAS_COM_TREINO, type PontoAdesaoSemanal } from "./adesao-semanal.ts";
+import {
+  LIMIAR_DESCIDA_ADESAO,
+  LIMIAR_SUBIDA_ADESAO,
+  MIN_SEMANAS_COM_TREINO,
+  chaveSemanaIso,
+  type PontoAdesaoSemanal,
+} from "./adesao-semanal.ts";
 
 /** "melhor"/"pior" só onde há um bom e um mau objetivos (força, volume,
  *  adesão); peso e medidas são sempre "neutro". */
@@ -72,6 +78,7 @@ export function leituraForca(
   nome: string,
   pontos: { valueKg: number; recordedAt: string; source?: "manual" | "auto" }[],
   perspetiva: "atleta" | "pt" = "atleta",
+  opcoes: { minDias?: number } = {},
 ): Leitura | null {
   const testados = pontos.filter((p) => (p.source ?? "manual") === "manual");
   const estimados = pontos.filter((p) => p.source === "auto");
@@ -82,7 +89,7 @@ export function leituraForca(
   const primeiro = ord[0];
   const ultimo = ord[ord.length - 1];
   const dias = diasEntre(primeiro.recordedAt, ultimo.recordedAt);
-  if (dias < MIN_DIAS_FORCA) return null;
+  if (dias < (opcoes.minDias ?? MIN_DIAS_FORCA)) return null;
 
   const delta = arred(ultimo.valueKg - primeiro.valueKg, 0.25);
   const maximo = Math.max(...ord.map((p) => p.valueKg));
@@ -100,22 +107,24 @@ export function leituraForca(
 
 // ------------------------------------------------------------------ peso e medidas (neutro)
 
-const JANELA_MEDIDA_DIAS = 30;
 const MIN_DIAS_MEDIDA = 7;
 const LIMIAR_ESTAVEL = 0.5; // kg ou cm — abaixo disto é ruído de balança/fita
 
-/** Valor atual vs. o de há ~1 mês (o último registo com pelo menos 30 dias
- *  antes do atual; se o histórico for mais curto, o primeiro). Só o facto —
- *  nunca "ótimo, perdeste peso". A altura não tem frase (não é tendência). */
-export function leituraMetrica(metric: MetricaId, pontos: { value: number; recordedAt: string }[]): Leitura | null {
+/** Primeiro vs. último ponto dos que recebe — quem chama passa os pontos
+ *  DO PERÍODO escolhido, que são exatamente os que o gráfico desenha (a
+ *  frase nunca contradiz a linha). Só o facto — nunca "ótimo, perdeste
+ *  peso". A altura não tem frase (não é tendência). */
+export function leituraMetrica(
+  metric: MetricaId,
+  pontos: { value: number; recordedAt: string }[],
+  opcoes: { minDias?: number } = {},
+): Leitura | null {
   if (metric === "height_cm" || pontos.length < 2) return null;
   const ord = [...pontos].sort((a, b) => a.recordedAt.localeCompare(b.recordedAt));
+  const base = ord[0];
   const atual = ord[ord.length - 1];
-  const limite = Date.parse(atual.recordedAt) - JANELA_MEDIDA_DIAS * MS_DIA;
-  const antesDoLimite = ord.filter((p) => Date.parse(p.recordedAt) <= limite);
-  const base = antesDoLimite.length > 0 ? antesDoLimite[antesDoLimite.length - 1] : ord[0];
   const dias = diasEntre(base.recordedAt, atual.recordedAt);
-  if (dias < MIN_DIAS_MEDIDA) return null;
+  if (dias < (opcoes.minDias ?? MIN_DIAS_MEDIDA)) return null;
 
   const def = METRICAS[metric];
   const delta = arred(atual.value - base.value, 0.1);
@@ -149,6 +158,27 @@ export function leituraVolume(
 
   const normais = ord.filter((s) => !s.isDeload && s.volumeKg > 0);
   if (normais.length < 3) return null;
+
+  // 4+ semanas no período: 1.ª metade vs 2.ª metade (a frase acompanha o
+  // período escolhido, como o gráfico). 3 semanas: a regra das duas
+  // variações seguidas, abaixo.
+  if (normais.length >= 4) {
+    const k = Math.floor(normais.length / 2);
+    const media = (xs: typeof normais) => xs.reduce((s2, x) => s2 + x.volumeKg, 0) / xs.length;
+    const antes = media(normais.slice(0, k));
+    const depois = media(normais.slice(-k));
+    const v = depois / antes - 1;
+    if (Math.abs(v) < LIMIAR_VOLUME) {
+      return { texto: `Volume semanal estável nas últimas ${normais.length} semanas.`, sentido: "neutro" };
+    }
+    return v > 0
+      ? { texto: `Volume semanal a subir: +${Math.round(v * 100)}% nas últimas ${k} semanas face às ${k} anteriores.`, sentido: "melhor" }
+      : {
+          texto: `Volume semanal a descer: ${MENOS}${Math.round(-v * 100)}% nas últimas ${k} semanas face às ${k} anteriores.`,
+          sentido: "pior",
+        };
+  }
+
   const [a, b, c] = normais.slice(-3).map((s) => s.volumeKg);
 
   if (a < b && b < c && (c - a) / a >= LIMIAR_VOLUME) {
@@ -171,36 +201,79 @@ export function leituraVolume(
 
 // ------------------------------------------------------------------ adesão
 
-/** Adesão por semana de calendário (o gráfico da ficha do aluno). Só semanas
- *  COMPLETAS — a em curso (a última do gráfico, "Atual") está a meio e
- *  pareceria sempre uma queda. Compara as 2 últimas semanas completas com
- *  as 2 anteriores, com os mesmos limiares do sinal de adesão (±8 pp), e
- *  diz que está baixa abaixo do mesmo limiar dos alertas (75%). */
+/** Adesão por semana de calendário (o gráfico da ficha do aluno), para as
+ *  semanas do período escolhido. Regras:
+ *  - só semanas COMPLETAS — a em curso (a última, "Atual") está a meio e
+ *    pareceria sempre uma queda;
+ *  - quem chama corta as semanas ANTES do primeiro treino DE SEMPRE
+ *    (desdePrimeiraSessao) — nunca as de quem já treinava e parou;
+ *  - uma só semana completa (período de 7 dias): descreve essa semana, sem
+ *    inventar tendência;
+ *  - mais semanas: compara a 1.ª metade com a 2.ª metade, com os mesmos
+ *    limiares do sinal de adesão (±8 pp); estável mas abaixo dos 75% (o
+ *    limiar dos alertas do PT) → dito que está baixa. */
 export function leituraAdesao(pontos: PontoAdesaoSemanal[], perspetiva: "atleta" | "pt" = "atleta"): Leitura | null {
-  const completas = pontos.slice(0, -1).slice(-4);
-  if (completas.length < 4 || completas.filter((p) => p.feitos > 0).length < MIN_SEMANAS_COM_TREINO) return null;
+  const completas = pontos.slice(0, -1);
+  const eu = perspetiva === "atleta";
+  const quem = eu ? "A tua adesão" : "A adesão";
+
+  // Uma só semana completa no período (7 dias): o facto dessa semana.
+  if (completas.length === 1) {
+    const s = completas[0];
+    if (s.feitos === 0) {
+      return {
+        texto: `Na última semana completa ${eu ? "não treinaste" : "não treinou"} (0 de ${s.previstos} treinos).`,
+        sentido: "pior",
+      };
+    }
+    return {
+      texto: `Na última semana completa: ${pct(s.pct)} (${s.feitos} de ${s.previstos} treinos).`,
+      sentido: s.pct < LIMIAR_ADESAO_BAIXA ? "pior" : "neutro",
+    };
+  }
+
+  const comHistorico = completas;
+  if (comHistorico.length < 4 || comHistorico.filter((p) => p.feitos > 0).length < MIN_SEMANAS_COM_TREINO) return null;
 
   const media = (xs: PontoAdesaoSemanal[]) => xs.reduce((s, p) => s + p.pct, 0) / xs.length;
-  const antes = media(completas.slice(0, 2));
-  const agora = media(completas.slice(2));
-  const nivel = media(completas);
-  const quem = perspetiva === "pt" ? "A adesão" : "A tua adesão";
+  const metade = Math.floor(comHistorico.length / 2);
+  const antes = media(comHistorico.slice(0, metade));
+  const agora = media(comHistorico.slice(-metade));
+  const nivel = media(comHistorico);
+  const n = comHistorico.length;
+
+  // A média dilui o facto que mais importa: se a última semana completa foi
+  // a zero, diz-se sempre, em qualquer ramo — é o que dá para agir.
+  const semanaPassadaZero = comHistorico[n - 1].feitos === 0;
+  const aZero = semanaPassadaZero ? (eu ? " — na semana passada não treinaste" : " — na semana passada não treinou") : "";
 
   if (agora - antes <= LIMIAR_DESCIDA_ADESAO) {
-    // a média de 2 semanas dilui o facto que importa: se a última semana
-    // completa foi a zero, diz-se diretamente — é o que dá para agir
-    const semanaPassadaZero = completas[completas.length - 1].feitos === 0;
-    const aZero = perspetiva === "pt" ? " — na semana passada não treinou" : " — na semana passada não treinaste";
     return {
-      texto: `${quem} desceu para ${pct(agora)} nas últimas 2 semanas (era ${pct(antes)})${semanaPassadaZero ? aZero : ""}.`,
+      texto: `${quem} desceu para ${pct(agora)} nas últimas ${metade} semanas (era ${pct(antes)})${aZero}.`,
       sentido: "pior",
     };
   }
   if (agora - antes >= LIMIAR_SUBIDA_ADESAO) {
-    return { texto: `${quem} subiu para ${pct(agora)} nas últimas 2 semanas (era ${pct(antes)}).`, sentido: "melhor" };
+    return {
+      texto: `${quem} subiu para ${pct(agora)} nas últimas ${metade} semanas (era ${pct(antes)})${aZero}.`,
+      sentido: semanaPassadaZero ? "pior" : "melhor",
+    };
   }
-  if (nivel < LIMIAR_ADESAO_BAIXA) {
-    return { texto: `${quem} está estável, mas baixa: ${pct(nivel)} nas últimas 4 semanas.`, sentido: "pior" };
+  if (nivel < LIMIAR_ADESAO_BAIXA || semanaPassadaZero) {
+    const baixa = nivel < LIMIAR_ADESAO_BAIXA ? "estável, mas baixa" : "estável";
+    return { texto: `${quem} está ${baixa}: ${pct(nivel)} nas últimas ${n} semanas${aZero}.`, sentido: "pior" };
   }
-  return { texto: `${quem} está estável: ${pct(nivel)} nas últimas 4 semanas.`, sentido: "neutro" };
+  return { texto: `${quem} está estável: ${pct(nivel)} nas últimas ${n} semanas.`, sentido: "neutro" };
+}
+
+/** Tira as semanas ANTES da semana do primeiro treino DE SEMPRE (a conta ou
+ *  o plano ainda não existiam — não é 0% de adesão). Só essas: se a pessoa
+ *  já treinava antes do período e parou, as semanas a zero ficam — são
+ *  adesão real e nunca se escondem. A semana em curso fica sempre. Usado
+ *  pelo gráfico E pela frase, para dizerem o mesmo. */
+export function desdePrimeiraSessao(pontos: PontoAdesaoSemanal[], primeiraSessao: string | null): PontoAdesaoSemanal[] {
+  if (!primeiraSessao) return pontos;
+  const semanaInicial = chaveSemanaIso(primeiraSessao);
+  const i = pontos.findIndex((p) => p.semana >= semanaInicial);
+  return i <= 0 ? pontos : pontos.slice(i);
 }

@@ -2,7 +2,7 @@ process.env.TZ = "UTC";
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { leituraAdesao, leituraForca, leituraMetrica, leituraVolume } from "./leituras.ts";
+import { desdePrimeiraSessao, leituraAdesao, leituraForca, leituraMetrica, leituraVolume } from "./leituras.ts";
 
 const dia = (d: string) => `${d}T10:00:00Z`;
 const AGORA = new Date("2026-09-27T12:00:00Z");
@@ -99,13 +99,13 @@ test("força: um ponto só → não inventa", () => {
 });
 
 // ---------------------------------------------------------------- peso / medidas (neutro)
-test("peso a descer: só o facto, sem julgar", () => {
+test("peso a descer: só o facto, sem julgar — do primeiro ao último ponto do período (o que o gráfico desenha)", () => {
   const r = leituraMetrica("weight_kg", [
     { value: 72.4, recordedAt: dia("2026-08-20") },
     { value: 71.8, recordedAt: dia("2026-08-28") },
     { value: 71.2, recordedAt: dia("2026-09-27") },
   ]);
-  assert.equal(r?.texto, "Peso: −0,6 kg em 4 semanas.");
+  assert.equal(r?.texto, "Peso: −1,2 kg em 5 semanas.");
   assert.equal(r?.sentido, "neutro");
 });
 
@@ -192,13 +192,15 @@ test("adesão a DESCER: 'desceu para X%' — nunca animadora", () => {
 });
 
 test("adesão: semana passada a zero — di-lo diretamente (caso real)", () => {
-  // 2/3, 2/3, 2/3, 0/3 nas 4 semanas completas (+ a em curso)
+  // 2/3, 2/3, 2/3, 0/3 nas semanas completas (+ a em curso); a 1.ª semana
+  // (W30) é antes do 1.º treino de sempre (W31) — cortada como no ecrã
+  const edu = desdePrimeiraSessao(ad(0, 2, 2, 2, 0, 0), "2026-07-28T10:00:00Z");
   assert.equal(
-    leituraAdesao(ad(0, 2, 2, 2, 0, 0))?.texto,
+    leituraAdesao(edu)?.texto,
     "A tua adesão desceu para 33% nas últimas 2 semanas (era 67%) — na semana passada não treinaste.",
   );
   assert.equal(
-    leituraAdesao(ad(0, 2, 2, 2, 0, 0), "pt")?.texto,
+    leituraAdesao(edu, "pt")?.texto,
     "A adesão desceu para 33% nas últimas 2 semanas (era 67%) — na semana passada não treinou.",
   );
 });
@@ -211,13 +213,13 @@ test("adesão a SUBIR", () => {
 
 test("adesão estável mas baixa: diz que está baixa", () => {
   const r = leituraAdesao(ad(2, 1, 2, 1, 2, 0));
-  assert.equal(r?.texto, "A tua adesão está estável, mas baixa: 50% nas últimas 4 semanas.");
+  assert.equal(r?.texto, "A tua adesão está estável, mas baixa: 53% nas últimas 5 semanas."); // (2+1+2+1+2)/15 — todas as semanas completas do período
   assert.equal(r?.sentido, "pior");
 });
 
 test("adesão estável e boa", () => {
   const r = leituraAdesao(ad(3, 3, 3, 3, 3, 0));
-  assert.equal(r?.texto, "A tua adesão está estável: 100% nas últimas 4 semanas.");
+  assert.equal(r?.texto, "A tua adesão está estável: 100% nas últimas 5 semanas.");
 });
 
 test("adesão: menos de 2 semanas completas com treino → não inventa", () => {
@@ -237,4 +239,61 @@ test("nenhuma frase é animadora vazia", () => {
     leituraForca("Supino", [{ valueKg: 50, recordedAt: dia("2026-08-16") }, { valueKg: 45, recordedAt: dia("2026-09-27") }]),
   ].map((r) => r!.texto);
   for (const t of todas) assert.doesNotMatch(t, /continua|parabéns|boa!|excelente|ótimo|força!|!/i, t);
+});
+
+// ---------------------------------------------------------------- períodos
+test("período de 7 dias: aceita tendência com 3 dias entre pontos (senão nunca haveria frase)", () => {
+  const pesos = [{ value: 70.8, recordedAt: dia("2026-09-24") }, { value: 70, recordedAt: dia("2026-09-27") }];
+  assert.equal(leituraMetrica("weight_kg", pesos), null); // por omissão exige 7 dias
+  assert.equal(leituraMetrica("weight_kg", pesos, { minDias: 3 })?.texto, "Peso: −0,8 kg em 3 dias.");
+  const forca = [{ valueKg: 40, recordedAt: dia("2026-09-23") }, { valueKg: 42.5, recordedAt: dia("2026-09-27") }];
+  assert.equal(leituraForca("Supino", forca), null);
+  assert.equal(leituraForca("Supino", forca, "atleta", { minDias: 3 })?.texto, "Supino: +2,5 kg em 4 dias.");
+});
+
+test("adesão, 7 dias (só UMA semana completa): descreve essa semana, sem inventar tendência", () => {
+  assert.equal(leituraAdesao(ad(0, 0))?.texto, "Na última semana completa não treinaste (0 de 3 treinos).");
+  assert.equal(leituraAdesao(ad(0, 0), "pt")?.texto, "Na última semana completa não treinou (0 de 3 treinos).");
+  assert.equal(leituraAdesao(ad(2, 1))?.texto, "Na última semana completa: 67% (2 de 3 treinos).");
+  assert.equal(leituraAdesao(ad(0, 0))?.sentido, "pior");
+});
+
+test("adesão: semanas ANTES do primeiro treino DE SEMPRE não contam como 0% (a conta ainda não existia)", () => {
+  // 13 semanas (3 meses): 8 vazias antes de começar, depois 2,2,2,0 e a atual.
+  // ad() numera as semanas 2026-W30…; o 1.º treino de sempre foi na W38.
+  const tresMeses = desdePrimeiraSessao(ad(0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 1), "2026-09-14T10:00:00Z");
+  const trintaDias = ad(2, 2, 2, 0, 1);
+  // mesma frase nos dois períodos — coerente (caso real da edu graça)
+  assert.equal(leituraAdesao(tresMeses)?.texto, leituraAdesao(trintaDias)?.texto);
+  assert.equal(leituraAdesao(tresMeses)?.texto, "A tua adesão desceu para 33% nas últimas 2 semanas (era 67%) — na semana passada não treinaste.");
+});
+
+test("adesão: quem JÁ treinava antes e parou — as semanas a zero CONTAM (nunca escondidas)", () => {
+  // 1.º treino de sempre muito antes do período → nada se corta
+  const parou = desdePrimeiraSessao(ad(3, 3, 0, 0, 0, 0, 0, 0, 0), "2026-01-05T10:00:00Z");
+  assert.equal(parou.length, 9);
+  assert.equal(leituraAdesao(parou)?.sentido, "pior");
+  assert.match(leituraAdesao(parou)!.texto, /desceu para 0%/);
+});
+
+test("adesão, períodos longos: compara a 1.ª metade com a 2.ª metade das semanas com histórico", () => {
+  // 8 semanas completas: 3,3,3,3 | 1,1,1,1 (+ atual)
+  const r = leituraAdesao(ad(3, 3, 3, 3, 1, 1, 1, 1, 0));
+  assert.equal(r?.texto, "A tua adesão desceu para 33% nas últimas 4 semanas (era 100%).");
+});
+
+test("volume, períodos longos: compara a 1.ª metade com a 2.ª metade das semanas do período", () => {
+  // 8 semanas: 10 000 ×4 | 8 000 ×4 → −20%
+  const semanas = [10000, 10000, 10000, 10000, 8000, 8000, 8000, 8000].map((v, i) => sem(i + 1, v));
+  assert.equal(leituraVolume(semanas, AGORA)?.texto, "Volume semanal a descer: −20% nas últimas 4 semanas face às 4 anteriores.");
+  const sobe = [8000, 8000, 8000, 8000, 10000, 10000, 10000, 10000].map((v, i) => sem(i + 1, v));
+  assert.equal(leituraVolume(sobe, AGORA)?.texto, "Volume semanal a subir: +25% nas últimas 4 semanas face às 4 anteriores.");
+  const igual = [10000, 10100, 9900, 10000, 10050, 9950].map((v, i) => sem(i + 1, v));
+  assert.equal(leituraVolume(igual, AGORA)?.texto, "Volume semanal estável nas últimas 6 semanas.");
+});
+
+test("adesão estável MAS a semana passada a zero: di-lo também (não só quando desce)", () => {
+  // 1.ª metade (2,1,1) = 44%, 2.ª metade (2,2,0) = 44% → estável, baixa; última a zero
+  const r = leituraAdesao(ad(2, 1, 1, 2, 2, 0, 0), "pt");
+  assert.equal(r?.texto, "A adesão está estável, mas baixa: 44% nas últimas 6 semanas — na semana passada não treinou.");
 });

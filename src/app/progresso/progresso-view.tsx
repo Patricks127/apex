@@ -16,6 +16,15 @@ import type { RecordePessoal, MetricaCorporal, SessaoHistorico } from "@/lib/tre
 import { FUSO } from "@/lib/fuso";
 import { formatarKg, formatarNumero, formatarReservaMedia } from "@/lib/formato";
 import { FraseLeitura } from "@/app/_ui/treino/frase-leitura";
+import { SeletorPeriodo, SemDadosNoPeriodo } from "@/app/_ui/treino/seletor-periodo";
+import {
+  PERIODO_OMISSAO,
+  filtrarPeriodo,
+  inicioPeriodo,
+  minDiasTendencia,
+  periodo,
+  type PeriodoId,
+} from "@/lib/treino/periodos";
 import { leituraForca, leituraMetrica, leituraVolume } from "@/lib/treino/leituras";
 const COR = {
   tinta: "var(--apex-tinta)",
@@ -57,6 +66,8 @@ export function ProgressoView({
 }) {
   const router = useRouter();
   const aoGravado = () => router.refresh();
+  // UM período para todos os gráficos e frases da página
+  const [periodoId, setPeriodoId] = useState<PeriodoId>(PERIODO_OMISSAO);
 
   return (
     <div className="flex flex-col gap-4">
@@ -76,9 +87,11 @@ export function ProgressoView({
         </Link>
       </div>
 
-      <SeccaoForca recordes={recordes} aoGravado={aoGravado} />
-      <SeccaoMetricas metricas={metricas} aoGravado={aoGravado} />
-      <SeccaoVolume sessoes={sessoes} />
+      <SeletorPeriodo valor={periodoId} aoMudar={setPeriodoId} />
+
+      <SeccaoForca recordes={recordes} aoGravado={aoGravado} periodoId={periodoId} />
+      <SeccaoMetricas metricas={metricas} aoGravado={aoGravado} periodoId={periodoId} />
+      <SeccaoVolume sessoes={sessoes} periodoId={periodoId} />
       <SeccaoHistorico sessoes={sessoes} />
     </div>
   );
@@ -91,13 +104,18 @@ export function ProgressoView({
 function SeccaoForca({
   recordes,
   aoGravado,
+  periodoId,
 }: {
   recordes: RecordePessoal[];
   aoGravado: () => void;
+  periodoId: PeriodoId;
 }) {
   const [lift, setLift] = useState<Lift>("agachamento");
 
-  const pontos = useMemo(() => {
+  // "novo recorde" decide-se contra TODO o histórico; só depois se recorta
+  // o período (um ponto não passa a "recorde" por os anteriores ficarem
+  // fora da janela).
+  const todos = useMemo(() => {
     const desteLevantamento = recordes.filter((r) => r.lift === lift);
     return marcarNovosRecordes(
       desteLevantamento,
@@ -106,8 +124,9 @@ function SeccaoForca({
       (r) => r.recordedAt,
     );
   }, [recordes, lift]);
+  const pontos = useMemo(() => filtrarPeriodo(todos, (r) => r.recordedAt, periodoId), [todos, periodoId]);
 
-  const ultimo = pontos.at(-1);
+  const ultimo = todos.at(-1);
 
   return (
     <section>
@@ -135,16 +154,21 @@ function SeccaoForca({
       </div>
 
       <div className="mt-3">
-        {pontos.length === 0 ? (
+        {todos.length === 0 ? (
           <div className="apex-grafico__vazio apex-tipo-secundario">
             Ainda sem recordes registados para {LIFT_LABEL[lift].toLowerCase()}.
           </div>
+        ) : pontos.length === 0 ? (
+          <SemDadosNoPeriodo oque={`de ${LIFT_LABEL[lift].toLowerCase()}`} nomePeriodo={periodo(periodoId).nome} />
         ) : (
           <GraficoForca pontos={pontos} />
         )}
       </div>
 
-      <FraseLeitura leitura={leituraForca(LIFT_LABEL[lift], pontos)} temDados={pontos.length > 0} />
+      <FraseLeitura
+        leitura={leituraForca(LIFT_LABEL[lift], pontos, "atleta", { minDias: minDiasTendencia(periodoId) })}
+        temDados={pontos.length > 0}
+      />
 
       {ultimo ? (
         <p className="apex-tipo-corpo apex-tabular mt-2" style={{ color: COR.tinta }}>
@@ -208,9 +232,11 @@ function FormRecorde({ liftInicial, aoGravado }: { liftInicial: Lift; aoGravado:
 function SeccaoMetricas({
   metricas,
   aoGravado,
+  periodoId,
 }: {
   metricas: MetricaCorporal[];
   aoGravado: () => void;
+  periodoId: PeriodoId;
 }) {
   // UM estado para o separador E para o formulário: escolher "Cintura" em
   // cima regista cintura em baixo (antes o formulário ficava preso no Peso
@@ -218,15 +244,17 @@ function SeccaoMetricas({
   const [metric, setMetric] = useState<MetricaId>("weight_kg");
   const def = METRICAS[metric];
 
-  const pontos = useMemo(
+  const todos = useMemo(
     () =>
       [...metricas.filter((m) => m.metric === metric)].sort((a, b) =>
         a.recordedAt.localeCompare(b.recordedAt),
       ),
     [metricas, metric],
   );
-  const ultimo = pontos.at(-1);
-  const recentes = pontos.slice(-5).reverse();
+  // gráfico e frase: só o período; "Atual" e o histórico: todos os registos
+  const pontos = useMemo(() => filtrarPeriodo(todos, (m) => m.recordedAt, periodoId), [todos, periodoId]);
+  const ultimo = todos.at(-1);
+  const recentes = todos.slice(-5).reverse();
 
   return (
     <section>
@@ -251,13 +279,15 @@ function SeccaoMetricas({
       </div>
 
       <div className="mt-3">
-        {pontos.length === 0 ? (
+        {todos.length === 0 ? (
           <div className="apex-grafico__vazio apex-tipo-secundario px-4 text-center">
             Ainda sem registos de {def.label.toLowerCase()}. Regista o primeiro abaixo.
           </div>
+        ) : pontos.length === 0 ? (
+          <SemDadosNoPeriodo oque={`de ${def.label.toLowerCase()}`} nomePeriodo={periodo(periodoId).nome} />
         ) : pontos.length === 1 ? (
           <div className="apex-grafico__vazio apex-tipo-secundario px-4 text-center">
-            Um registo só — o gráfico aparece a partir do segundo.
+            Um registo só nos últimos {periodo(periodoId).nome} — o gráfico aparece a partir do segundo.
           </div>
         ) : (
           <GraficoMetrica pontos={pontos} />
@@ -265,7 +295,10 @@ function SeccaoMetricas({
       </div>
 
       {metric !== "height_cm" ? (
-        <FraseLeitura leitura={leituraMetrica(metric, pontos)} temDados={pontos.length > 0} />
+        <FraseLeitura
+          leitura={leituraMetrica(metric, pontos, { minDias: minDiasTendencia(periodoId) })}
+          temDados={pontos.length > 1}
+        />
       ) : null}
 
       {ultimo ? (
@@ -363,17 +396,21 @@ function FormMetrica({
 // Volume — por sessão / por semana
 // ---------------------------------------------------------------------------
 
-function SeccaoVolume({ sessoes }: { sessoes: SessaoHistorico[] }) {
+function SeccaoVolume({ sessoes, periodoId }: { sessoes: SessaoHistorico[]; periodoId: PeriodoId }) {
   const [vista, setVista] = useState<"semana" | "sessao">("semana");
 
-  const porSemana = useMemo(
-    () =>
-      agruparVolumePorSemana(
-        sessoes.map((s) => ({ weekNumber: s.weekNumber, volumeKg: s.volumeKg, isDeload: s.isDeload, performedAt: s.performedAt })),
-      ),
-    [sessoes],
+  // Semanas de programa com alguma sessão dentro do período (com o volume
+  // TODO dessa semana — uma semana cortada a meio pareceria uma queda).
+  const porSemana = useMemo(() => {
+    const inicio = inicioPeriodo(periodoId);
+    return agruparVolumePorSemana(
+      sessoes.map((s) => ({ weekNumber: s.weekNumber, volumeKg: s.volumeKg, isDeload: s.isDeload, performedAt: s.performedAt })),
+    ).filter((sem) => sem.ultimaSessao != null && Date.parse(sem.ultimaSessao) >= inicio);
+  }, [sessoes, periodoId]);
+  const ultimasSessoes = useMemo(
+    () => filtrarPeriodo([...sessoes].reverse(), (s) => s.performedAt, periodoId).slice(-12),
+    [sessoes, periodoId],
   );
-  const ultimasSessoes = useMemo(() => [...sessoes].reverse().slice(-12), [sessoes]);
 
   const barras =
     vista === "semana"
@@ -399,8 +436,10 @@ function SeccaoVolume({ sessoes }: { sessoes: SessaoHistorico[] }) {
       </div>
 
       <div className="mt-3">
-        {barras.length === 0 ? (
+        {sessoes.length === 0 ? (
           <div className="apex-grafico__vazio apex-tipo-secundario">Ainda sem sessões registadas.</div>
+        ) : barras.length === 0 ? (
+          <SemDadosNoPeriodo oque="de treinos" nomePeriodo={periodo(periodoId).nome} />
         ) : (
           <GraficoVolume barras={barras} />
         )}

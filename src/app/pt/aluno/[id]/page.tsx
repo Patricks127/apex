@@ -9,14 +9,12 @@ import { MOTIVO_LABEL } from "@/lib/treino/atencao";
 import { carregarPlanoAtivo } from "@/lib/treino/perfil";
 import { formatarData } from "@/lib/fuso";
 import { carregarProgresso } from "@/lib/treino/progresso-dados";
-import { pontosAdesaoComFallback } from "@/lib/treino/adesao-semanal";
 import { apagarPlanoDocumento } from "@/app/actions/plan-documents";
 import { EditorPlanoPt, type ExercicioPicker, type DiaEditorInicial } from "./editor-plano-pt";
-import { SeccaoAdesaoSemanal, SeccaoForcaLeitura, SeccaoVolumeLeitura, SeccaoMetricasLeitura } from "./graficos-aluno";
+import { GraficosAlunoComPeriodo } from "./graficos-aluno";
 import { AnexarPlanoForm } from "./anexar-plano-form";
 import { formatarKg, formatarNumero, formatarReservaMedia } from "@/lib/formato";
 
-const JANELAS_ADESAO_FICHA = 12; // mais história do que a linha do painel (6) — a ficha tem espaço
 
 export const metadata: Metadata = {
   title: "Ficha do aluno · APEX",
@@ -111,13 +109,7 @@ export default async function FichaAlunoPage({
   );
 
   const diasPrevistosSemana = planoAtivo ? planoAtivo.days.days.filter((d) => !d.rest).length : null;
-  // Fallback binário sem plano estruturado (inclui PDF) — mesma porta que
-  // a linha do painel usa, para nunca divergirem. Ver adesao-semanal.ts.
-  const pontosAdesao = pontosAdesaoComFallback(
-    progresso.sessoes.map((s) => ({ performedAt: s.performedAt })),
-    diasPrevistosSemana,
-    JANELAS_ADESAO_FICHA,
-  );
+
 
   const evolucao = link.scope_evolucao
     ? await supabase
@@ -226,24 +218,15 @@ export default async function FichaAlunoPage({
         />
       </section>
 
-      <SeccaoAdesaoSemanal pontos={pontosAdesao} />
-
-      <SeccaoForcaLeitura recordes={progresso.recordes} />
-
-      <SeccaoVolumeLeitura sessoes={progresso.sessoes} />
-
-      {link.scope_metricas ? (
-        <SeccaoMetricasLeitura metricas={progresso.metricas} />
-      ) : (
-        <section className="flex flex-col gap-1">
-          <h2 className="apex-tipo-titulo-seccao" style={{ marginTop: 0, color: COR.tinta }}>
-            Peso e medidas
-          </h2>
-          <p className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
-            Sem permissão de métricas.
-          </p>
-        </section>
-      )}
+      {/* Adesão, força, volume e medidas com UM período (seletor no topo).
+          As medidas só são enviadas ao browser com scope métricas — e a RLS
+          de body_metrics já as devolve vazias sem ele. */}
+      <GraficosAlunoComPeriodo
+        sessoes={progresso.sessoes}
+        recordes={progresso.recordes}
+        metricas={link.scope_metricas ? progresso.metricas : null}
+        diasPrevistosSemana={diasPrevistosSemana}
+      />
 
       <Evolucao evolucao={evolucao} />
 
