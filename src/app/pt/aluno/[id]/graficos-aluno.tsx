@@ -23,6 +23,8 @@ import type { PontoAdesaoSemanal } from "@/lib/treino/adesao-semanal";
 import { FUSO } from "@/lib/fuso";
 import { BlocoImc } from "@/app/_ui/treino/bloco-imc";
 import { formatarKg, formatarNumero } from "@/lib/formato";
+import { FraseLeitura } from "@/app/_ui/treino/frase-leitura";
+import { leituraAdesao, leituraForca, leituraMetrica, leituraVolume } from "@/lib/treino/leituras";
 const COR = {
   tinta: "var(--apex-tinta)",
   fraco: "var(--apex-cinza-texto)",
@@ -59,7 +61,10 @@ export function SeccaoAdesaoSemanal({ pontos }: { pontos: PontoAdesaoSemanal[] }
           Sem plano ativo com dias de treino — não há &ldquo;previsto&rdquo; para comparar.
         </div>
       ) : (
-        <GraficoAdesaoSemanal pontos={pontos} />
+        <>
+          <GraficoAdesaoSemanal pontos={pontos} />
+          <FraseLeitura leitura={leituraAdesao(pontos, "pt")} temDados />
+        </>
       )}
     </section>
   );
@@ -144,6 +149,7 @@ export function SeccaoForcaLeitura({ recordes }: { recordes: RecordePessoal[] })
             ))}
           </div>
           <GraficoForca pontos={pontos} />
+          {lift ? <FraseLeitura leitura={leituraForca(LIFT_LABEL[lift], pontos, "pt")} temDados={pontos.length > 0} /> : null}
           {ultimo ? (
             <p className="apex-tipo-corpo apex-tabular" style={{ color: COR.tinta }}>
               Atual: {formatarKg(ultimo.valueKg)}
@@ -169,7 +175,10 @@ export function SeccaoVolumeLeitura({ sessoes }: { sessoes: SessaoHistorico[] })
   const [vista, setVista] = useState<"semana" | "sessao">("semana");
 
   const porSemana = useMemo(
-    () => agruparVolumePorSemana(sessoes.map((s) => ({ weekNumber: s.weekNumber, volumeKg: s.volumeKg, isDeload: s.isDeload }))),
+    () =>
+      agruparVolumePorSemana(
+        sessoes.map((s) => ({ weekNumber: s.weekNumber, volumeKg: s.volumeKg, isDeload: s.isDeload, performedAt: s.performedAt })),
+      ),
     [sessoes],
   );
   const ultimasSessoes = useMemo(() => [...sessoes].reverse().slice(-12), [sessoes]);
@@ -206,6 +215,7 @@ export function SeccaoVolumeLeitura({ sessoes }: { sessoes: SessaoHistorico[] })
             </button>
           </div>
           <GraficoVolume barras={barras} />
+          {vista === "semana" ? <FraseLeitura leitura={leituraVolume(porSemana)} temDados={porSemana.length > 0} /> : null}
         </>
       )}
     </section>
@@ -245,6 +255,9 @@ export function SeccaoMetricasLeitura({ metricas }: { metricas: MetricaCorporal[
             ))}
           </div>
           <GraficoMetrica pontos={pontos} />
+          {metric && metric !== "height_cm" ? (
+            <FraseLeitura leitura={leituraMetrica(metric, pontos)} temDados={pontos.length > 0} />
+          ) : null}
           {ultimo && def ? (
             <p className="apex-tipo-corpo apex-tabular" style={{ color: COR.tinta }}>
               Atual: {formatarNumero(ultimo.value)} {def.unidade}

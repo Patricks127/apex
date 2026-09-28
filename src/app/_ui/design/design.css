@@ -1790,3 +1790,32 @@ body:has(.apex-nav):not(:has(.apex-treino, .apex-chat)) .apex-rodape {
   flex: none;
   accent-color: var(--apex-verde);
 }
+
+/* ============================================================
+   Leitura de um gráfico — UMA frase gerada dos dados (Fase 2, /progresso
+   e ficha do aluno). Factual; se piora, di-lo. Traço lateral de 3px como
+   o aviso da app: vermelho se piora, verde se melhora, cinza se neutro
+   (peso e medidas são SEMPRE neutros — subir ou descer não é bom nem mau
+   em si). A cor só reforça: o sentido está escrito.
+   ============================================================ */
+.apex-leitura {
+  margin-top: var(--apex-space-2);
+  padding-left: var(--apex-space-3);
+  border-left: 3px solid var(--apex-cinza-linha);
+  color: var(--apex-tinta);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.apex-leitura[data-sentido="pior"] {
+  border-left-color: var(--apex-erro);
+}
+
+.apex-leitura[data-sentido="melhor"] {
+  border-left-color: var(--apex-positivo);
+}
+
+.apex-leitura--sem-tendencia {
+  color: var(--apex-cinza-texto);
+  font-weight: 500;
+}

@@ -9,8 +9,8 @@ test("soma o volume das sessões da mesma semana", () => {
     { weekNumber: 2, volumeKg: 2000, isDeload: false },
   ]);
   assert.deepEqual(out, [
-    { weekNumber: 1, volumeKg: 2500, isDeload: false, nSessoes: 2 },
-    { weekNumber: 2, volumeKg: 2000, isDeload: false, nSessoes: 1 },
+    { weekNumber: 1, volumeKg: 2500, isDeload: false, nSessoes: 2, ultimaSessao: null },
+    { weekNumber: 2, volumeKg: 2000, isDeload: false, nSessoes: 1, ultimaSessao: null },
   ]);
 });
 
@@ -41,4 +41,13 @@ test("devolve ordenado por semana ascendente, independentemente da ordem de entr
     out.map((s) => s.weekNumber),
     [1, 2, 3],
   );
+});
+
+test("ultimaSessao: a data mais recente da semana (para saber se ainda está em curso)", () => {
+  const out = agruparVolumePorSemana([
+    { weekNumber: 3, volumeKg: 1000, isDeload: false, performedAt: "2026-09-20T10:00:00Z" },
+    { weekNumber: 3, volumeKg: 1000, isDeload: false, performedAt: "2026-09-24T10:00:00Z" },
+    { weekNumber: 3, volumeKg: 1000, isDeload: false, performedAt: "2026-09-22T10:00:00Z" },
+  ]);
+  assert.equal(out[0].ultimaSessao, "2026-09-24T10:00:00Z");
 });

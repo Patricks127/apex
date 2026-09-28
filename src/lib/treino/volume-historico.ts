@@ -8,6 +8,8 @@ export type SessaoVolume = {
   weekNumber: number | null;
   volumeKg: number;
   isDeload: boolean;
+  /** para saber se a semana ainda está em curso (leituras.ts) */
+  performedAt?: string;
 };
 
 export type SemanaVolume = {
@@ -16,6 +18,8 @@ export type SemanaVolume = {
   /** true se ALGUMA sessão dessa semana foi gravada em descarga. */
   isDeload: boolean;
   nSessoes: number;
+  /** data da sessão mais recente da semana (null se nenhuma a trouxe) */
+  ultimaSessao: string | null;
 };
 
 /** Soma o volume por semana de programa. Sessões sem `weekNumber` (planos
@@ -30,10 +34,12 @@ export function agruparVolumePorSemana(sessoes: SessaoVolume[]): SemanaVolume[] 
       volumeKg: 0,
       isDeload: false,
       nSessoes: 0,
+      ultimaSessao: null,
     };
     atual.volumeKg += s.volumeKg;
     atual.isDeload = atual.isDeload || s.isDeload;
     atual.nSessoes += 1;
+    if (s.performedAt && (!atual.ultimaSessao || s.performedAt > atual.ultimaSessao)) atual.ultimaSessao = s.performedAt;
     porSemana.set(s.weekNumber, atual);
   }
   return [...porSemana.values()].sort((a, b) => a.weekNumber - b.weekNumber);

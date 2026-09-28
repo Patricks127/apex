@@ -15,6 +15,8 @@ import type { RecordePessoal, MetricaCorporal, SessaoHistorico } from "@/lib/tre
 
 import { FUSO } from "@/lib/fuso";
 import { formatarKg, formatarNumero, formatarReservaMedia } from "@/lib/formato";
+import { FraseLeitura } from "@/app/_ui/treino/frase-leitura";
+import { leituraForca, leituraMetrica, leituraVolume } from "@/lib/treino/leituras";
 const COR = {
   tinta: "var(--apex-tinta)",
   branco: "var(--apex-branco)",
@@ -142,6 +144,8 @@ function SeccaoForca({
         )}
       </div>
 
+      <FraseLeitura leitura={leituraForca(LIFT_LABEL[lift], pontos)} temDados={pontos.length > 0} />
+
       {ultimo ? (
         <p className="apex-tipo-corpo apex-tabular mt-2" style={{ color: COR.tinta }}>
           Atual: {formatarKg(ultimo.valueKg)}
@@ -260,6 +264,10 @@ function SeccaoMetricas({
         )}
       </div>
 
+      {metric !== "height_cm" ? (
+        <FraseLeitura leitura={leituraMetrica(metric, pontos)} temDados={pontos.length > 0} />
+      ) : null}
+
       {ultimo ? (
         <p className="apex-tipo-corpo apex-tabular mt-2" style={{ color: COR.tinta }}>
           Atual: {formatarNumero(ultimo.value)} {def.unidade}
@@ -361,7 +369,7 @@ function SeccaoVolume({ sessoes }: { sessoes: SessaoHistorico[] }) {
   const porSemana = useMemo(
     () =>
       agruparVolumePorSemana(
-        sessoes.map((s) => ({ weekNumber: s.weekNumber, volumeKg: s.volumeKg, isDeload: s.isDeload })),
+        sessoes.map((s) => ({ weekNumber: s.weekNumber, volumeKg: s.volumeKg, isDeload: s.isDeload, performedAt: s.performedAt })),
       ),
     [sessoes],
   );
@@ -397,6 +405,9 @@ function SeccaoVolume({ sessoes }: { sessoes: SessaoHistorico[] }) {
           <GraficoVolume barras={barras} />
         )}
       </div>
+
+      {/* a frase é da vista semanal — a tendência é por semana, não por sessão */}
+      {vista === "semana" ? <FraseLeitura leitura={leituraVolume(porSemana)} temDados={porSemana.length > 0} /> : null}
     </section>
   );
 }
