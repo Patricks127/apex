@@ -118,8 +118,6 @@ export async function guardarPerfil(
       certs,
       services,
       price,
-      contact_phone: contact_phone || null,
-      contact_email: contact_email || null,
       instagram: instagram || null,
       gym: gym || null,
       show_contacts: show_contacts || "alunos",
@@ -128,6 +126,13 @@ export async function guardarPerfil(
     .eq("id", user.id);
 
   if (error) return { erro: BLOQUEIO_RLS };
+
+  // Contactos numa tabela à parte (migração 024): a RLS só os mostra ao
+  // próprio, a todos se show_contacts='todos', ou a alunos ativos.
+  const { error: erroContactos } = await supabase
+    .from("contactos_pt")
+    .upsert({ id: user.id, contact_phone: contact_phone || null, contact_email: contact_email || null });
+  if (erroContactos) return { erro: BLOQUEIO_RLS };
 
   revalidatePath("/perfil/editar");
   revalidatePath("/descobrir");

@@ -52,8 +52,6 @@ const CURRICULO = {
   certs: ["NSCA CSCS", "Precision Nutrition L1"],
   services: ["presencial", "online"],
   price: 45,
-  contact_phone: "912345678",
-  contact_email: "coach@exemplo.pt",
   instagram: "coach.forca",
   gym: "Barbell Club Coimbra",
   show_contacts: "alunos",
@@ -77,6 +75,12 @@ async function main() {
     method: "PATCH",
     headers: { prefer: "return=representation" },
     body: JSON.stringify(CURRICULO),
+  });
+  // contactos numa tabela à parte (migração 024)
+  await rest(B, `contactos_pt`, {
+    method: "POST",
+    headers: { prefer: "resolution=merge-duplicates" },
+    body: JSON.stringify({ id: B.id, contact_phone: "912345678", contact_email: "coach@exemplo.pt" }),
   });
   const row = (await g.json())[0];
   if (
@@ -124,16 +128,15 @@ async function main() {
     ko("apareceu um não-PT na pesquisa", soPts);
   }
 
-  console.log("── visibilidade de contactos (gating é no servidor, não na RLS) ──");
-  // A NÃO está ligada a B → a página /pt/[codigo] não mostra os contactos.
-  // Mas a RLS de profiles é por linha, não por coluna: via PostgREST direto o
-  // atleta vê as colunas. Documentado.
-  const aVeDireto = (await rest(A, `profiles?id=eq.${B.id}&select=contact_phone,contact_email,show_contacts`).then((r) => r.json()))[0];
-  if (aVeDireto.contact_phone === "912345678") {
-    nota("via PostgREST direto, um atleta não-ligado LÊ contact_phone — a RLS de profiles não é por coluna. O /pt/[codigo] só renderiza os contactos se show_contacts='todos' ou o viewer for aluno ativo (verificado no código). Se quiseres bloqueio duro, é preciso um RPC SECURITY DEFINER.");
-    ok("(esperado) contact_* legível via API — o gating de contactos é server-render");
+  console.log("── visibilidade de contactos (RLS de contactos_pt, migração 024) ──");
+  // Antes da 024 isto era uma limitação aceite (os contactos viviam em
+  // profiles, legível por todos). Agora a RLS aplica a escolha do PT: A não
+  // está ligada a B e B escolheu "só alunos" → A não lê nada, nem pela API.
+  const aVeDireto = await rest(A, `contactos_pt?id=eq.${B.id}&select=contact_phone,contact_email`).then((r) => r.json());
+  if (Array.isArray(aVeDireto) && aVeDireto.length === 0) {
+    ok("atleta não-ligado + show_contacts='alunos' → contactos_pt devolve 0 linhas pela API");
   } else {
-    ko("contact_phone não voltou como esperado", aVeDireto);
+    ko("FUGA: atleta não-ligado lê os contactos de um PT em 'só alunos'", aVeDireto);
   }
 
   // O atleta envia o pedido (é o que o botão do /pt/[codigo] despoleta via /ligar)

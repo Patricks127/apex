@@ -37,7 +37,7 @@ export default async function PerfilPublicoPage({
   const { data: pt } = await supabase
     .from("profiles")
     .select(
-      "id, name, avatar_url, headline, bio, city, experience, specialties, certs, services, price, gym, instagram, contact_phone, contact_email, show_contacts, pt_code, is_verified, role",
+      "id, name, avatar_url, headline, bio, city, experience, specialties, certs, services, price, gym, instagram, show_contacts, pt_code, is_verified, role",
     )
     .eq("pt_code", code)
     .eq("role", "pt")
@@ -61,12 +61,19 @@ export default async function PerfilPublicoPage({
 
   const meuPerfil = pt.id === user.id;
 
-  const [{ data: link }, { data: meuPerfilRow }, perfilPublico, posts] = await Promise.all([
+  // Contactos: tabela contactos_pt (migração 024) — a RLS só os devolve ao
+  // próprio PT, a todos se show_contacts='todos', ou a alunos ATIVOS. A
+  // condição mostrarContactos abaixo fica como segunda barreira (e para a
+  // mensagem "só mostra aos alunos").
+  const [{ data: link }, { data: meuPerfilRow }, perfilPublico, posts, { data: contactos }] = await Promise.all([
     supabase.from("pt_links").select("status").eq("pt_id", pt.id).eq("student_id", user.id).in("status", ["ativo", "pendente"]).maybeSingle(),
     supabase.from("profiles").select("role").eq("id", user.id).single(),
     carregarPerfilPublico(supabase, pt.id, user.id),
     carregarPostsDoUtilizador(supabase, pt.id, user.id),
+    supabase.from("contactos_pt").select("contact_phone, contact_email").eq("id", pt.id).maybeSingle(),
   ]);
+  const contactPhone = contactos?.contact_phone ?? null;
+  const contactEmail = contactos?.contact_email ?? null;
 
   const souAtleta = meuPerfilRow?.role === "atleta";
   const alunoLigado = link?.status === "ativo";
@@ -206,14 +213,14 @@ export default async function PerfilPublicoPage({
       <Seccao titulo="Contactos">
         {mostrarContactos ? (
           <ul className="flex flex-col gap-1">
-            {pt.contact_phone ? (
+            {contactPhone ? (
               <li className="apex-tipo-corpo" style={{ color: COR.tinta }}>
-                Telefone: {pt.contact_phone}
+                Telefone: {contactPhone}
               </li>
             ) : null}
-            {pt.contact_email ? (
+            {contactEmail ? (
               <li className="apex-tipo-corpo" style={{ color: COR.tinta }}>
-                Email: {pt.contact_email}
+                Email: {contactEmail}
               </li>
             ) : null}
             {pt.instagram ? (
@@ -224,7 +231,7 @@ export default async function PerfilPublicoPage({
                 </a>
               </li>
             ) : null}
-            {!pt.contact_phone && !pt.contact_email && !pt.instagram ? (
+            {!contactPhone && !contactEmail && !pt.instagram ? (
               <li className="apex-tipo-secundario" style={{ color: COR.fraco }}>
                 Sem contactos preenchidos.
               </li>

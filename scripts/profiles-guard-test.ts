@@ -137,8 +137,7 @@ async function main() {
     certs: ["NSCA CSCS"],
     services: ["presencial", "online"],
     price: 40,
-    contact_email: "coach@exemplo.pt",
-    show_contacts: "todos",
+    show_contacts: "todos", // contactos: tabela contactos_pt (migração 024)
   });
   const legRow = (await read(B, B.id, "headline,city,specialties,price,show_contacts"))[0];
   if (

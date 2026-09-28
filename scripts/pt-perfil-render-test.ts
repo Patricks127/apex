@@ -70,10 +70,14 @@ async function main() {
     method: "PATCH",
     body: JSON.stringify({
       headline: "Só alunos veem o contacto",
-      contact_phone: PHONE,
-      contact_email: "render@exemplo.pt",
       show_contacts: "alunos",
     }),
+  });
+  // contactos numa tabela à parte (migração 024)
+  await rest(B.token, `contactos_pt`, {
+    method: "POST",
+    headers: { prefer: "resolution=merge-duplicates" },
+    body: JSON.stringify({ id: B.id, contact_phone: PHONE, contact_email: "render@exemplo.pt" }),
   });
 
   const cookieA = cookieFor(A.session);

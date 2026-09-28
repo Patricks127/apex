@@ -19,7 +19,7 @@ export default async function EditarPerfilPage() {
   const { data: p } = await supabase
     .from("profiles")
     .select(
-      "role, name, avatar_url, headline, bio, city, experience, specialties, certs, services, price, gym, instagram, contact_phone, contact_email, show_contacts, pt_code, is_verified",
+      "role, name, avatar_url, headline, bio, city, experience, specialties, certs, services, price, gym, instagram, show_contacts, pt_code, is_verified",
     )
     .eq("id", user.id)
     .single();
@@ -49,6 +49,13 @@ export default async function EditarPerfilPage() {
   }
   if (p?.role !== "pt") redirect("/painel");
 
+  // Contactos do PT: tabela contactos_pt (migração 024) — o próprio lê os seus.
+  const { data: contactos } = await supabase
+    .from("contactos_pt")
+    .select("contact_phone, contact_email")
+    .eq("id", user.id)
+    .maybeSingle();
+
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col px-4 py-8">
       <FormPerfil
@@ -65,8 +72,8 @@ export default async function EditarPerfilPage() {
           price: p.price != null ? String(p.price) : "",
           gym: p.gym ?? "",
           instagram: p.instagram ?? "",
-          contact_phone: p.contact_phone ?? "",
-          contact_email: p.contact_email ?? "",
+          contact_phone: contactos?.contact_phone ?? "",
+          contact_email: contactos?.contact_email ?? "",
           show_contacts: (p.show_contacts as "alunos" | "todos") ?? "alunos",
         }}
         ptCode={p.pt_code ?? null}
