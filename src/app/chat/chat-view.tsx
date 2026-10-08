@@ -232,7 +232,7 @@ export function ChatView({
           <Composer
             linkId={linkId}
             meId={meId}
-            podeEnviarMedia={perspetiva === "aluno"}
+            podeEnviarMedia={true}
             supabase={supabase}
             supabaseUrl={supabaseUrl}
             anonKey={anonKey}
