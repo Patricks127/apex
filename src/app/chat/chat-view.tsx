@@ -593,7 +593,7 @@ function PainelMedia({
         return;
       }
       if (ehVideo && file.size > MAX_VIDEO_BYTES) {
-        setErro("Vídeo demasiado grande (máx. 50 MB).");
+        setErro("Vídeo demasiado grande (máx. 200 MB).");
         return;
       }
 
