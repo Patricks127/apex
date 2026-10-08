@@ -15,6 +15,7 @@ import { GraficosAlunoComPeriodo } from "./graficos-aluno";
 import { AnexarPlanoForm } from "./anexar-plano-form";
 import { formatarKg, formatarNumero, formatarReservaMedia } from "@/lib/formato";
 import { PtAthleteCheckins } from "@/components/PtAthleteCheckins";
+import { PlanStatusControls } from "@/components/PlanStatusControls";
 
 
 export const metadata: Metadata = {
@@ -58,7 +59,7 @@ export default async function FichaAlunoPage({
         <p className="apex-tipo-corpo" style={{ color: COR.fraco }}>
           {!link
             ? "Não tens uma ligação ativa com este aluno."
-            : "Este aluno não te deu permissão de treinos — não podes atribuir-lhe um plano."}
+            : "Este aluno não te deu permissão de treinos – não podes atribuir-lhe um plano."}
         </p>
         <Link href="/pt/alunos" className="apex-tipo-secundario underline underline-offset-4" style={{ color: COR.tinta }}>
           Voltar aos alunos
@@ -70,22 +71,15 @@ export default async function FichaAlunoPage({
   const [{ data: planoExistente }, atencaoMap, planoAtivo, progresso, { data: documentos }] = await Promise.all([
     supabase
       .from("training_plans")
-      .select("name, days")
+      .select("id, name, days, is_draft, is_template, archived_at")
       .eq("owner_id", user.id)
       .eq("student_id", alunoId)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
     atencaoDosAlunos(supabase, [alunoId]),
-    // Plano ATIVO real do aluno (próprio ou de qualquer PT, ver migração
-    // 019) — só para saber os dias previstos/semana da adesão abaixo.
-    // Diferente de `planoExistente`, que é sempre o plano que ESTE PT
-    // atribuiu (para pré-preencher o editor), possa ou não ser o ativo.
     carregarPlanoAtivo(supabase, alunoId),
     carregarProgresso(supabase, alunoId),
-    // Planos em PDF anexados a este aluno — de qualquer PT com scope
-    // (migração 020, mesma decisão consciente da 019: histórico inclui
-    // anexos de um PT anterior já revogado, ver decisions-and-principles.md).
     supabase
       .from("plan_documents")
       .select("id, pt_id, file_name, size_bytes, storage_path, created_at")
@@ -196,22 +190,32 @@ export default async function FichaAlunoPage({
           Dar um plano
         </h2>
         <p className="apex-tipo-secundario" style={{ color: COR.fraco }}>
-          Dois caminhos independentes — escolhe um, ou os dois. O plano da app tem sempre prioridade sobre o PDF (ver /plano do aluno).
+          Dois caminhos independentes – escolhe um, ou os dois. O plano da app tem sempre prioridade sobre o PDF (ver /plano do aluno).
         </p>
       </div>
 
       <SeccaoPlanosDocumento alunoId={alunoId} documentos={documentosComUrl} />
 
       <section className="flex flex-col gap-4 border-t pt-6" style={{ borderColor: COR.linha }}>
-        <div>
-          <h2 className="apex-tipo-titulo-seccao" style={{ marginTop: 0, color: COR.tinta }}>
-            Criar plano na app
-          </h2>
-          <p className="apex-tipo-secundario" style={{ color: COR.fraco }}>
-            {planoExistente
-              ? "Editar o plano que atribuíste a este aluno."
-              : "O editor completo, dia a dia — precisa de pelo menos um dia com exercícios antes de gravar."}
-          </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="apex-tipo-titulo-seccao" style={{ marginTop: 0, color: COR.tinta }}>
+              Criar plano na app
+            </h2>
+            <p className="apex-tipo-secundario" style={{ color: COR.fraco }}>
+              {planoExistente
+                ? "Editar o plano que atribuíste a este aluno."
+                : "O editor completo, dia a dia – precisa de pelo menos um dia com exercícios antes de gravar."}
+            </p>
+          </div>
+          {planoExistente?.id ? (
+            <PlanStatusControls
+              planId={planoExistente.id}
+              isDraft={planoExistente.is_draft ?? false}
+              isTemplate={planoExistente.is_template ?? false}
+              isArchived={planoExistente.archived_at != null}
+            />
+          ) : null}
         </div>
 
         <EditorPlanoPt
@@ -222,7 +226,7 @@ export default async function FichaAlunoPage({
         />
       </section>
 
-      {/* Check-ins do aluno — esforço, zonas de desconforto, notas */}
+      {/* Check-ins do aluno – esforço, zonas de desconforto, notas */}
       <section className="flex flex-col gap-3 border-t pt-6" style={{ borderColor: COR.linha }}>
         <h2 className="apex-tipo-titulo-seccao" style={{ marginTop: 0, color: COR.tinta }}>
           Feedback dos treinos
@@ -231,7 +235,7 @@ export default async function FichaAlunoPage({
       </section>
 
       {/* Adesão, força, volume e medidas com UM período (seletor no topo).
-          As medidas só são enviadas ao browser com scope métricas — e a RLS
+          As medidas só são enviadas ao browser com scope métricas – e a RLS
           de body_metrics já as devolve vazias sem ele. */}
       <GraficosAlunoComPeriodo
         sessoes={progresso.sessoes}
@@ -264,12 +268,12 @@ function formatarTamanho(bytes: number): string {
 }
 
 /**
- * Caminho 1 de 2 para dar um plano — completamente independente do editor
+ * Caminho 1 de 2 para dar um plano – completamente independente do editor
  * estruturado abaixo (secção própria, form próprio, Server Action própria,
  * sem validação de dias nenhuma). O caminho rápido: o PT já tem o plano
  * feito, anexa o ficheiro, a aluna vê-o de imediato. Qualquer PT com scope
  * vê o histórico (mesma decisão da 019), mas só quem anexou tem o botão de
- * apagar — a RLS já bloquearia os outros, isto é só não mostrar um botão
+ * apagar – a RLS já bloquearia os outros, isto é só não mostrar um botão
  * que nunca funcionaria.
  */
 function SeccaoPlanosDocumento({ alunoId, documentos }: { alunoId: string; documentos: PlanoDocumento[] }) {
@@ -280,7 +284,7 @@ function SeccaoPlanosDocumento({ alunoId, documentos }: { alunoId: string; docum
           Anexar plano em PDF
         </h2>
         <p className="apex-tipo-secundario" style={{ color: COR.fraco, marginTop: 4 }}>
-          O caminho rápido — já tens o plano feito, anexa o ficheiro e a aluna vê-o de imediato.
+          O caminho rápido – já tens o plano feito, anexa o ficheiro e a aluna vê-o de imediato.
         </p>
       </div>
 
@@ -331,9 +335,9 @@ function SeccaoPlanosDocumento({ alunoId, documentos }: { alunoId: string; docum
   );
 }
 
-// Fotos de evolução (chat, is_evolution) — diferente de "Peso e medidas"
+// Fotos de evolução (chat, is_evolution) – diferente de "Peso e medidas"
 // acima (essa é o registo estruturado de /progresso, gráfico com números).
-// Recordes pessoais já não aparecem aqui em lista plana — têm a secção
+// Recordes pessoais já não aparecem aqui em lista plana – têm a secção
 // "Força" acima, com gráfico e o valor atual junto.
 function Evolucao({
   evolucao,
