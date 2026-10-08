@@ -7,14 +7,28 @@ export type ExercicioPicker = { id: string; nome: string; familia: string; muscu
 export type ExercicioEditorInicial = {
   exercicioId: string;
   nome: string;
+  tipo: string;
   series: number;
   reps: number;
   carga: number | null;
+  durationMin: number | null;
+  distanceKm: number | null;
   nota: string;
 };
 export type DiaEditorInicial = { nome: string; exercicios: ExercicioEditorInicial[] };
 
-type ExercicioState = { chave: string; exercicioId: string; nome: string; series: string; reps: string; carga: string; nota: string };
+type ExercicioState = {
+  chave: string;
+  exercicioId: string;
+  nome: string;
+  tipo: string;
+  series: string;
+  reps: string;
+  carga: string;
+  durationMin: string;
+  distanceKm: string;
+  nota: string;
+};
 type DiaState = { chave: string; nome: string; exercicios: ExercicioState[] };
 
 const COR = {
@@ -24,6 +38,13 @@ const COR = {
   fundo: "var(--apex-cinza-fundo)",
   erro: "var(--apex-erro)",
 } as const;
+
+const EXERCISE_TYPES = [
+  { id: "strength", label: "Força" },
+  { id: "cardio", label: "Cardio" },
+  { id: "running", label: "Corrida" },
+  { id: "mobility", label: "Mobilidade" },
+] as const;
 
 let seq = 0;
 const novaChave = () => `k${++seq}`;
@@ -53,9 +74,12 @@ export function EditorPlanoPt({
             chave: novaChave(),
             exercicioId: e.exercicioId,
             nome: e.nome,
+            tipo: e.tipo || "strength",
             series: String(e.series),
             reps: String(e.reps),
             carga: e.carga != null ? String(e.carga) : "",
+            durationMin: e.durationMin != null ? String(e.durationMin) : "",
+            distanceKm: e.distanceKm != null ? String(e.distanceKm) : "",
             nota: e.nota,
           })),
         }))
@@ -63,9 +87,6 @@ export function EditorPlanoPt({
   );
   const [estado, acao, pendente] = useActionState(atribuirPlanoPt, ESTADO_INICIAL);
 
-  // Serializado a cada render — o campo escondido vai sempre para o servidor
-  // com o estado atual do editor (o servidor nunca confia em nome/músculo,
-  // só no exercicioId + nos números — ver validarPlanoPt em actions/treino.ts).
   const planoJson = useMemo(
     () =>
       JSON.stringify(
@@ -73,12 +94,12 @@ export function EditorPlanoPt({
           nome: d.nome,
           exercicios: d.exercicios.map((e) => ({
             exercicioId: e.exercicioId,
+            tipo: e.tipo || "strength",
             series: Number(e.series) || 0,
             reps: Number(e.reps) || 0,
-            // o texto tal como escrito ("72,5") — o servidor lê vírgula ou
-            // ponto e recusa o resto. Antes: Number("72,5") = NaN → null no
-            // JSON → a carga desaparecia sem aviso.
             carga: e.carga.trim() === "" ? null : e.carga.trim(),
+            durationMin: e.durationMin.trim() === "" ? null : Number(e.durationMin) || null,
+            distanceKm: e.distanceKm.trim() === "" ? null : Number(e.distanceKm) || null,
             nota: e.nota,
           })),
         })),
@@ -98,7 +119,18 @@ export function EditorPlanoPt({
               ...d,
               exercicios: [
                 ...d.exercicios,
-                { chave: novaChave(), exercicioId: ex.id, nome: ex.nome, series: "3", reps: "10", carga: "", nota: "" },
+                {
+                  chave: novaChave(),
+                  exercicioId: ex.id,
+                  nome: ex.nome,
+                  tipo: "strength",
+                  series: "3",
+                  reps: "10",
+                  carga: "",
+                  durationMin: "",
+                  distanceKm: "",
+                  nota: "",
+                },
               ],
             }
           : d,
@@ -116,6 +148,19 @@ export function EditorPlanoPt({
     setDias((prev) =>
       prev.map((d) => (d.chave !== diaChave ? d : { ...d, exercicios: d.exercicios.filter((e) => e.chave !== exChave) })),
     );
+  const moverExercicio = (diaChave: string, exChave: string, direcao: "cima" | "baixo") =>
+    setDias((prev) =>
+      prev.map((d) => {
+        if (d.chave !== diaChave) return d;
+        const idx = d.exercicios.findIndex((e) => e.chave === exChave);
+        if (idx === -1) return d;
+        const novoIdx = direcao === "cima" ? idx - 1 : idx + 1;
+        if (novoIdx < 0 || novoIdx >= d.exercicios.length) return d;
+        const lista = [...d.exercicios];
+        [lista[idx], lista[novoIdx]] = [lista[novoIdx], lista[idx]];
+        return { ...d, exercicios: lista };
+      }),
+    );
 
   return (
     <form action={acao} className="flex flex-col gap-5">
@@ -129,7 +174,7 @@ export function EditorPlanoPt({
       ) : null}
       {estado.ok ? (
         <p className="apex-tipo-secundario" style={{ color: COR.tinta }}>
-          Plano gravado. O aluno já pode escolhê-lo em &ldquo;Trocar de plano&rdquo;.
+          Plano gravado e ativado — o aluno já pode segui-lo.
         </p>
       ) : null}
 
@@ -161,6 +206,7 @@ export function EditorPlanoPt({
             onAdicionarExercicio={(ex) => adicionarExercicio(d.chave, ex)}
             onAtualizarExercicio={(exChave, patch) => atualizarExercicio(d.chave, exChave, patch)}
             onRemoverExercicio={(exChave) => removerExercicio(d.chave, exChave)}
+            onMoverExercicio={(exChave, dir) => moverExercicio(d.chave, exChave, dir)}
           />
         ))}
       </div>
@@ -193,6 +239,7 @@ function DiaCard({
   onAdicionarExercicio,
   onAtualizarExercicio,
   onRemoverExercicio,
+  onMoverExercicio,
 }: {
   indice: number;
   dia: DiaState;
@@ -202,6 +249,7 @@ function DiaCard({
   onAdicionarExercicio: (ex: ExercicioPicker) => void;
   onAtualizarExercicio: (exChave: string, patch: Partial<ExercicioState>) => void;
   onRemoverExercicio: (exChave: string) => void;
+  onMoverExercicio: (exChave: string, direcao: "cima" | "baixo") => void;
 }) {
   const [aPesquisar, setAPesquisar] = useState(false);
 
@@ -230,32 +278,108 @@ function DiaCard({
       </div>
 
       <ul className="flex flex-col gap-2">
-        {dia.exercicios.map((e) => (
+        {dia.exercicios.map((e, idx) => (
           <li key={e.chave} className="border p-3" style={{ borderColor: COR.linha, background: "var(--apex-branco)" }}>
             <div className="flex items-baseline justify-between gap-2">
               <span className="apex-tipo-nome-exercicio" style={{ color: COR.tinta }}>
                 {e.nome}
               </span>
-              <button
-                type="button"
-                onClick={() => onRemoverExercicio(e.chave)}
-                className="apex-tipo-etiqueta shrink-0"
-                style={{ color: COR.fraco }}
-              >
-                remover
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => onMoverExercicio(e.chave, "cima")}
+                  disabled={idx === 0}
+                  className="apex-tipo-etiqueta disabled:opacity-30"
+                  style={{ color: COR.fraco }}
+                  aria-label="Mover para cima"
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onMoverExercicio(e.chave, "baixo")}
+                  disabled={idx === dia.exercicios.length - 1}
+                  className="apex-tipo-etiqueta disabled:opacity-30"
+                  style={{ color: COR.fraco }}
+                  aria-label="Mover para baixo"
+                >
+                  ↓
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onRemoverExercicio(e.chave)}
+                  className="apex-tipo-etiqueta"
+                  style={{ color: COR.fraco }}
+                >
+                  remover
+                </button>
+              </div>
             </div>
-            <div className="mt-2 grid grid-cols-3 gap-2">
-              <NumField label="séries" value={e.series} onChange={(v) => onAtualizarExercicio(e.chave, { series: v })} />
-              <NumField label="reps" value={e.reps} onChange={(v) => onAtualizarExercicio(e.chave, { reps: v })} />
-              <NumField
-                label="carga (kg)"
-                decimal
-                value={e.carga}
-                onChange={(v) => onAtualizarExercicio(e.chave, { carga: v })}
-                opcional
-              />
+
+            {/* Tipo de exercício */}
+            <div className="mt-2 flex gap-1 flex-wrap">
+              {EXERCISE_TYPES.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => onAtualizarExercicio(e.chave, { tipo: t.id })}
+                  className="apex-tipo-etiqueta border px-2 py-0.5"
+                  style={{
+                    borderColor: e.tipo === t.id ? COR.tinta : COR.linha,
+                    color: e.tipo === t.id ? COR.tinta : COR.fraco,
+                    fontWeight: e.tipo === t.id ? 600 : undefined,
+                  }}
+                >
+                  {t.label}
+                </button>
+              ))}
             </div>
+
+            {/* Campos condicionais por tipo */}
+            {(e.tipo === "strength" || !e.tipo) ? (
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                <NumField label="séries" value={e.series} onChange={(v) => onAtualizarExercicio(e.chave, { series: v })} />
+                <NumField label="reps" value={e.reps} onChange={(v) => onAtualizarExercicio(e.chave, { reps: v })} />
+                <NumField
+                  label="carga (kg)"
+                  decimal
+                  value={e.carga}
+                  onChange={(v) => onAtualizarExercicio(e.chave, { carga: v })}
+                  opcional
+                />
+              </div>
+            ) : e.tipo === "mobility" ? (
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <NumField label="reps / séries" value={e.reps} onChange={(v) => onAtualizarExercicio(e.chave, { reps: v })} />
+                <NumField label="séries" value={e.series} onChange={(v) => onAtualizarExercicio(e.chave, { series: v })} opcional />
+              </div>
+            ) : (
+              /* cardio ou running */
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <NumField
+                  label="duração (min)"
+                  value={e.durationMin}
+                  onChange={(v) => onAtualizarExercicio(e.chave, { durationMin: v })}
+                />
+                {e.tipo === "running" ? (
+                  <NumField
+                    label="distância (km)"
+                    decimal
+                    value={e.distanceKm}
+                    onChange={(v) => onAtualizarExercicio(e.chave, { distanceKm: v })}
+                    opcional
+                  />
+                ) : (
+                  <NumField
+                    label="séries"
+                    value={e.series}
+                    onChange={(v) => onAtualizarExercicio(e.chave, { series: v })}
+                    opcional
+                  />
+                )}
+              </div>
+            )}
+
             <input
               value={e.nota}
               onChange={(ev) => onAtualizarExercicio(e.chave, { nota: ev.currentTarget.value })}
