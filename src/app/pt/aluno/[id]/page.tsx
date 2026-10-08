@@ -14,6 +14,7 @@ import { EditorPlanoPt, type ExercicioPicker, type DiaEditorInicial } from "./ed
 import { GraficosAlunoComPeriodo } from "./graficos-aluno";
 import { AnexarPlanoForm } from "./anexar-plano-form";
 import { formatarKg, formatarNumero, formatarReservaMedia } from "@/lib/formato";
+import { PtAthleteCheckins } from "@/components/PtAthleteCheckins";
 
 
 export const metadata: Metadata = {
@@ -142,9 +143,12 @@ export default async function FichaAlunoPage({
         exercicios: d.exercises!.map((e) => ({
           exercicioId: e.exercicioId ?? "",
           nome: e.name,
+          tipo: (e as Record<string, unknown>).tipo as string ?? "strength",
           series: e.sets.length,
           reps: e.sets[0]?.reps ?? 8,
           carga: e.sets[0]?.w ?? null,
+          durationMin: (e as Record<string, unknown>).durationMin as number ?? null,
+          distanceKm: (e as Record<string, unknown>).distanceKm as number ?? null,
           nota: e.nota ?? "",
         })),
       }));
@@ -192,7 +196,7 @@ export default async function FichaAlunoPage({
           Dar um plano
         </h2>
         <p className="apex-tipo-secundario" style={{ color: COR.fraco }}>
-          Dois caminhos independentes — escolhe um, ou os dois (o PDF manda sempre que existir, ver /plano do aluno).
+          Dois caminhos independentes — escolhe um, ou os dois. O plano da app tem sempre prioridade sobre o PDF (ver /plano do aluno).
         </p>
       </div>
 
@@ -216,6 +220,14 @@ export default async function FichaAlunoPage({
           nomeInicial={planoExistente?.name ?? ""}
           diasIniciais={diasIniciais}
         />
+      </section>
+
+      {/* Check-ins do aluno — esforço, zonas de desconforto, notas */}
+      <section className="flex flex-col gap-3 border-t pt-6" style={{ borderColor: COR.linha }}>
+        <h2 className="apex-tipo-titulo-seccao" style={{ marginTop: 0, color: COR.tinta }}>
+          Feedback dos treinos
+        </h2>
+        <PtAthleteCheckins studentId={alunoId} />
       </section>
 
       {/* Adesão, força, volume e medidas com UM período (seletor no topo).
