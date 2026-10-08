@@ -178,11 +178,18 @@ function AvancarSemana() {
 function DiaDetalhe({ dia, ehHoje, hojeFeito }: { dia: DiaGerado; ehHoje: boolean; hojeFeito: boolean }) {
   if (dia.rest) {
     return (
-      <section className="flex flex-col items-center gap-1 border-t border-b py-8 text-center" style={{ borderColor: "var(--apex-cinza-linha)" }}>
+      <section className="flex flex-col items-center gap-3 border-t border-b py-8 text-center" style={{ borderColor: "var(--apex-cinza-linha)" }}>
         <p className="apex-tipo-nome-exercicio" style={{ color: "var(--apex-tinta)" }}>{dia.dayName}</p>
         <p className="apex-tipo-secundario" style={{ color: "var(--apex-cinza-texto)" }}>
           Descanso. Recuperar faz parte do treino.
         </p>
+        <Link
+          href={`/treino/${dia.dayIndex}`}
+          className="apex-tipo-secundario"
+          style={{ color: "var(--apex-cinza-texto)", textDecoration: "underline", textUnderlineOffset: 3 }}
+        >
+          Quero treinar mesmo assim →
+        </Link>
       </section>
     );
   }
@@ -302,32 +309,58 @@ function ConteudoExercicio({
   indice,
   mostrarQuadrados,
 }: {
-  exercicio: ExercicioGerado;
+  exercicio: ExercicioGerado & { tipo?: string; duration_min?: number; distance_km?: number };
   indice: number;
   mostrarQuadrados: boolean;
 }) {
   const s = exercicio.sets[0];
-  const carga = s.w != null ? formatarKg(s.w) : exercicio.bw ? "peso corporal" : "—";
-  const series = s.reps > 0 ? `${exercicio.sets.length} × ${s.reps}` : `${exercicio.sets.length} séries`;
+  const isCardio = exercicio.tipo === "cardio" || exercicio.tipo === "running";
 
-  // Cada exercício é um cartão (mesma linguagem de .apex-cartao: borda 1px,
-  // cantos vivos), dentro da linha do tempo. Nome em cima, a toda a largura;
-  // por baixo, UMA linha com a carga (o que se procura de relance) e as
-  // séries — e, no exercício a decorrer, os quadrados das séries. Igual em
-  // todos os tamanhos: num iPhone SE, pôr a carga ao lado do nome esmagava-o
-  // ou atirava as séries para um sítio solto do cartão.
+  // Linha de detalhe: cardio mostra duração/distância; força mostra carga+séries
+  let detalhe: string;
+  if (isCardio) {
+    const partes: string[] = [];
+    if (exercicio.duration_min) partes.push(`${exercicio.duration_min} min`);
+    if (exercicio.distance_km) partes.push(`${exercicio.distance_km} km`);
+    detalhe = partes.length > 0 ? partes.join(" · ") : "Cardio livre";
+  } else {
+    const carga = s.w != null ? formatarKg(s.w) : exercicio.bw ? "peso corporal" : "—";
+    const series = s.reps > 0 ? `${exercicio.sets.length} × ${s.reps}` : `${exercicio.sets.length} séries`;
+    detalhe = `${carga} · ${series}`;
+  }
+
+  // Badge de tipo para exercícios não-força
+  const tipoBadge: Record<string, string> = {
+    cardio: "Cardio",
+    running: "Corrida",
+    mobility: "Mobilidade",
+  };
+
   return (
     <div className="apex-cartao apex-cartao--compacto">
-      <span className="apex-tipo-nome-exercicio" style={{ color: "var(--apex-tinta)" }}>
-        {indice + 1}. {exercicio.name}
-      </span>
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="apex-tipo-nome-exercicio" style={{ color: "var(--apex-tinta)" }}>
+          {indice + 1}. {exercicio.name}
+        </span>
+        {exercicio.tipo && exercicio.tipo !== "strength" && tipoBadge[exercicio.tipo] ? (
+          <span
+            className="apex-tipo-etiqueta px-2 py-0.5"
+            style={{
+              background: exercicio.tipo === "running" ? "var(--apex-azul)" : "var(--apex-cinza-fundo)",
+              color: exercicio.tipo === "running" ? "#fff" : "var(--apex-cinza-texto)",
+              borderRadius: 4,
+            }}
+          >
+            {tipoBadge[exercicio.tipo]}
+          </span>
+        ) : null}
+      </div>
 
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-2">
-        <span className="apex-tabular apex-linha-exercicio__carga">{carga}</span>
         <span className="apex-tipo-secundario apex-tabular" style={{ color: "var(--apex-cinza-texto)" }}>
-          {series}
+          {detalhe}
         </span>
-        {mostrarQuadrados ? (
+        {!isCardio && mostrarQuadrados ? (
           <div className="apex-quadrados-series self-center">
             {exercicio.sets.map((_, i) => (
               <span key={i} className="apex-quadrado-serie" />
@@ -336,9 +369,11 @@ function ConteudoExercicio({
         ) : null}
       </div>
 
-      <span className="apex-tipo-etiqueta" style={{ color: "var(--apex-cinza-texto)" }}>
-        {[rotuloMusculo(exercicio.muscle), rotuloEsforco(s.rpe, s.reps > 0)].filter(Boolean).join(" · ")}
-      </span>
+      {!isCardio && (
+        <span className="apex-tipo-etiqueta" style={{ color: "var(--apex-cinza-texto)" }}>
+          {[rotuloMusculo(exercicio.muscle), rotuloEsforco(s.rpe, s.reps > 0)].filter(Boolean).join(" · ")}
+        </span>
+      )}
 
       {exercicio.substituted ? (
         <span className="apex-tipo-secundario" style={{ color: "var(--apex-azul)" }}>
