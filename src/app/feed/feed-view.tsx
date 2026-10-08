@@ -4,7 +4,8 @@ import { useState, useActionState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LIFT_LABEL, type Lift } from "@/lib/motor";
-import { redimensionarImagem } from "@/lib/chat/media";
+import { redimensionarImagem, uploadComProgresso, extensaoDe, idFicheiro } from "@/lib/chat/media";
+import { createClient } from "@/lib/supabase/client";
 import { criarPost, type EstadoSocial } from "@/app/actions/social";
 import { PostCard } from "@/app/_ui/social/post-card";
 import type {
@@ -12,7 +13,6 @@ import type {
   PostFeed,
   FontePickerTreino,
   FontePickerRecorde,
-  FontePickerVideo,
 } from "@/lib/social/feed-dados";
 import type { PostKind } from "@/lib/social/sanitizar-post";
 
@@ -56,11 +56,15 @@ export function FeedView({
   filtroInicial,
   posts,
   fontes,
+  supabaseUrl,
+  anonKey,
 }: {
   meId: string;
   filtroInicial: Filtro;
   posts: PostFeed[];
-  fontes: { treinos: FontePickerTreino[]; recordes: FontePickerRecorde[]; videos: FontePickerVideo[] };
+  fontes: { treinos: FontePickerTreino[]; recordes: FontePickerRecorde[] };
+  supabaseUrl: string;
+  anonKey: string;
 }) {
   const router = useRouter();
   const aoMudar = () => router.refresh();
@@ -83,7 +87,7 @@ export function FeedView({
         </Link>
       </header>
 
-      <Composer fontes={fontes} aoPublicado={aoMudar} />
+      <Composer fontes={fontes} aoPublicado={aoMudar} supabaseUrl={supabaseUrl} anonKey={anonKey} />
 
       <div className="apex-abas apex-abas--scroll">
         {(Object.keys(FILTRO_LABEL) as Filtro[]).map((f) => (
@@ -124,24 +128,37 @@ export function FeedView({
 
 const KINDS: PostKind[] = ["treino", "recorde", "conquista", "video", "imagem", "texto"];
 
+// Limite de vídeo para o feed — post-media tem 50 MB de limite de ficheiro
+const MAX_FEED_VIDEO_BYTES = 50 * 1024 * 1024;
+
 function Composer({
   fontes,
   aoPublicado,
+  supabaseUrl,
+  anonKey,
 }: {
-  fontes: { treinos: FontePickerTreino[]; recordes: FontePickerRecorde[]; videos: FontePickerVideo[] };
+  fontes: { treinos: FontePickerTreino[]; recordes: FontePickerRecorde[] };
   aoPublicado: () => void;
+  supabaseUrl: string;
+  anonKey: string;
 }) {
   const [aberto, setAberto] = useState(false);
   const [kind, setKind] = useState<PostKind>("texto");
   const [erroImagem, setErroImagem] = useState<string | null>(null);
+
+  // Estado específico do fluxo de vídeo (upload direto com progresso)
+  const [videoFicheiro, setVideoFicheiro] = useState<File | null>(null);
+  const [videoProgresso, setVideoProgresso] = useState<number | null>(null);
+  const [erroVideo, setErroVideo] = useState<string | null>(null);
+  const [videoAEnviar, setVideoAEnviar] = useState(false);
 
   // O trabalho assíncrono (redimensionar) tem de viver DENTRO da função
   // passada a useActionState, nunca num wrapper `async` à volta de
   // `submeter` — chamar o dispatcher fora de uma transição dá um aviso
   // do React e a submissão não chega a acontecer. `redimensionarImagem`
   // (lib/chat/media.ts, mesma função do chat) só pode correr no browser,
-  // por isso o redimensionamento fica no cliente; o resultado (Blob) é
-  // que viaja para criarPost, nunca o ficheiro original em tamanho real.
+  // por isso o redimensionamento fica no cliente; o resultado (Blob)
+  // é que viaja para criarPost, nunca o ficheiro original em tamanho real.
   async function acaoComposta(anterior: EstadoSocial, fd: FormData): Promise<EstadoSocial> {
     setErroImagem(null);
     const ficheiro = fd.get("imagem");
@@ -160,8 +177,80 @@ function Composer({
 
   const [estado, submeter, aEnviar] = useActionState<EstadoSocial, FormData>(acaoComposta, {});
 
-  const precisaDeFonte = kind === "treino" || kind === "recorde" || kind === "video";
-  const listaFontes = kind === "treino" ? fontes.treinos : kind === "recorde" ? fontes.recordes : kind === "video" ? fontes.videos : [];
+  // Upload de vídeo: fluxo separado do useActionState porque precisa de
+  // XHR com progresso e não pode ir via FormData do Server Action (limite
+  // de tamanho). O vídeo vai diretamente para post-media (bucket público
+  // com RLS que verifica auth.uid() == primeiro segmento do path). Só
+  // depois de o upload concluir é que chamamos criarPost com o path.
+  async function submeterVideo(bodyTexto: string) {
+    if (!videoFicheiro || videoAEnviar) return;
+    setErroVideo(null);
+
+    if (!videoFicheiro.type.startsWith("video/")) {
+      setErroVideo("Só ficheiros de vídeo são aceites.");
+      return;
+    }
+    if (videoFicheiro.size > MAX_FEED_VIDEO_BYTES) {
+      setErroVideo("Vídeo demasiado grande (máx. 50 MB).");
+      return;
+    }
+
+    setVideoAEnviar(true);
+    try {
+      const supabase = createClient();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        setErroVideo("Sessão expirada.");
+        setVideoAEnviar(false);
+        return;
+      }
+
+      const ext = extensaoDe(videoFicheiro.type);
+      const path = `${session.user.id}/${idFicheiro()}.${ext}`;
+
+      setVideoProgresso(0);
+      await uploadComProgresso({
+        supabaseUrl,
+        anonKey,
+        token: session.access_token,
+        path,
+        blob: videoFicheiro,
+        contentType: videoFicheiro.type,
+        bucket: "post-media",
+        onProgress: setVideoProgresso,
+      });
+      setVideoProgresso(null);
+
+      // O ficheiro já está em post-media — só precisamos de registar o post
+      const fd = new FormData();
+      fd.set("kind", "video");
+      fd.set("video_path", path);
+      fd.set("body", bodyTexto);
+      const resultado = await criarPost({}, fd);
+
+      if (resultado.erro) {
+        setErroVideo(resultado.erro);
+        setVideoAEnviar(false);
+        return;
+      }
+
+      // Sucesso
+      setVideoFicheiro(null);
+      setVideoAEnviar(false);
+      setAberto(false);
+      aoPublicado();
+    } catch (e) {
+      setVideoProgresso(null);
+      setVideoAEnviar(false);
+      setErroVideo(e instanceof Error ? e.message : "Falha no envio.");
+    }
+  }
+
+  const precisaDeFonte = kind === "treino" || kind === "recorde";
+  const listaFontes =
+    kind === "treino" ? fontes.treinos : kind === "recorde" ? fontes.recordes : [];
   const semFontes = precisaDeFonte && listaFontes.length === 0;
 
   if (!aberto) {
@@ -172,13 +261,117 @@ function Composer({
     );
   }
 
+  // Formulário de vídeo: fluxo separado (upload com progresso)
+  if (kind === "video") {
+    return (
+      <div className="apex-form-registo">
+        <div className="flex items-center justify-between">
+          <p className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
+            Nova publicação
+          </p>
+          <button
+            type="button"
+            onClick={() => { setAberto(false); setVideoFicheiro(null); setErroVideo(null); setVideoProgresso(null); }}
+            className="apex-tipo-etiqueta"
+            style={{ color: COR.fraco }}
+            disabled={videoAEnviar}
+          >
+            Cancelar
+          </button>
+        </div>
+
+        <div className="apex-abas apex-abas--scroll">
+          {KINDS.map((k) => (
+            <button
+              key={k}
+              type="button"
+              className="apex-aba"
+              data-ativa={k === kind}
+              onClick={() => { setKind(k); setVideoFicheiro(null); setErroVideo(null); }}
+              disabled={videoAEnviar}
+            >
+              {KIND_LABEL[k]}
+            </button>
+          ))}
+        </div>
+
+        {/* Seleção de ficheiro e pré-visualização */}
+        <div className="flex flex-col gap-2">
+          <input
+            type="file"
+            accept="video/mp4,video/quicktime,video/*"
+            onChange={(e) => {
+              const f = e.target.files?.[0] ?? null;
+              setVideoFicheiro(f);
+              setErroVideo(null);
+            }}
+            className="apex-tipo-secundario"
+            style={{ color: COR.tinta }}
+            disabled={videoAEnviar}
+          />
+          <p className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
+            Máx. 50 MB · MP4 ou MOV
+          </p>
+          {videoFicheiro ? (
+            <video
+              src={URL.createObjectURL(videoFicheiro)}
+              controls
+              className="max-h-48 w-full bg-black"
+              style={{ borderRadius: 4 }}
+            />
+          ) : null}
+        </div>
+
+        {/* Barra de progresso durante o upload */}
+        {videoProgresso !== null ? (
+          <div className="flex flex-col gap-1">
+            <div
+              className="h-1 w-full overflow-hidden"
+              style={{ background: COR.linha, borderRadius: 2 }}
+            >
+              <div
+                className="h-full transition-all"
+                style={{ width: `${videoProgresso}%`, background: COR.tinta }}
+              />
+            </div>
+            <p className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
+              A enviar… {videoProgresso}%
+            </p>
+          </div>
+        ) : null}
+
+        {/* Texto opcional */}
+        <CorpoTextarea kind="video" disabled={videoAEnviar} id="video-body" />
+
+        {erroVideo ? (
+          <p className="apex-tipo-secundario" style={{ color: COR.erro }}>
+            {erroVideo}
+          </p>
+        ) : null}
+
+        <button
+          type="button"
+          onClick={() => {
+            const el = document.getElementById("video-body") as HTMLTextAreaElement | null;
+            submeterVideo(el?.value ?? "");
+          }}
+          disabled={videoAEnviar || !videoFicheiro}
+          className="apex-botao apex-botao--claro self-start"
+          style={{ width: "auto", padding: "10px 20px" }}
+        >
+          {videoAEnviar ? (videoProgresso !== null ? `A enviar… ${videoProgresso}%` : "A publicar…") : "Publicar"}
+        </button>
+      </div>
+    );
+  }
+
   return (
     <form
       action={(fd) => {
         // submeter(fd) TEM de ser chamado sincronamente aqui dentro — não
         // em onSubmit separado (desmonta o form antes do React despachar
         // a ação) nem atrás de um await (dá aviso do React e a submissão
-        // nem chega a acontecer). O trabalho assíncrono (redimensionar)
+        // não chega a acontecer). O trabalho assíncrono (redimensionar)
         // já vive dentro de acaoComposta, que é isso que submeter dispara.
         submeter(fd);
         setAberto(false);
@@ -213,12 +406,12 @@ function Composer({
       {precisaDeFonte ? (
         semFontes ? (
           <p className="apex-tipo-secundario" style={{ color: COR.fraco }}>
-            {kind === "treino" ? "Ainda sem treinos registados." : kind === "recorde" ? "Ainda sem recordes registados." : "Ainda sem vídeos enviados."}
+            {kind === "treino" ? "Ainda sem treinos registados." : "Ainda sem recordes registados."}
           </p>
         ) : (
           <select name="source_id" required defaultValue="">
             <option value="" disabled>
-              Escolhe {kind === "treino" ? "um treino" : kind === "recorde" ? "um recorde" : "um vídeo"}…
+              Escolhe {kind === "treino" ? "um treino" : "um recorde"}…
             </option>
             {kind === "treino"
               ? (fontes.treinos as FontePickerTreino[]).map((t) => (
@@ -226,17 +419,11 @@ function Composer({
                     {t.title} · {dataCurta(t.performedAt)} · {t.nSets} séries
                   </option>
                 ))
-              : kind === "recorde"
-                ? (fontes.recordes as FontePickerRecorde[]).map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {LIFT_LABEL[r.lift as Lift] ?? r.lift} — {formatarKg(r.valueKg)} · {dataCurta(r.recordedAt)}
-                    </option>
-                  ))
-                : (fontes.videos as FontePickerVideo[]).map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.exercise ?? "Vídeo"} · {dataCurta(v.createdAt)}
-                    </option>
-                  ))}
+              : (fontes.recordes as FontePickerRecorde[]).map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {LIFT_LABEL[r.lift as Lift] ?? r.lift} — {formatarKg(r.valueKg)} · {dataCurta(r.recordedAt)}
+                  </option>
+                ))}
           </select>
         )
       ) : null}
@@ -288,5 +475,25 @@ function Composer({
         {aEnviar ? "A publicar…" : "Publicar"}
       </button>
     </form>
+  );
+}
+
+// Textarea reutilizável para o fluxo de vídeo (fora de <form>)
+function CorpoTextarea({ kind, disabled, id }: { kind: PostKind; disabled: boolean; id: string }) {
+  return (
+    <textarea
+      id={id}
+      rows={2}
+      maxLength={2000}
+      placeholder="Diz alguma coisa sobre este vídeo (opcional)"
+      className="apex-tipo-corpo resize-none border px-3 py-2 outline-none"
+      style={{
+        borderColor: "var(--apex-cinza-linha)",
+        borderRadius: 2,
+        background: "var(--apex-branco)",
+        color: "var(--apex-tinta)",
+      }}
+      disabled={disabled}
+    />
   );
 }
