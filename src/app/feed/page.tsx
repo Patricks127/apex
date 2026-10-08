@@ -33,7 +33,14 @@ export default async function FeedPage({
   return (
     <main className="apex-ecra-claro mx-auto flex min-h-dvh w-full max-w-lg flex-col gap-4 px-5 py-8">
       <BotaoVoltar />
-      <FeedView meId={user.id} filtroInicial={filtro} posts={posts} fontes={fontes} />
+      <FeedView
+        meId={user.id}
+        filtroInicial={filtro}
+        posts={posts}
+        fontes={fontes}
+        supabaseUrl={process.env.NEXT_PUBLIC_SUPABASE_URL!}
+        anonKey={process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}
+      />
     </main>
   );
 }
