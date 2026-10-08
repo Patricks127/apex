@@ -75,44 +75,23 @@ export async function criarPost(
         }
       : null;
   } else if (kind === "video") {
-    if (!sourceId) return { erro: "Escolhe um vídeo." };
-    const { data } = await supabase
-      .from("training_videos")
-      .select("user_id, storage_path")
-      .eq("id", sourceId)
-      .maybeSingle();
-    if (!data) return { erro: "Vídeo não encontrado." };
-    // Verificação explícita ANTES de sequer tocar no storage — o vídeo
-    // original vive em private-media/{uid}/videos/..., o MESMO sítio dos
-    // vídeos de execução privados que o PT comenta. Um PT com
-    // scope_videos consegue LER essa linha (RLS legítima para
-    // acompanhamento) — isso nunca pode virar "copiar o vídeo do aluno
-    // para uma publicação pública". Sem esta verificação, o próximo
-    // passo (download) teria sucesso para um PT ligado, e o vídeo
-    // privado do aluno acabaria num post que não é dele.
-    if (data.user_id !== user.id) return { erro: "Só podes publicar vídeos teus." };
+    // Fluxo direto: o cliente fez upload do vídeo para post-media via XHR
+    // com progresso (feed-view.tsx → submeterVideo). Aqui só registamos
+    // o post — o ficheiro já está no bucket público.
+    const videoPath = String(formData.get("video_path") ?? "").trim();
+    if (!videoPath) return { erro: "Ficheiro de vídeo em falta." };
 
-    // Nunca aponta o post para private-media — copia-se para post-media
-    // (bucket público, separado) e o post referencia só a cópia. O
-    // original fica privado, sempre; publicar é um ato deliberado que
-    // cria uma cópia, tal como o post de treino copia os números da
-    // sessão em vez de a referenciar.
-    const { data: ficheiro, error: erroDownload } = await supabase.storage
-      .from("private-media")
-      .download(data.storage_path);
-    if (erroDownload || !ficheiro) return { erro: "Não foi possível preparar o vídeo para publicar." };
-
-    const extensao = extensaoDe(ficheiro.type || "video/mp4");
-    const novoPath = `${user.id}/${idFicheiro()}.${extensao}`;
-    const { error: erroUpload } = await supabase.storage
-      .from("post-media")
-      .upload(novoPath, ficheiro, { contentType: ficheiro.type || "video/mp4" });
-    if (erroUpload) return { erro: "Não foi possível publicar o vídeo." };
+    // Segurança: o primeiro segmento do path tem de ser o uid do utilizador
+    // autenticado. A RLS do bucket post-media faz a mesma verificação,
+    // mas repetimos aqui para clareza e para não depender só da RLS.
+    if (!videoPath.startsWith(`${user.id}/`)) {
+      return { erro: "Só podes publicar vídeos teus." };
+    }
 
     fonte = {
       kind: "video",
-      authorId: data.user_id,
-      video: { storagePath: novoPath },
+      authorId: user.id,
+      video: { storagePath: videoPath },
     };
   } else if (kind === "imagem") {
     // Upload DIRETO, sem fonte privada nenhuma a copiar — ao contrário do
