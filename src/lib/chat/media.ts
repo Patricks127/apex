@@ -2,7 +2,7 @@
 
 export const MAX_DIM = 1200;
 export const JPEG_QUALITY = 0.82;
-export const MAX_VIDEO_BYTES = 50 * 1024 * 1024; // 50 MB
+export const MAX_VIDEO_BYTES = 200 * 1024 * 1024; // 200 MB
 
 /**
  * Redimensiona uma imagem para no máximo `maxDim` px no lado maior e
