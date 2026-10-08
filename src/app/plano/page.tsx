@@ -41,8 +41,8 @@ export default async function PlanoPage({
       .eq("student_id", user.id)
       .order("created_at", { ascending: false })
       .overrideTypes<{ id: string; name: string; owner_id: string; owner: { name: string | null } | null }[]>(),
-    // Planos em PDF que algum PT te anexou (migração 020) — em paralelo
-    // ao plano estruturado, não em vez dele.
+    // Planos em PDF que algum PT te anexou (migração 020) — fallback quando
+    // não há plano estruturado ativo. O plano da app tem sempre prioridade.
     supabase
       .from("plan_documents")
       .select("id, file_name, size_bytes, created_at, storage_path")
@@ -65,10 +65,6 @@ export default async function PlanoPage({
     }),
   );
 
-  // Já treinaste hoje? Só interessa para o dia que É hoje na semana (ver
-  // src/lib/treino/linha-tempo.ts — "a decorrer" só existe para o dia de
-  // hoje). Casa por título com o dia real de hoje, não só "algo recente",
-  // para não marcar "feito" se o treino registado foi de outro dia.
   const indiceHoje = indiceDiaSemanaHoje();
   const diaHoje = planoAtivo?.days.days[indiceHoje];
   const tituloHoje = diaHoje && !diaHoje.rest ? diaHoje.title : null;
@@ -83,10 +79,6 @@ export default async function PlanoPage({
       feito_por: p.owner_id === user.id ? "Gerado por ti" : `PT: ${p.owner?.name ?? "—"}`,
     }));
 
-  // PDF manda: se o PT anexou um plano em ficheiro, é ESSE o plano — não se
-  // mostra o plano estruturado a competir com ele (VistaPlano, pedido para
-  // gerar/escolher, "Trocar de plano"), mesmo que exista um antigo. Ver
-  // apex-plan-documents.md.
   const temPdf = documentosComUrl.length > 0;
 
   return (
@@ -97,21 +89,19 @@ export default async function PlanoPage({
           className="apex-tipo-corpo border-b pb-4"
           style={{ color: "var(--apex-tinta)", borderColor: "var(--apex-cinza-linha)" }}
         >
-          {temPdf
-            ? "Treino registado."
-            : "Treino gravado. Quando fechares a semana, a progressão usa estes dados."}
+          Treino gravado. Quando fechares a semana, a progressão usa estes dados.
         </p>
       ) : null}
 
-      {temPdf ? (
-        <PlanoDocumentoDestaque documentos={documentosComUrl} />
-      ) : planoAtivo ? (
+      {planoAtivo ? (
         <VistaPlano
           plano={planoAtivo.days}
           nome={planoAtivo.name}
           indiceHoje={indiceHoje}
           hojeFeito={hojeFeito}
         />
+      ) : temPdf ? (
+        <PlanoDocumentoDestaque documentos={documentosComUrl} />
       ) : !perfil?.goal && outros.length === 0 ? (
         <div className="flex flex-col gap-3">
           <h1 className="apex-tipo-titulo-ecra" style={{ color: "var(--apex-tinta)" }}>
@@ -144,7 +134,7 @@ export default async function PlanoPage({
         </div>
       )}
 
-      {!temPdf && outros.length > 0 ? (
+      {outros.length > 0 ? (
         <section className="flex flex-col gap-2 border-t pt-4" style={{ borderColor: "var(--apex-cinza-linha)" }}>
           <h2 className="apex-tipo-titulo-seccao" style={{ marginTop: 0, color: "var(--apex-tinta)" }}>
             Trocar de plano
