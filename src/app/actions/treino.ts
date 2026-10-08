@@ -371,7 +371,7 @@ export async function gravarTreino(
   // validarLogsExercicio. Não bloqueia o registo do treino se falhar: a
   // sessão e o check-in (o que já é usado — /plano, avancarSemana) já
   // gravaram com sucesso a esta altura.
-  const logs = validarLogsExercicio(String(formData.get("logs_json") ?? "[]"));
+  const logs = validarLogsExercicio(String(formData.get("logs_json") ?? "[]"))idarLogsExercicio(String(formData.get("logs_json") ?? "[]"));
   if (logs.length > 0) {
     const { error: erroLogs } = await supabase.from("exercise_logs").insert(
       logs.map((l) => ({
@@ -518,15 +518,19 @@ export async function avancarSemana(
 /** O formato que o editor (client) manda no campo escondido `plano_json`. */
 type ExercicioEditorJSON = {
   exercicioId: string;
+  tipo: string;
   series: number;
   reps: number;
   carga: number | null;
+  durationMin: number | null;
+  distanceKm: number | null;
   nota: string;
 };
 type DiaEditorJSON = { nome: string; exercicios: ExercicioEditorJSON[] };
 
 const MAX_DIAS_PT = 6;
 const MAX_EXERCICIOS_DIA_PT = 12;
+const TIPOS_VALIDOS = ["strength", "cardio", "running", "mobility"] as const;
 
 export type EstadoAtribuirPlano = {
   erro?: string;
@@ -561,16 +565,47 @@ function validarPlanoPt(bruto: unknown): { dias: DiaEditorJSON[] } | { erro: str
       const exercicio = EXERCICIO_POR_ID.get(exercicioId);
       if (!exercicio) return { erro: `"${nome}": exercício desconhecido.` };
 
+      // Tipo — retrocompat: ausente => strength
+      const tipoRaw = typeof e.tipo === "string" ? e.tipo : "strength";
+      const tipo = TIPOS_VALIDOS.includes(tipoRaw as (typeof TIPOS_VALIDOS)[number]) ? tipoRaw : "strength";
+      const isStrength = tipo === "strength";
+      const isMobility = tipo === "mobility";
+      const isCardio = tipo === "cardio" || tipo === "running";
+
+      // Séries e reps: obrigatórios apenas para força/mobilidade
       const series = Number(e.series);
-      if (!Number.isInteger(series) || series < 1 || series > 10) {
-        return { erro: `${exercicio.nome}: séries tem de ser um número entre 1 e 10.` };
-      }
       const reps = Number(e.reps);
-      if (!Number.isInteger(reps) || reps < 1 || reps > 50) {
-        return { erro: `${exercicio.nome}: reps tem de ser um número entre 1 e 50.` };
+      if (isStrength || isMobility) {
+        if (!Number.isInteger(series) || series < 1 || series > 10) {
+          return { erro: `${exercicio.nome}: séries tem de ser um número entre 1 e 10.` };
+        }
+        if (!Number.isInteger(reps) || reps < 1 || reps > 50) {
+          return { erro: `${exercicio.nome}: reps tem de ser um número entre 1 e 50.` };
+        }
       }
+
+      // Duração: obrigatória para cardio/corrida
+      let durationMin: number | null = null;
+      if (isCardio) {
+        const dur = Number(e.durationMin);
+        if (!Number.isInteger(dur) || dur < 1 || dur > 600) {
+          return { erro: `${exercicio.nome}: duração tem de ser em minutos (1–600).` };
+        }
+        durationMin = dur;
+      }
+
+      // Distância: opcional, só para corrida
+      let distanceKm: number | null = null;
+      if (tipo === "running" && e.distanceKm !== null && e.distanceKm !== undefined && e.distanceKm !== "") {
+        const km = lerDecimal(String(e.distanceKm));
+        if (!Number.isFinite(km) || km < 0 || km > 1000) {
+          return { erro: `${exercicio.nome}: distância inválida.` };
+        }
+        distanceKm = Math.round(km * 10) / 10;
+      }
+
       let carga: number | null = null;
-      if (e.carga !== null && e.carga !== undefined && e.carga !== "") {
+      if (isStrength && e.carga !== null && e.carga !== undefined && e.carga !== "") {
         const n = lerDecimal(String(e.carga)); // "72,5" ou "72.5"
         if (!Number.isFinite(n) || n < 0 || n > 500) {
           return { erro: `${exercicio.nome}: carga inválida.` };
@@ -579,7 +614,16 @@ function validarPlanoPt(bruto: unknown): { dias: DiaEditorJSON[] } | { erro: str
       }
       const nota = typeof e.nota === "string" ? e.nota.trim().slice(0, 200) : "";
 
-      exercicios.push({ exercicioId, series, reps, carga, nota });
+      exercicios.push({
+        exercicioId,
+        tipo,
+        series: isStrength || isMobility ? series : 1,
+        reps: isStrength || isMobility ? reps : 0,
+        carga,
+        durationMin,
+        distanceKm,
+        nota,
+      });
     }
     dias.push({ nome, exercicios });
   }
@@ -599,16 +643,24 @@ function planoPtParaGerado(dias: DiaEditorJSON[], ptNome: string): PlanoGerado {
     }
     const exercises: ExercicioGerado[] = d.exercicios.map((e) => {
       const ex = EXERCICIO_POR_ID.get(e.exercicioId)!;
+      const isCardio = e.tipo === "cardio" || e.tipo === "running";
       return {
         name: ex.nome,
         swap: null,
-        sets: Array.from({ length: e.series }, () => ({ w: e.carga, reps: e.reps, rpe: "—" })),
-        rest: "90 s",
+        sets: isCardio
+          ? [{ w: null, reps: 0, rpe: "—" }]
+          : Array.from({ length: e.series }, () => ({ w: e.carga, reps: e.reps, rpe: "—" })),
+        rest: isCardio ? "—" : "90 s",
         muscle: ex.primarios[0] ? MUSCULO_LABEL[ex.primarios[0].musculo] : null,
         bw: e.carga == null,
         substituted: false,
         nota: e.nota || undefined,
         exercicioId: e.exercicioId,
+        // Campos extra para cardio/corrida — armazenados no JSONB existente
+        // (backwards-compatible — campos inexistentes são simplesmente undefined)
+        ...(e.tipo ? { tipo: e.tipo } : {}),
+        ...(e.durationMin != null ? { durationMin: e.durationMin } : {}),
+        ...(e.distanceKm != null ? { distanceKm: e.distanceKm } : {}),
       };
     });
     diasGerados.push({ dayIndex: i, dayName: DAY_NAMES[i], dayShort: DAY_SHORT[i], rest: false, title: d.nome, exercises });
@@ -670,6 +722,7 @@ export async function atribuirPlanoPt(
     .limit(1)
     .maybeSingle();
 
+  let planId: string;
   if (existente) {
     const { error } = await supabase
       .from("training_plans")
@@ -677,17 +730,29 @@ export async function atribuirPlanoPt(
       .eq("id", existente.id)
       .eq("owner_id", user.id);
     if (error) return { erro: BLOQUEIO_RLS };
+    planId = existente.id;
   } else {
-    const { error } = await supabase.from("training_plans").insert({
-      owner_id: user.id,
-      student_id: alunoId,
-      name: nome,
-      days: plano,
-      progression: initProgression(),
-      is_active: false, // o aluno é quem escolhe seguir este plano
-    });
-    if (error) return { erro: BLOQUEIO_RLS };
+    const { data: novo, error } = await supabase
+      .from("training_plans")
+      .insert({
+        owner_id: user.id,
+        student_id: alunoId,
+        name: nome,
+        days: plano,
+        progression: initProgression(),
+        is_active: false,
+      })
+      .select("id")
+      .single();
+    if (error || !novo) return { erro: BLOQUEIO_RLS };
+    planId = novo.id;
   }
+
+  // Auto-ativar o plano para o aluno — o PT gravou, o aluno começa a seguir
+  // de imediato sem ter de ir a "Trocar de plano".
+  await supabase
+    .from("active_plans")
+    .upsert({ student_id: alunoId, plan_id: planId }, { onConflict: "student_id" });
 
   await notificar(supabase, {
     userId: alunoId,
