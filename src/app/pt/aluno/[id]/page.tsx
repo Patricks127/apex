@@ -143,12 +143,12 @@ export default async function FichaAlunoPage({
         exercicios: d.exercises!.map((e) => ({
           exercicioId: e.exercicioId ?? "",
           nome: e.name,
-          tipo: (e as Record<string, unknown>).tipo as string ?? "strength",
+          tipo: (e as unknown as Record<string, unknown>).tipo as string ?? "strength",
           series: e.sets.length,
           reps: e.sets[0]?.reps ?? 8,
           carga: e.sets[0]?.w ?? null,
-          durationMin: (e as Record<string, unknown>).durationMin as number ?? null,
-          distanceKm: (e as Record<string, unknown>).distanceKm as number ?? null,
+          durationMin: (e as unknown as Record<string, unknown>).durationMin as number ?? null,
+          distanceKm: (e as unknown as Record<string, unknown>).distanceKm as number ?? null,
           nota: e.nota ?? "",
         })),
       }));
