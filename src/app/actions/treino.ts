@@ -371,7 +371,7 @@ export async function gravarTreino(
   // validarLogsExercicio. Não bloqueia o registo do treino se falhar: a
   // sessão e o check-in (o que já é usado — /plano, avancarSemana) já
   // gravaram com sucesso a esta altura.
-  const logs = validarLogsExercicio(String(formData.get("logs_json") ?? "[]"))idarLogsExercicio(String(formData.get("logs_json") ?? "[]"));
+  const logs = validarLogsExercicio(String(formData.get("logs_json") ?? "[]"));
   if (logs.length > 0) {
     const { error: erroLogs } = await supabase.from("exercise_logs").insert(
       logs.map((l) => ({
