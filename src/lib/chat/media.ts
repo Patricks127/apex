@@ -37,14 +37,34 @@ export async function redimensionarImagem(
   });
 }
 
+/**
+ * Normaliza o MIME type de um vídeo: remove parâmetros de codec
+ * (ex: "video/mp4; codecs=avc1.42E01E" → "video/mp4") e faz fallback
+ * para video/mp4 em tipos não-standard (video/3gpp, video/x-m4v…).
+ * O Supabase Storage rejeita MIME types com parâmetros ou não listados.
+ */
+export function mimeNormalizado(raw: string): string {
+  const base = raw.split(";")[0].trim().toLowerCase();
+  if (base === "video/mp4") return "video/mp4";
+  if (base === "video/quicktime") return "video/quicktime";
+  if (base === "video/webm") return "video/webm";
+  // Fallback: tipos menos comuns (3gpp, mpeg, x-m4v…) →
+  // bucket permite video/mp4 e os bytes reproduzem igual.
+  if (base.startsWith("video/")) return "video/mp4";
+  // Imagens e outros — devolve a base sem parâmetros
+  return base;
+}
+
 /** Extensão para o caminho de storage a partir do MIME. */
 export function extensaoDe(mime: string): string {
-  if (mime === "image/jpeg" || mime === "image/jpg") return "jpg";
-  if (mime === "image/png") return "png";
-  if (mime === "image/webp") return "webp";
-  if (mime === "video/mp4") return "mp4";
-  if (mime === "video/quicktime") return "mov";
-  if (mime === "video/webm") return "webm";
+  const base = mime.split(";")[0].trim().toLowerCase();
+  if (base === "image/jpeg" || base === "image/jpg") return "jpg";
+  if (base === "image/png") return "png";
+  if (base === "image/webp") return "webp";
+  if (base === "video/mp4") return "mp4";
+  if (base === "video/quicktime") return "mov";
+  if (base === "video/webm") return "webm";
+  if (base.startsWith("video/")) return "mp4"; // fallback para tipos não-standard
   return "bin";
 }
 
@@ -86,10 +106,15 @@ export function uploadComProgresso(opts: {
         opts.onProgress(Math.round((e.loaded / e.total) * 100));
       }
     };
-    xhr.onload = () =>
-      xhr.status >= 200 && xhr.status < 300
-        ? resolve()
-        : reject(new Error(`Upload falhou (${xhr.status}).`));
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve();
+      } else {
+        // Inclui o corpo da resposta para diagnóstico mais fácil
+        const detalhe = xhr.responseText ? ` — ${xhr.responseText.slice(0, 300)}` : "";
+        reject(new Error(`Upload falhou (${xhr.status})${detalhe}.`));
+      }
+    };
     xhr.onerror = () => reject(new Error("Falha de rede no upload."));
     xhr.send(opts.blob);
   });

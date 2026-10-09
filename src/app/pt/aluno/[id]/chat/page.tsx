@@ -47,7 +47,7 @@ export default async function ChatComAlunoPage({
   const { data: mensagens } = await supabase
     .from("messages")
     .select(
-      "id, sender_id, body, media_path, media_kind, is_evolution, weight_kg, measurement, read_at, created_at",
+      "id, sender_id, body, media_path, media_kind, is_evolution, weight_kg, measurement, ai_analysis, read_at, created_at",
     )
     .eq("link_id", link.id)
     .order("created_at", { ascending: true })

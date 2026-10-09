@@ -10,7 +10,9 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { BotaoVoltar } from "@/app/_ui/design/botao-voltar";
 import {
+  analisarFotoEvolucao,
   assinarMedia,
+  compararFotosEvolucao,
   enviarMensagem,
   marcarLidas,
   registarMedia,
@@ -20,6 +22,7 @@ import {
   uploadComProgresso,
   extensaoDe,
   idFicheiro,
+  mimeNormalizado,
   MAX_VIDEO_BYTES,
 } from "@/lib/chat/media";
 
@@ -34,6 +37,7 @@ export type Mensagem = {
   is_evolution: boolean;
   weight_kg: number | null;
   measurement: string | null;
+  ai_analysis: string | null;
   read_at: string | null;
   created_at: string;
 };
@@ -118,7 +122,7 @@ export function ChatView({
     const { data } = await supabase
       .from("messages")
       .select(
-        "id, sender_id, body, media_path, media_kind, is_evolution, weight_kg, measurement, read_at, created_at",
+        "id, sender_id, body, media_path, media_kind, is_evolution, weight_kg, measurement, ai_analysis, read_at, created_at",
       )
       .eq("link_id", linkId)
       .order("created_at", { ascending: true })
@@ -244,6 +248,10 @@ export function ChatView({
           itens={evolucao}
           urls={urls}
           podeVer={perspetiva === "aluno" || scopeEvolucao}
+          ehPt={perspetiva === "pt"}
+          aoAnalisar={(id, texto) =>
+            setMsgs((lista) => lista.map((m) => (m.id === id ? { ...m, ai_analysis: texto } : m)))
+          }
         />
       )}
     </div>
@@ -367,10 +375,14 @@ function TimelineEvolucao({
   itens,
   urls,
   podeVer,
+  ehPt,
+  aoAnalisar,
 }: {
   itens: Mensagem[];
   urls: Record<string, string | null>;
   podeVer: boolean;
+  ehPt: boolean;
+  aoAnalisar: (id: string, texto: string) => void;
 }) {
   return (
     <div className="apex-chat-corpo">
@@ -385,8 +397,9 @@ function TimelineEvolucao({
         </p>
       ) : (
         <div className="flex flex-col">
-          {itens.map((m) => (
+          {itens.map((m, i) => (
             <div key={m.id} className="flex flex-col gap-2 border-b py-4" style={{ borderColor: COR.linha }}>
+              {ehPt && i > 0 ? <ComparacaoIA anterior={itens[i - 1]} atual={m} /> : null}
               <div className="flex items-baseline justify-between">
                 <span className="apex-tipo-nome-exercicio" style={{ color: COR.tinta }}>
                   {new Date(m.created_at).toLocaleDateString("pt-PT", {
@@ -403,10 +416,132 @@ function TimelineEvolucao({
                 </span>
               </div>
               {m.media_path ? <MediaEvolucao path={m.media_path} url={urls[m.media_path]} /> : null}
+              {m.media_kind === "image" ? (
+                <AnaliseIA m={m} ehPt={ehPt} aoAnalisar={aoAnalisar} />
+              ) : null}
             </div>
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Análise IA (o PT pede; o atleta só vê o resultado)
+// ---------------------------------------------------------------------------
+
+function CaixaIA({ titulo, texto }: { titulo: string; texto: string }) {
+  return (
+    <div className="flex flex-col gap-1 border-l-2 px-3 py-2" style={{ borderColor: COR.tinta }}>
+      <span className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
+        {titulo}
+      </span>
+      <p className="apex-tipo-secundario whitespace-pre-wrap" style={{ color: COR.tinta }}>
+        {texto}
+      </p>
+    </div>
+  );
+}
+
+function BotaoIA({
+  rotulo,
+  aCorrer,
+  disabled,
+  onClick,
+}: {
+  rotulo: string;
+  aCorrer: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled || aCorrer}
+      className="apex-botao apex-botao--claro"
+      style={{ width: "auto", alignSelf: "flex-start", padding: "8px 16px" }}
+    >
+      {aCorrer ? "A analisar…" : rotulo}
+    </button>
+  );
+}
+
+function AnaliseIA({
+  m,
+  ehPt,
+  aoAnalisar,
+}: {
+  m: Mensagem;
+  ehPt: boolean;
+  aoAnalisar: (id: string, texto: string) => void;
+}) {
+  const [aCorrer, setACorrer] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  if (m.ai_analysis) return <CaixaIA titulo="Análise IA" texto={m.ai_analysis} />;
+  if (!ehPt) return null;
+
+  async function analisar() {
+    setACorrer(true);
+    setErro(null);
+    const r = await analisarFotoEvolucao(m.id);
+    setACorrer(false);
+    if (r.ok && r.texto) aoAnalisar(m.id, r.texto);
+    else setErro(r.erro ?? "Falha na análise.");
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <BotaoIA rotulo="Analisar com IA" aCorrer={aCorrer} onClick={analisar} />
+      {erro ? (
+        <p className="apex-tipo-secundario" style={{ color: COR.erro }}>
+          {erro}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/** Comparação com a foto anterior — não fica gravada, é só desta sessão. */
+function ComparacaoIA({ anterior, atual }: { anterior: Mensagem; atual: Mensagem }) {
+  const [aCorrer, setACorrer] = useState(false);
+  const [texto, setTexto] = useState<string | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+
+  if (anterior.media_kind !== "image" || atual.media_kind !== "image") return null;
+  if (texto) return <CaixaIA titulo="Comparação com a anterior" texto={texto} />;
+
+  const prontas = !!anterior.ai_analysis && !!atual.ai_analysis;
+
+  async function comparar() {
+    setACorrer(true);
+    setErro(null);
+    const r = await compararFotosEvolucao(anterior.id, atual.id);
+    setACorrer(false);
+    if (r.ok && r.texto) setTexto(r.texto);
+    else setErro(r.erro ?? "Falha na comparação.");
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <BotaoIA
+        rotulo="Comparar com a anterior"
+        aCorrer={aCorrer}
+        disabled={!prontas}
+        onClick={comparar}
+      />
+      {!prontas ? (
+        <p className="apex-tipo-etiqueta" style={{ color: COR.fraco }}>
+          Analisa primeiro as duas fotos.
+        </p>
+      ) : null}
+      {erro ? (
+        <p className="apex-tipo-secundario" style={{ color: COR.erro }}>
+          {erro}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -593,7 +728,7 @@ function PainelMedia({
         return;
       }
       if (ehVideo && file.size > MAX_VIDEO_BYTES) {
-        setErro("Vídeo demasiado grande (máx. 200 MB).");
+        setErro(`Vídeo demasiado grande (máx. ${MAX_VIDEO_BYTES / 1024 / 1024} MB).`);
         return;
       }
 
@@ -602,8 +737,8 @@ function PainelMedia({
       let ext: string;
       if (ehVideo) {
         blob = file;
-        contentType = file.type;
-        ext = extensaoDe(file.type);
+        contentType = mimeNormalizado(file.type);
+        ext = extensaoDe(contentType);
       } else {
         blob = await redimensionarImagem(file);
         contentType = "image/jpeg";
