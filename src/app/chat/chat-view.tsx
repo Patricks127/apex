@@ -237,6 +237,7 @@ export function ChatView({
             linkId={linkId}
             meId={meId}
             podeEnviarMedia={true}
+            podeEnviarEvolucao={perspetiva === "aluno"}
             supabase={supabase}
             supabaseUrl={supabaseUrl}
             anonKey={anonKey}
@@ -576,6 +577,7 @@ function Composer({
   linkId,
   meId,
   podeEnviarMedia,
+  podeEnviarEvolucao,
   supabase,
   supabaseUrl,
   anonKey,
@@ -584,6 +586,8 @@ function Composer({
   linkId: string;
   meId: string;
   podeEnviarMedia: boolean;
+  /** Fotos de evolução são só do atleta — o PT envia imagens/vídeos normais. */
+  podeEnviarEvolucao: boolean;
   supabase: Cliente;
   supabaseUrl: string;
   anonKey: string;
@@ -643,15 +647,17 @@ function Composer({
             </button>
             {menu ? (
               <div className="apex-composer__menu apex-tipo-corpo">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setModo("evolucao");
-                    setMenu(false);
-                  }}
-                >
-                  Foto de evolução
-                </button>
+                {podeEnviarEvolucao ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModo("evolucao");
+                      setMenu(false);
+                    }}
+                  >
+                    Foto de evolução
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => {

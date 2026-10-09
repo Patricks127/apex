@@ -93,6 +93,9 @@ export async function registarMedia(
 
   const link = await linkPertenceAoUtilizador(supabase, linkId, user.id);
   if (!link) return { erro: "Não tens uma ligação ativa." };
+  if (isEvolution && link.perspetiva !== "aluno") {
+    return { erro: "As fotos de evolução são enviadas pelo atleta." };
+  }
 
   // O caminho TEM de ser do próprio, na pasta certa.
   const prefixo = `${user.id}/${isEvolution ? "evolucao" : "chat"}/`;

@@ -1,4 +1,4 @@
--- 027_messages_ai_analysis_guard.sql — POR APLICAR (rever antes)
+-- 027_messages_ai_analysis_guard.sql — APLICADA a 2026-10-09 (versão 20261009141340)
 --
 -- Cache da análise IA de uma foto de evolução (server action
 -- analisarFotoEvolucao em src/app/actions/chat.ts).
